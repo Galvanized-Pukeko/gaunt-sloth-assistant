@@ -1,10 +1,10 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'url';
 import { Command } from 'commander';
-import { ProgressIndicator } from '#src/utils/utils.js';
 import { createInterface, type Interface as ReadLineInterface } from 'node:readline/promises';
 import { displayInfo, displayWarning } from './consoleUtils.js';
-import { createWriteStream, type WriteStream } from 'node:fs';
+import { createWriteStream, readFileSync, type WriteStream } from 'node:fs';
+import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
 /**
  * This file contains all system functions and objects that are globally available
@@ -212,3 +212,26 @@ export const warn = (message: string): void => console.warn(message);
 export const info = (message: string): void => console.info(message);
 export const debug = (message: string): void => console.debug(message);
 export const stream = (chunk: string): boolean => process.stdout.write(chunk);
+export async function execAsync(command: string): Promise<string> {
+  const { exec } = await import('node:child_process');
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      if (stderr) {
+        reject(new Error(stderr));
+        return;
+      }
+      resolve(stdout.trim());
+    });
+  });
+}
+
+export function getSlothVersion(): string {
+  const installDir = getInstallDir();
+  const jsonPath = resolve(installDir, 'package.json');
+  const projectJson = readFileSync(jsonPath, { encoding: 'utf8' });
+  return JSON.parse(projectJson).version;
+}

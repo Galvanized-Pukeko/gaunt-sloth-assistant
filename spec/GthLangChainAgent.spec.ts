@@ -25,13 +25,13 @@ vi.mock('#src/builtInToolsConfig.js', () => ({
   getDefaultTools: configMock.getDefaultTools,
 }));
 
-const progressIndicatorInstanceMock = {
+const ProgressIndicatorMock = vi.fn();
+const ProgressIndicatorInstanceMock = {
   stop: vi.fn(),
+  indicate: vi.fn(),
 };
-const progressIndicatorMock = vi.fn().mockImplementation(() => progressIndicatorInstanceMock);
-vi.mock('#src/utils/utils.js', () => ({
-  ProgressIndicator: progressIndicatorMock,
-  formatToolCalls: vi.fn((toolCalls) => toolCalls.map((tc: any) => `${tc.name}()`).join(', ')),
+vi.mock('#src/utils/ProgressIndicator.js', () => ({
+  ProgressIndicator: ProgressIndicatorMock,
 }));
 
 const multiServerMCPClientMock = vi.fn();
@@ -63,7 +63,7 @@ describe('GthLangChainAgent', () => {
 
     systemUtilsMock.getProjectDir.mockReturnValue('/test/dir');
     multiServerMCPClientMock.mockImplementation(() => mcpClientInstanceMock);
-    progressIndicatorMock.mockImplementation(() => progressIndicatorInstanceMock);
+    ProgressIndicatorMock.mockImplementation(() => ProgressIndicatorInstanceMock);
 
     // Setup config mocks
     configMock.getDefaultTools.mockResolvedValue([]);
@@ -286,8 +286,7 @@ describe('GthLangChainAgent', () => {
         'warning',
         expect.stringContaining('Something went wrong')
       );
-      expect(progressIndicatorMock).toHaveBeenCalled();
-      expect(progressIndicatorInstanceMock.stop).toHaveBeenCalled();
+      expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
       expect(result).toBe('');
     });
 

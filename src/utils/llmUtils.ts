@@ -8,6 +8,8 @@ import {
 } from '#src/constants.js';
 import { getGslothConfigReadPath, readFileFromInstallDir } from '#src/utils/fileUtils.js';
 import { existsSync, readFileSync } from 'node:fs';
+import { debugLog } from '#src/utils/debugUtils.js';
+import { truncateString } from '#src/utils/stringUtils.js';
 
 /**
  * Creates new runnable config.
@@ -95,4 +97,41 @@ export async function executeHooks<T extends (...args: any[]) => Promise<void>>(
   } else {
     await hooks(...args);
   }
+}
+/**
+ * Format tool call arguments in a human-readable way
+ */
+export function formatToolCallArgs(args: Record<string, unknown>): string {
+  return Object.entries(args)
+    .map(([key, value]) => {
+      let displayValue: string;
+      if (typeof value === 'string') {
+        displayValue = value;
+      } else if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+        displayValue = JSON.stringify(value);
+      } else {
+        displayValue = String(value);
+      }
+      return `${key}: ${truncateString(displayValue, 50)}`;
+    })
+    .join(', ');
+}
+
+/**
+ * Format multiple tool calls for display (matches Invocation.ts behavior)
+ */
+export function formatToolCalls(
+  toolCalls: Array<{ name: string; args?: Record<string, unknown> }>,
+  maxLength = 255
+): string {
+  const formatted = toolCalls
+    .map((toolCall) => {
+      debugLog(JSON.stringify(toolCall));
+      const formattedArgs = formatToolCallArgs(toolCall.args || {});
+      return `${toolCall.name}(${formattedArgs})`;
+    })
+    .join(', ');
+
+  // Truncate to maxLength characters if needed
+  return formatted.length > maxLength ? formatted.slice(0, maxLength - 3) + '...' : formatted;
 }

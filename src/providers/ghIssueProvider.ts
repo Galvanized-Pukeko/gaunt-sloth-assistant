@@ -1,6 +1,7 @@
 import { displayWarning } from '#src/utils/consoleUtils.js';
-import { execAsync, ProgressIndicator } from '#src/utils/utils.js';
 import type { ProviderConfig } from './types.js';
+import { execAsync } from '#src/utils/systemUtils.js';
+import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
 /**
  * Gets GitHub issue using GitHub CLI

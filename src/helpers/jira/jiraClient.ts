@@ -1,6 +1,7 @@
 import { env } from '#src/utils/systemUtils.js';
 import type { JiraConfig } from '#src/providers/types.js';
-import { ProgressIndicator } from '#src/utils/utils.js';
+
+import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
 export function getJiraCredentials(config: Partial<JiraConfig> | null): JiraConfig {
   if (!config) {

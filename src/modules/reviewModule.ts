@@ -9,11 +9,11 @@ import {
   initSessionLogging,
   stopSessionLogging,
 } from '#src/utils/consoleUtils.js';
-import { ProgressIndicator } from '#src/utils/utils.js';
 import { appendToFile, getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
+import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
 export async function review(
   source: string,

@@ -6,7 +6,7 @@ This document outlines a phased approach to reorganize utility files in the Gaun
 ## Current State Analysis
 
 ### Existing Utility Files
-1. **`src/utils.ts`** (342 lines)
+1. **`src/stringUtils.ts`** (342 lines)
    - File I/O operations
    - Date/string formatting utilities
    - Tool formatting functions
@@ -70,7 +70,7 @@ This document outlines a phased approach to reorganize utility files in the Gaun
 #### Actions:
 1. Create `src/fileUtils.ts` containing:
    ```typescript
-   // From utils.ts
+   // From stringUtils.ts
    - readFileFromProjectDir()
    - readFileFromInstallDir()
    - writeFileIfNotExistsWithMessages()
@@ -112,7 +112,7 @@ This document outlines a phased approach to reorganize utility files in the Gaun
    - getInstallDir()
    - setEntryPoint()
    
-   // From utils.ts
+   // From stringUtils.ts
    - toFileSafeString()
    - fileSafeLocalDate()
    - generateStandardFileName()
@@ -190,7 +190,7 @@ This document outlines a phased approach to reorganize utility files in the Gaun
 
 2. Create `src/formatUtils.ts`:
    ```typescript
-   // Move from utils.ts
+   // Move from stringUtils.ts
    - truncateString()
    - formatToolCallArgs()
    - formatToolCall()
@@ -201,7 +201,7 @@ This document outlines a phased approach to reorganize utility files in the Gaun
 
 3. Create `src/processUtils.ts`:
    ```typescript
-   // Move from utils.ts
+   // Move from stringUtils.ts
    - spawnCommand()
    - execAsync()
    - ProgressIndicator class
@@ -227,7 +227,7 @@ This document outlines a phased approach to reorganize utility files in the Gaun
 1. Remove all deprecated files:
    - Delete `globalConfigUtils.ts`
    - Delete `debugUtils.ts`
-   - Clean up old exports from `utils.ts`
+   - Clean up old exports from `stringUtils.ts`
 
 2. Create specialized utilities:
    ```typescript

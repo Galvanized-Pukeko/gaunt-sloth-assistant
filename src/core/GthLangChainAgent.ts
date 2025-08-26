@@ -6,7 +6,6 @@ import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.j
 import { createAuthProviderAndAuthenticate } from '#src/mcp/OAuthClientProviderImpl.js';
 import type { Message } from '#src/modules/types.js';
 import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
-import { formatToolCalls, ProgressIndicator } from '#src/utils/utils.js';
 import { isAIMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
@@ -15,6 +14,8 @@ import { BaseCheckpointSaver } from '@langchain/langgraph';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
+import { formatToolCalls } from '#src/utils/llmUtils.js';
+import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 

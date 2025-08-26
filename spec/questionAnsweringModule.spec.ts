@@ -45,16 +45,14 @@ const consoleUtilsMock = {
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 // Mock utils module
-const utilsMock = {
-  ProgressIndicator: vi.fn(),
-  createSystemMessage: vi.fn(),
-  createHumanMessage: vi.fn(),
-  executeHooks: vi.fn().mockResolvedValue(undefined),
+const ProgressIndicatorMock = vi.fn();
+const ProgressIndicatorInstanceMock = {
+  stop: vi.fn(),
+  indicate: vi.fn(),
 };
-utilsMock.ProgressIndicator.prototype.stop = vi.fn();
-utilsMock.ProgressIndicator.prototype.indicate = vi.fn();
-
-vi.mock('#src/utils/utils.js', () => utilsMock);
+vi.mock('#src/utils/ProgressIndicator.js', () => ({
+  ProgressIndicator: ProgressIndicatorMock,
+}));
 
 // Mock utils module
 const fileUtilsMock = {
@@ -118,6 +116,8 @@ describe('questionAnsweringModule', () => {
       return '';
     });
 
+    ProgressIndicatorMock.mockImplementation(() => ProgressIndicatorInstanceMock);
+
     // Setup pathUtils mocks
     fileUtilsMock.getGslothFilePath.mockReturnValue('test-file-path.md');
     fileUtilsMock.gslothDirExists.mockReturnValue(false);
@@ -159,7 +159,7 @@ describe('questionAnsweringModule', () => {
     expect(consoleUtilsMock.displaySuccess).toHaveBeenCalled();
 
     // Verify that ProgressIndicator.stop() was called
-    expect(utilsMock.ProgressIndicator.prototype.stop).toHaveBeenCalled();
+    expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
   });
 
   it('Should handle file write errors with prop drilling', async () => {
@@ -193,7 +193,7 @@ describe('questionAnsweringModule', () => {
     expect(consoleUtilsMock.displayError).toHaveBeenCalledWith('File write error');
 
     // Verify that ProgressIndicator.stop() was called even with error
-    expect(utilsMock.ProgressIndicator.prototype.stop).toHaveBeenCalled();
+    expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
   });
 
   // Specific test to verify that prop drilling works with different config objects
