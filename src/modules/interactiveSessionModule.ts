@@ -9,7 +9,7 @@ import {
   stopSessionLogging,
 } from '#src/utils/consoleUtils.js';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
-import { getCommandOutputFilePath } from '#src/utils/pathUtils.js';
+import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import {
   createInterface,
   error,

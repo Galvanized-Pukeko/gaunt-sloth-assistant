@@ -279,7 +279,7 @@ import { readFileFromProjectDir } from '#src/fileUtils.js';
 import { getGlobalGslothDir } from '#src/utils/globalConfigUtils.js';
 
 // New import
-import { getGlobalGslothDir } from '#src/utils/pathUtils.js';
+import { getGlobalGslothDir } from '#src/utils/fileUtils.js';
 ```
 
 ### For Release 3:

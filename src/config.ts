@@ -23,7 +23,7 @@ import {
 } from '#src/constants.js';
 import type { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import type { GthAgentInterface } from '#src/core/types.js';
-import { getGslothConfigReadPath, getGslothConfigWritePath } from '#src/utils/pathUtils.js';
+import { getGslothConfigReadPath, getGslothConfigWritePath } from '#src/utils/fileUtils.js';
 import type { Message } from '#src/modules/types.js';
 import { JiraConfig } from '#src/providers/types.js';
 import { error, exit, isTTY, setUseColour } from '#src/utils/systemUtils.js';

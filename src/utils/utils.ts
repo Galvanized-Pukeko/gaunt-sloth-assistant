@@ -111,48 +111,6 @@ export function readFileSyncWithMessages(
   }
 }
 
-interface SpawnOutput {
-  stdout: string;
-  stderr: string;
-}
-
-export async function spawnCommand(
-  command: string,
-  args: string[],
-  progressMessage: string,
-  successMessage: string
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const progressIndicator = new ProgressIndicator(progressMessage, true);
-    const out: SpawnOutput = { stdout: '', stderr: '' };
-    const spawned = spawn(command, args);
-
-    spawned.stdout.on('data', async (stdoutChunk) => {
-      progressIndicator.indicate();
-      out.stdout += stdoutChunk.toString();
-    });
-
-    spawned.stderr.on('data', (err) => {
-      progressIndicator.indicate();
-      out.stderr += err.toString();
-    });
-
-    spawned.on('error', (err) => {
-      reject(err.toString());
-    });
-
-    spawned.on('close', (code) => {
-      if (code === 0) {
-        displaySuccess(successMessage);
-        resolve(out.stdout);
-      } else {
-        displayError(`Failed to spawn command with code ${code}`);
-        reject(out.stdout + ' ' + out.stderr);
-      }
-    });
-  });
-}
-
 export function getSlothVersion(): string {
   // TODO figure out if this can be injected with TS
   const installDir = getInstallDir();
@@ -222,18 +180,6 @@ export function formatToolCallArgs(args: Record<string, unknown>): string {
 }
 
 /**
- * Format a single tool call with name and arguments
- */
-export function formatToolCall(
-  toolName: string,
-  args: Record<string, unknown>,
-  prefix = ''
-): string {
-  const formattedArgs = formatToolCallArgs(args);
-  return `${prefix}${toolName}(${formattedArgs})`;
-}
-
-/**
  * Format multiple tool calls for display (matches Invocation.ts behavior)
  */
 export function formatToolCalls(
@@ -259,18 +205,6 @@ interface LLMOutput {
 }
 
 /**
- * Extracts the content of the last message from an LLM response
- * @param output - The output from the LLM containing messages
- * @returns The content of the last message
- */
-export function extractLastMessageContent(output: LLMOutput): string {
-  if (!output || !output.messages || !output.messages.length) {
-    return '';
-  }
-  return output.messages[output.messages.length - 1].content;
-}
-
-/**
  * Dynamically imports a module from a file path from the outside of the installation dir
  * @returns A promise that resolves to the imported module
  */
@@ -280,13 +214,6 @@ export function importExternalFile(
   const configFileUrl = url.pathToFileURL(filePath).toString();
   return import(configFileUrl);
 }
-
-/**
- * Alias for importExternalFile for backward compatibility with tests
- * @param filePath - The path to the file to import
- * @returns A promise that resolves to the imported module
- */
-export const importFromFilePath = importExternalFile;
 
 /**
  * Reads multiple files from the current directory and returns their contents

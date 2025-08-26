@@ -7,7 +7,7 @@ import {
   GSLOTH_CODE_PROMPT,
   GSLOTH_SYSTEM_PROMPT,
 } from '#src/constants.js';
-import { getGslothConfigReadPath } from '#src/utils/pathUtils.js';
+import { getGslothConfigReadPath } from '#src/utils/fileUtils.js';
 import { existsSync, readFileSync } from 'node:fs';
 
 /**

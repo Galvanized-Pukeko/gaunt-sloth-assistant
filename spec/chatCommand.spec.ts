@@ -21,7 +21,7 @@ vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 const pathUtilsMock = {
   getGslothFilePath: vi.fn(),
 };
-vi.mock('#src/utils/pathUtils.js', () => pathUtilsMock);
+vi.mock('#src/utils/fileUtils.js', () => pathUtilsMock);
 
 const utilsMock = {
   generateStandardFileName: vi.fn(),

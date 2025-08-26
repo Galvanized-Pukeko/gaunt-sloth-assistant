@@ -49,7 +49,7 @@ const pathUtilsMock = {
   getGslothConfigReadPath: vi.fn().mockImplementation((path: string) => `/mock/read/${path}`),
   getGslothConfigWritePath: vi.fn().mockImplementation((path: string) => `/mock/write/${path}`),
 };
-vi.mock('#src/utils/pathUtils.js', () => pathUtilsMock);
+vi.mock('#src/utils/fileUtils.js', () => pathUtilsMock);
 
 describe('config', async () => {
   beforeEach(async () => {

@@ -50,9 +50,9 @@ const pathUtilsMock = {
   gslothDirExists: vi.fn(),
   getCommandOutputFilePath: vi.fn(),
 };
-vi.mock('#src/utils/pathUtils.js', () => pathUtilsMock);
-vi.mock('#src/utils/pathUtils.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#src/utils/pathUtils.js')>();
+vi.mock('#src/utils/fileUtils.js', () => pathUtilsMock);
+vi.mock('#src/utils/fileUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#src/utils/fileUtils.js')>();
   return {
     ...actual,
     getGslothFilePath: pathUtilsMock.getGslothFilePath,

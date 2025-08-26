@@ -61,7 +61,7 @@ const pathUtilsMock = {
   gslothDirExists: vi.fn(),
   getCommandOutputFilePath: vi.fn(),
 };
-vi.mock('#src/utils/pathUtils.js', () => pathUtilsMock);
+vi.mock('#src/utils/fileUtils.js', () => pathUtilsMock);
 
 // Mock utils module
 const utilsMock = {
