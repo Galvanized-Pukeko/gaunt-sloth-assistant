@@ -4,7 +4,8 @@
     "paths": {
       "#src/*": ["../src/*"]
     },
-    "rootDir": ".."
+    "rootDir": "..",
+    "baseUrl": ".."
   },
   "include": ["../src/**/*", "../spec/**/*"],
   "exclude": ["../src", "../integration-tests"]
