@@ -2,7 +2,6 @@ import { GthConfig } from '#src/config.js';
 import { displayInfo, displayWarning } from '#src/utils/consoleUtils.js';
 import { debugLog, debugLogError } from '#src/utils/debugUtils.js';
 import { env } from '#src/utils/systemUtils.js';
-import { writeFileIfNotExistsWithMessages } from '#src/utils/utils.js';
 import type { AnthropicInput } from '@langchain/anthropic';
 import type {
   BaseChatModel,
@@ -10,6 +9,8 @@ import type {
 } from '@langchain/core/language_models/chat_models';
 import { AIMessage, isAIMessage } from '@langchain/core/messages';
 import { BinaryOperatorAggregate, Messages, StateType } from '@langchain/langgraph';
+
+import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 
 /**
  * Function to process JSON config and create Anthropic LLM instance

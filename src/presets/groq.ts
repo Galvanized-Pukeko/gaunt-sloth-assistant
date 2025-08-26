@@ -1,8 +1,9 @@
 import { displayWarning } from '#src/utils/consoleUtils.js';
 import { env } from '#src/utils/systemUtils.js';
-import { writeFileIfNotExistsWithMessages } from '#src/utils/utils.js';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatGroqInput } from '@langchain/groq';
+
+import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 
 // Function to process JSON config and create Groq LLM instance
 export async function processJsonConfig(llmConfig: ChatGroqInput): Promise<BaseChatModel> {

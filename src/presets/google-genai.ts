@@ -1,11 +1,12 @@
 import { displayWarning } from '#src/utils/consoleUtils.js';
 import { env } from '#src/utils/systemUtils.js';
-import { writeFileIfNotExistsWithMessages } from '#src/utils/utils.js';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import type {
   BaseChatModel,
   BaseChatModelParams,
 } from '@langchain/core/language_models/chat_models';
+
+import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 
 // Function to process JSON config and create Google GenAI LLM instance
 export async function processJsonConfig(

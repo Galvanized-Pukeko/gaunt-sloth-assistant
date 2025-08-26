@@ -9,7 +9,7 @@ import {
   stopSessionLogging,
 } from '#src/utils/consoleUtils.js';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
-import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
+import { appendToFile, getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import {
   createInterface,
   error,
@@ -18,7 +18,6 @@ import {
   stdin as input,
   stdout as output,
 } from '#src/utils/systemUtils.js';
-import { appendToFile } from '#src/utils/utils.js';
 import { type BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import { readBackstory, readGuidelines, readSystemPrompt } from '#src/utils/llmUtils.js';

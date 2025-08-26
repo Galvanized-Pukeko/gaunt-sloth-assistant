@@ -1,11 +1,12 @@
 import { displayWarning } from '#src/utils/consoleUtils.js';
 import { env } from '#src/utils/systemUtils.js';
-import { writeFileIfNotExistsWithMessages } from '#src/utils/utils.js';
 import type {
   BaseChatModel,
   BaseChatModelParams,
 } from '@langchain/core/language_models/chat_models';
 import { ChatDeepSeekInput } from '@langchain/deepseek';
+
+import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 
 // Function to process JSON config and create DeepSeek LLM instance
 export async function processJsonConfig(

@@ -21,14 +21,18 @@ const prompt = {
 const questionAnsweringModule = { askQuestion };
 
 const utilsMock = {
-  readFileFromCurrentDir: vi.fn(),
-  readMultipleFilesFromProjectDir: vi.fn(),
   ProgressIndicator: vi.fn(),
   extractLastMessageContent: vi.fn(),
+};
+vi.mock('#src/utils/utils.js', () => utilsMock);
+const fileUtilsMock = {
+  readFileFromCurrentDir: vi.fn(),
+  readMultipleFilesFromProjectDir: vi.fn(),
   toFileSafeString: vi.fn(),
   fileSafeLocalDate: vi.fn(),
   generateStandardFileName: vi.fn(),
 };
+vi.mock('#src/utils/fileUtils.js', () => fileUtilsMock);
 
 // Mock config to return specific test values
 const mockConfig = {
@@ -73,7 +77,6 @@ const configMock = {
 };
 
 vi.mock('#src/config.js', () => configMock);
-vi.mock('#src/utils/utils.js', () => utilsMock);
 
 describe('askCommand', () => {
   beforeEach(async () => {
@@ -86,7 +89,7 @@ describe('askCommand', () => {
     configMock.createDefaultConfig.mockReturnValue(mockConfig);
 
     // Mock the util functions
-    utilsMock.readMultipleFilesFromProjectDir.mockImplementation((files: string[]) => {
+    fileUtilsMock.readMultipleFilesFromProjectDir.mockImplementation((files: string[]) => {
       if (files.includes('test.file')) {
         return 'test.file:\n```\nFILE CONTENT\n```';
       }
@@ -137,7 +140,7 @@ describe('askCommand', () => {
     const { askCommand } = await import('#src/commands/askCommand.js');
     const program = new Command();
     askCommand(program, {});
-    utilsMock.readMultipleFilesFromProjectDir.mockImplementation((files: string[]) => {
+    fileUtilsMock.readMultipleFilesFromProjectDir.mockImplementation((files: string[]) => {
       if (files.includes('test.file') && files.includes('test2.file')) {
         return 'test.file:\n```\nFILE CONTENT\n```\n\ntest2.file:\n```\nFILE2 CONTENT\n```';
       }

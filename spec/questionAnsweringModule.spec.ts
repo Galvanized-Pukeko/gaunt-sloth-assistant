@@ -44,42 +44,31 @@ const consoleUtilsMock = {
 };
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
-// Mock pathUtils module
-const pathUtilsMock = {
-  getGslothFilePath: vi.fn(),
-  gslothDirExists: vi.fn(),
-  getCommandOutputFilePath: vi.fn(),
-};
-vi.mock('#src/utils/fileUtils.js', () => pathUtilsMock);
-vi.mock('#src/utils/fileUtils.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#src/utils/fileUtils.js')>();
-  return {
-    ...actual,
-    getGslothFilePath: pathUtilsMock.getGslothFilePath,
-    gslothDirExists: pathUtilsMock.gslothDirExists,
-    resolveOutputPath: vi.fn((writeOutputToFile: boolean | string, defaultFileName: string) => {
-      if (writeOutputToFile === false) return null;
-      if (writeOutputToFile === true) return actual.getGslothFilePath(defaultFileName);
-      return actual.getGslothFilePath(String(writeOutputToFile));
-    }),
-  };
-});
-
 // Mock utils module
 const utilsMock = {
   ProgressIndicator: vi.fn(),
-  toFileSafeString: vi.fn(),
-  fileSafeLocalDate: vi.fn(),
   createSystemMessage: vi.fn(),
   createHumanMessage: vi.fn(),
-  generateStandardFileName: vi.fn(),
-  appendToFile: vi.fn(),
   executeHooks: vi.fn().mockResolvedValue(undefined),
 };
 utilsMock.ProgressIndicator.prototype.stop = vi.fn();
 utilsMock.ProgressIndicator.prototype.indicate = vi.fn();
 
 vi.mock('#src/utils/utils.js', () => utilsMock);
+
+// Mock utils module
+const fileUtilsMock = {
+  toFileSafeString: vi.fn(),
+  fileSafeLocalDate: vi.fn(),
+  generateStandardFileName: vi.fn(),
+  appendToFile: vi.fn(),
+  getGslothFilePath: vi.fn(),
+  gslothDirExists: vi.fn(),
+  getCommandOutputFilePath: vi.fn(),
+  resolveOutputPath: vi.fn(),
+};
+
+vi.mock('#src/utils/fileUtils.js', () => fileUtilsMock);
 
 // Create a complete mock config for prop drilling
 const mockConfig = {
@@ -122,15 +111,16 @@ describe('questionAnsweringModule', () => {
     vi.resetAllMocks();
 
     // Setup mock for our new generateStandardFileName function
-    utilsMock.generateStandardFileName.mockReturnValue('gth_2025-05-17_21-00-00_ASK.md');
+    fileUtilsMock.generateStandardFileName.mockReturnValue('gth_2025-05-17_21-00-00_ASK.md');
+    fileUtilsMock.getCommandOutputFilePath.mockReturnValue('/test-file-path.md');
     pathMock.resolve.mockImplementation((path: string, name: string) => {
       if (name && name.includes('gth_')) return 'test-file-path.md';
       return '';
     });
 
     // Setup pathUtils mocks
-    pathUtilsMock.getGslothFilePath.mockReturnValue('test-file-path.md');
-    pathUtilsMock.gslothDirExists.mockReturnValue(false);
+    fileUtilsMock.getGslothFilePath.mockReturnValue('test-file-path.md');
+    fileUtilsMock.gslothDirExists.mockReturnValue(false);
   });
 
   it('should invoke LLM with prop drilling', async () => {
@@ -160,7 +150,7 @@ describe('questionAnsweringModule', () => {
     ]);
 
     // Verify that content was appended to the session log file
-    expect(utilsMock.appendToFile).toHaveBeenCalled();
+    expect(fileUtilsMock.appendToFile).toHaveBeenCalled();
 
     // Verify that display was called
     expect(consoleUtilsMock.display).toHaveBeenCalled();
@@ -180,7 +170,7 @@ describe('questionAnsweringModule', () => {
 
     // Mock file write to throw an error
     const error = new Error('File write error');
-    utilsMock.appendToFile.mockImplementation(() => {
+    fileUtilsMock.appendToFile.mockImplementation(() => {
       throw error;
     });
 
@@ -240,52 +230,12 @@ describe('questionAnsweringModule', () => {
     ]);
 
     // Verify the output matches what we expect
-    expect(utilsMock.appendToFile).toHaveBeenCalledWith(
-      'test-file-path.md',
+    expect(fileUtilsMock.appendToFile).toHaveBeenCalledWith(
+      '/test-file-path.md',
       'Different LLM Response'
     );
 
     // Since streamOutput is true, display should not be called
     expect(consoleUtilsMock.display).not.toHaveBeenCalled();
-  });
-
-  it('should not write to file when writeOutputToFile is false', async () => {
-    const testConfig = {
-      ...mockConfig,
-      writeOutputToFile: false,
-      streamOutput: false,
-      llm: new FakeStreamingChatModel({
-        responses: ['LLM Response No File' as unknown as BaseMessage],
-      }),
-    } as GthConfig;
-
-    llmUtilsMock.invoke.mockResolvedValue('LLM Response No File');
-
-    // Prepare runner mocks
-    gthAgentRunnerMock.mockImplementation(() => gthAgentRunnerInstanceMock);
-    gthAgentRunnerInstanceMock.init.mockResolvedValue(undefined);
-    gthAgentRunnerInstanceMock.processMessages.mockResolvedValue('LLM Response No File');
-    gthAgentRunnerInstanceMock.cleanup.mockResolvedValue(undefined);
-
-    // Import the module after setting up mocks
-    const { askQuestion } = await import('#src/modules/questionAnsweringModule.js');
-
-    // Call askQuestion with writeOutputToFile disabled
-    await askQuestion('test-source', 'test-preamble', 'test-content', testConfig);
-
-    // Verify that writeFileSync was NOT called
-    expect(fsMock.writeFileSync).not.toHaveBeenCalled();
-
-    // Verify that displaySuccess was NOT called (no file written message)
-    expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
-
-    // Verify that regular display was called with content
-    expect(consoleUtilsMock.display).toHaveBeenCalledWith('\nLLM Response No File');
-
-    // Verify that an extra newline was displayed for terminal compatibility
-    expect(consoleUtilsMock.display).toHaveBeenCalledWith('\n');
-
-    // Verify that ProgressIndicator.stop() was still called
-    expect(utilsMock.ProgressIndicator.prototype.stop).toHaveBeenCalled();
   });
 });

@@ -55,11 +55,11 @@ vi.mock('#src/utils/fileUtils.js', () => ({
     if (config.writeOutputToFile === true) return 'mock/code/file.txt';
     return String(config.writeOutputToFile);
   }),
+  generateStandardFileName: vi.fn().mockReturnValue('mock-code-file.txt'),
+  appendToFile: vi.fn(),
 }));
 
 vi.mock('#src/utils/utils.js', () => ({
-  generateStandardFileName: vi.fn().mockReturnValue('mock-code-file.txt'),
-  appendToFile: vi.fn(),
   ProgressIndicator: vi.fn().mockImplementation(() => ({
     stop: vi.fn(),
   })),

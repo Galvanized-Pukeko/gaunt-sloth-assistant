@@ -50,7 +50,9 @@ describe('utils', () => {
 
       try {
         // Import the function after mocks are set up
-        const { generateStandardFileName, toFileSafeString } = await import('#src/utils/utils.js');
+        const { generateStandardFileName, toFileSafeString } = await import(
+          '#src/utils/fileUtils.js'
+        );
 
         // Define test commands
         const commands = ['ASK', 'REVIEW', 'PR-123'];
@@ -90,7 +92,7 @@ describe('utils', () => {
       fsUtilsMock.readFileSync.mockReturnValue(fileContent);
 
       // Import the function after mocks are set up
-      const { readFileFromProjectDir } = await import('#src/utils/utils.js');
+      const { readFileFromProjectDir } = await import('#src/utils/fileUtils.js');
 
       // Act
       const result = readFileFromProjectDir(fileName);
@@ -123,7 +125,7 @@ describe('utils', () => {
         });
 
       // Import the function after mocks are set up
-      const { readFileFromInstallDir } = await import('#src/utils/utils.js');
+      const { readFileFromInstallDir } = await import('#src/utils/fileUtils.js');
 
       // Act & Assert
       expect(() => readFileFromInstallDir(fileName)).toThrow();

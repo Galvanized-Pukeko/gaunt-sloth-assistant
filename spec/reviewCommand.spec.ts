@@ -26,16 +26,21 @@ vi.mock('#src/modules/reviewModule.js', () => ({
 }));
 
 const utilsMock = {
-  readFileFromCurrentDir: vi.fn(),
-  readMultipleFilesFromProjectDir: vi.fn(),
-  readFileSyncWithMessages: vi.fn(),
   execAsync: vi.fn(),
   ProgressIndicator: vi.fn(),
   extractLastMessageContent: vi.fn(),
+};
+vi.mock('#src/utils/utils.js', () => utilsMock);
+
+const fileUtilsMock = {
+  readFileFromCurrentDir: vi.fn(),
+  readMultipleFilesFromProjectDir: vi.fn(),
+  readFileSyncWithMessages: vi.fn(),
   toFileSafeString: vi.fn(),
   fileSafeLocalDate: vi.fn(),
   generateStandardFileName: vi.fn(),
 };
+vi.mock('#src/utils/fileUtils.js', () => fileUtilsMock);
 
 // Set up static mocks
 const mockConfig = {
@@ -74,7 +79,6 @@ vi.mock('#src/utils/llmUtils.js', async () => {
   };
 });
 vi.mock('#src/config.js', () => configMock);
-vi.mock('#src/utils/utils.js', () => utilsMock);
 
 describe('reviewCommand', () => {
   beforeEach(async () => {
@@ -82,11 +86,11 @@ describe('reviewCommand', () => {
 
     // Setup default mock returns
     configMock.initConfig.mockResolvedValue(mockConfig);
-    utilsMock.readFileFromCurrentDir.mockReturnValue('FILE TO REVIEW');
-    utilsMock.readMultipleFilesFromProjectDir.mockReturnValue(
+    fileUtilsMock.readFileFromCurrentDir.mockReturnValue('FILE TO REVIEW');
+    fileUtilsMock.readMultipleFilesFromProjectDir.mockReturnValue(
       'test.file:\n```\nFILE TO REVIEW\n```'
     );
-    utilsMock.readFileSyncWithMessages.mockReturnValue('content-id');
+    fileUtilsMock.readFileSyncWithMessages.mockReturnValue('content-id');
     utilsMock.execAsync.mockResolvedValue('');
     llmUtils.readBackstory.mockReturnValue('INTERNAL BACKSTORY');
     llmUtils.readGuidelines.mockReturnValue('PROJECT GUIDELINES');
@@ -118,7 +122,7 @@ describe('reviewCommand', () => {
 
     reviewCommand(program, {});
 
-    utilsMock.readMultipleFilesFromProjectDir.mockReturnValue(
+    fileUtilsMock.readMultipleFilesFromProjectDir.mockReturnValue(
       'test.file:\n```\nFILE TO REVIEW\n```\n\ntest2.file:\n```\nFILE2 TO REVIEW\n```'
     );
 

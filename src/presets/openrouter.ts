@@ -1,12 +1,13 @@
 import { displayWarning } from '#src/utils/consoleUtils.js';
 import { env } from '#src/utils/systemUtils.js';
-import { writeFileIfNotExistsWithMessages } from '#src/utils/utils.js';
 import {
   BaseChatModel,
   type BaseChatModelParams,
 } from '@langchain/core/language_models/chat_models';
 import { OpenAIChatInput } from '@langchain/openai';
 import { ChatOpenAIFields } from '@langchain/openai';
+
+import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 
 // Function to process JSON config and create OpenRouter LLM instance
 // noinspection JSUnusedGlobalSymbols

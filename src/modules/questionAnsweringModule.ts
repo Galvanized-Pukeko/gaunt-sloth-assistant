@@ -8,8 +8,8 @@ import {
   initSessionLogging,
   stopSessionLogging,
 } from '#src/utils/consoleUtils.js';
-import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
-import { ProgressIndicator, appendToFile } from '#src/utils/utils.js';
+import { appendToFile, getCommandOutputFilePath } from '#src/utils/fileUtils.js';
+import { ProgressIndicator } from '#src/utils/utils.js';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';

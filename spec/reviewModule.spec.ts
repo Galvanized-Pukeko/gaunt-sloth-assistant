@@ -56,20 +56,20 @@ const consoleUtilsMock = {
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 // Mock pathUtils module
-const pathUtilsMock = {
+const fileUtilsMock = {
   getGslothFilePath: vi.fn(),
   gslothDirExists: vi.fn(),
   getCommandOutputFilePath: vi.fn(),
-};
-vi.mock('#src/utils/fileUtils.js', () => pathUtilsMock);
-
-// Mock utils module
-const utilsMock = {
-  ProgressIndicator: vi.fn(),
   toFileSafeString: vi.fn(),
   fileSafeLocalDate: vi.fn(),
   generateStandardFileName: vi.fn(),
   appendToFile: vi.fn(),
+};
+vi.mock('#src/utils/fileUtils.js', () => fileUtilsMock);
+
+// Mock utils module
+const utilsMock = {
+  ProgressIndicator: vi.fn(),
 };
 utilsMock.ProgressIndicator.prototype.stop = vi.fn();
 utilsMock.ProgressIndicator.prototype.indicate = vi.fn();
@@ -136,7 +136,7 @@ describe('reviewModule', () => {
     vi.resetAllMocks();
 
     // Setup mock for our new generateStandardFileName function
-    utilsMock.generateStandardFileName.mockReturnValue('gth_2025-05-17_21-00-00_REVIEW.md');
+    fileUtilsMock.generateStandardFileName.mockReturnValue('gth_2025-05-17_21-00-00_REVIEW.md');
     // Setup both the top-level resolve and the default.resolve functions
     const resolveMock = (path: string, name: string) => {
       if (name && name.includes('gth_')) return 'test-review-file-path.md';
@@ -146,9 +146,9 @@ describe('reviewModule', () => {
     pathMock.default.resolve.mockImplementation(resolveMock);
 
     // Setup pathUtils mocks
-    pathUtilsMock.getGslothFilePath.mockReturnValue('test-review-file-path.md');
-    pathUtilsMock.gslothDirExists.mockReturnValue(false);
-    pathUtilsMock.getCommandOutputFilePath.mockImplementation((config: any, _source: string) => {
+    fileUtilsMock.getGslothFilePath.mockReturnValue('test-review-file-path.md');
+    fileUtilsMock.gslothDirExists.mockReturnValue(false);
+    fileUtilsMock.getCommandOutputFilePath.mockImplementation((config: any, _source: string) => {
       if (config.writeOutputToFile === false) return null;
       if (config.writeOutputToFile === true) return 'test-review-file-path.md';
       return String(config.writeOutputToFile);
@@ -174,11 +174,11 @@ describe('reviewModule', () => {
     ]);
 
     // Verify that content was appended to the session log file
-    expect(utilsMock.appendToFile).toHaveBeenCalledWith(
+    expect(fileUtilsMock.appendToFile).toHaveBeenCalledWith(
       'test-review-file-path.md',
       'LLM Review Response'
     );
-    expect(pathUtilsMock.getCommandOutputFilePath).toHaveBeenCalledWith(
+    expect(fileUtilsMock.getCommandOutputFilePath).toHaveBeenCalledWith(
       expect.objectContaining({ writeOutputToFile: true }),
       'test-source'
     );
@@ -203,8 +203,8 @@ describe('reviewModule', () => {
     } as unknown as GthConfig;
 
     // Mock resolver to respect provided path as-is
-    pathUtilsMock.getGslothFilePath.mockReturnValue('custom/review.md');
-    pathUtilsMock.getCommandOutputFilePath.mockImplementation((config: any, _source: string) => {
+    fileUtilsMock.getGslothFilePath.mockReturnValue('custom/review.md');
+    fileUtilsMock.getCommandOutputFilePath.mockImplementation((config: any, _source: string) => {
       if (config.writeOutputToFile === false) return null;
       if (config.writeOutputToFile === true) return 'test-review-file-path.md';
       return String(config.writeOutputToFile);
@@ -219,11 +219,14 @@ describe('reviewModule', () => {
       new SystemMessage('test-preamble'),
       new HumanMessage('test-diff'),
     ]);
-    expect(pathUtilsMock.getCommandOutputFilePath).toHaveBeenCalledWith(
+    expect(fileUtilsMock.getCommandOutputFilePath).toHaveBeenCalledWith(
       expect.objectContaining({ writeOutputToFile: 'custom/review.md' }),
       'test-source'
     );
-    expect(utilsMock.appendToFile).toHaveBeenCalledWith('custom/review.md', 'LLM Review Response');
+    expect(fileUtilsMock.appendToFile).toHaveBeenCalledWith(
+      'custom/review.md',
+      'LLM Review Response'
+    );
     expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith(
       expect.stringContaining('custom/review.md')
     );
@@ -232,7 +235,7 @@ describe('reviewModule', () => {
   it('should handle file write errors with prop drilling', async () => {
     // Mock file append to throw an error (session logging flow)
     const error = new Error('File write error');
-    utilsMock.appendToFile.mockImplementation(() => {
+    fileUtilsMock.appendToFile.mockImplementation(() => {
       throw error;
     });
 
@@ -277,7 +280,7 @@ describe('reviewModule', () => {
     ]);
 
     // Verify the output matches what we expect
-    expect(utilsMock.appendToFile).toHaveBeenCalledWith(
+    expect(fileUtilsMock.appendToFile).toHaveBeenCalledWith(
       'test-review-file-path.md',
       'Different LLM Response'
     );

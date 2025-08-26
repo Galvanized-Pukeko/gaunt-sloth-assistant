@@ -1,5 +1,4 @@
 import { Command, Option } from 'commander';
-import { readMultipleFilesFromProjectDir } from '#src/utils/utils.js';
 import { getStringFromStdin } from '#src/utils/systemUtils.js';
 import {
   REQUIREMENTS_PROVIDERS,
@@ -17,6 +16,8 @@ import {
   readSystemPrompt,
   wrapContent,
 } from '#src/utils/llmUtils.js';
+
+import { readMultipleFilesFromProjectDir } from '#src/utils/fileUtils.js';
 
 interface ReviewCommandOptions {
   file?: string[];

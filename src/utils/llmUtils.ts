@@ -1,13 +1,12 @@
 import { RunnableConfig } from '@langchain/core/runnables';
 import { randomUUID } from 'node:crypto';
-import { readFileFromInstallDir } from '#src/utils/utils.js';
 import {
   GSLOTH_BACKSTORY,
   GSLOTH_CHAT_PROMPT,
   GSLOTH_CODE_PROMPT,
   GSLOTH_SYSTEM_PROMPT,
 } from '#src/constants.js';
-import { getGslothConfigReadPath } from '#src/utils/fileUtils.js';
+import { getGslothConfigReadPath, readFileFromInstallDir } from '#src/utils/fileUtils.js';
 import { existsSync, readFileSync } from 'node:fs';
 
 /**

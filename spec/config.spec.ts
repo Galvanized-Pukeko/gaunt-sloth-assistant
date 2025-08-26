@@ -25,16 +25,22 @@ const consoleUtilsMock = {
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 const utilsMock = {
+  ProgressIndicator: vi.fn(),
+  extractLastMessageContent: vi.fn(),
+};
+vi.mock('#src/utils/utils.js', () => utilsMock);
+
+const fileUtilsMock = {
   writeFileIfNotExistsWithMessages: vi.fn(),
   importExternalFile: vi.fn(),
   importFromFilePath: vi.fn(),
-  ProgressIndicator: vi.fn(),
   fileSafeLocalDate: vi.fn(),
   toFileSafeString: vi.fn(),
-  extractLastMessageContent: vi.fn(),
   readFileSyncWithMessages: vi.fn(),
+  getGslothConfigReadPath: vi.fn().mockImplementation((path: string) => `/mock/read/${path}`),
+  getGslothConfigWritePath: vi.fn().mockImplementation((path: string) => `/mock/write/${path}`),
 };
-vi.mock('#src/utils/utils.js', () => utilsMock);
+vi.mock('#src/utils/fileUtils.js', () => fileUtilsMock);
 
 const systemUtilsMock = {
   exit: vi.fn(),
@@ -44,12 +50,6 @@ const systemUtilsMock = {
   isTTY: vi.fn(),
 };
 vi.mock('#src/utils/systemUtils.js', () => systemUtilsMock);
-
-const pathUtilsMock = {
-  getGslothConfigReadPath: vi.fn().mockImplementation((path: string) => `/mock/read/${path}`),
-  getGslothConfigWritePath: vi.fn().mockImplementation((path: string) => `/mock/write/${path}`),
-};
-vi.mock('#src/utils/fileUtils.js', () => pathUtilsMock);
 
 describe('config', async () => {
   beforeEach(async () => {
@@ -84,8 +84,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -141,13 +140,12 @@ describe('config', async () => {
         return path && path.includes('.gsloth.config.js');
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
       // Mock the import function - ensure it resolves successfully for JS config
-      utilsMock.importExternalFile.mockImplementation((path: string) => {
+      fileUtilsMock.importExternalFile.mockImplementation((path: string) => {
         if (path.includes('.gsloth.config.js')) {
           return Promise.resolve(mockConfigModule);
         }
@@ -202,13 +200,12 @@ describe('config', async () => {
         return path && path.includes('.gsloth.config.mjs');
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
       // Mock the import function
-      utilsMock.importExternalFile.mockImplementation((path: string) => {
+      fileUtilsMock.importExternalFile.mockImplementation((path: string) => {
         if (path.includes('.gsloth.config.mjs')) return Promise.resolve(mockConfigModule);
         return Promise.reject(new Error('Not found'));
       });
@@ -252,7 +249,7 @@ describe('config', async () => {
       fsMock.existsSync.mockReturnValue(false);
 
       // Ensure pathUtils returns mock paths
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -295,8 +292,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -335,8 +331,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -375,8 +370,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -415,8 +409,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -455,8 +448,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -495,8 +487,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -535,7 +526,7 @@ describe('config', async () => {
         return '';
       });
 
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -572,8 +563,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -614,8 +604,7 @@ describe('config', async () => {
         return '';
       });
 
-      // Ensure pathUtils mock is properly configured for this test
-      pathUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
         return `/mock/read/${filename}`;
       });
 
@@ -1007,7 +996,7 @@ describe('config', async () => {
       });
 
       // Mock the import function
-      utilsMock.importExternalFile.mockImplementation((path: string) => {
+      fileUtilsMock.importExternalFile.mockImplementation((path: string) => {
         if (path === customConfigPath) return Promise.resolve(mockConfigModule);
         return Promise.reject(new Error('Not found'));
       });
@@ -1050,7 +1039,7 @@ describe('config', async () => {
       });
 
       // Mock the import function
-      utilsMock.importExternalFile.mockImplementation((path: string) => {
+      fileUtilsMock.importExternalFile.mockImplementation((path: string) => {
         if (path === customConfigPath) return Promise.resolve(mockConfigModule);
         return Promise.reject(new Error('Not found'));
       });
@@ -1182,7 +1171,7 @@ describe('config', async () => {
       }));
 
       // Ensure the pathUtils mock is properly set for different files
-      pathUtilsMock.getGslothConfigWritePath.mockImplementation(
+      fileUtilsMock.getGslothConfigWritePath.mockImplementation(
         (filename: string) => `/mock/write/${filename}`
       );
 
@@ -1205,12 +1194,12 @@ describe('config', async () => {
       expect(mockInit).toHaveBeenCalledWith('/mock/write/.gsloth.config.json');
 
       // Verify writeFileIfNotExistsWithMessages was called for guidelines and review instructions
-      expect(utilsMock.writeFileIfNotExistsWithMessages).toHaveBeenCalledTimes(2);
-      expect(utilsMock.writeFileIfNotExistsWithMessages).toHaveBeenCalledWith(
+      expect(fileUtilsMock.writeFileIfNotExistsWithMessages).toHaveBeenCalledTimes(2);
+      expect(fileUtilsMock.writeFileIfNotExistsWithMessages).toHaveBeenCalledWith(
         '/mock/write/.gsloth.guidelines.md',
         expect.stringContaining('# Development Guidelines')
       );
-      expect(utilsMock.writeFileIfNotExistsWithMessages).toHaveBeenCalledWith(
+      expect(fileUtilsMock.writeFileIfNotExistsWithMessages).toHaveBeenCalledWith(
         '/mock/write/.gsloth.review.md',
         expect.stringContaining('# Code Review Guidelines')
       );
@@ -1245,7 +1234,7 @@ describe('config', async () => {
       }));
 
       // Ensure the pathUtils mock is properly set for different files
-      pathUtilsMock.getGslothConfigWritePath.mockImplementation(
+      fileUtilsMock.getGslothConfigWritePath.mockImplementation(
         (filename: string) => `/mock/write/${filename}`
       );
 
@@ -1269,7 +1258,7 @@ describe('config', async () => {
       }));
 
       // Ensure the pathUtils mock is properly set for different files
-      pathUtilsMock.getGslothConfigWritePath.mockImplementation(
+      fileUtilsMock.getGslothConfigWritePath.mockImplementation(
         (filename: string) => `/mock/write/${filename}`
       );
 
@@ -1291,7 +1280,7 @@ describe('config', async () => {
       }));
 
       // Ensure the pathUtils mock is properly set for different files
-      pathUtilsMock.getGslothConfigWritePath.mockImplementation(
+      fileUtilsMock.getGslothConfigWritePath.mockImplementation(
         (filename: string) => `/mock/write/${filename}`
       );
 
@@ -1315,7 +1304,7 @@ describe('config', async () => {
       }));
 
       // Ensure the pathUtils mock is properly set for different files
-      pathUtilsMock.getGslothConfigWritePath.mockImplementation(
+      fileUtilsMock.getGslothConfigWritePath.mockImplementation(
         (filename: string) => `/mock/write/${filename}`
       );
 
