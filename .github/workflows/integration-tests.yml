@@ -5,6 +5,16 @@ name: Integration tests
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to test (e.g., 123). If set, the workflow will checkout the PR's merge ref."
+        required: false
+        type: string
+      ref:
+        description: "Branch, tag, or commit SHA to checkout. Ignored if pr_number is provided."
+        required: false
+        type: string
 
 jobs:
   integration-tests:
@@ -15,7 +25,20 @@ jobs:
         node-version: [22.x]
 
     steps:
+    - name: Compute ref to checkout
+      id: compute_ref
+      run: |
+        if [ -n "${{ inputs.pr_number }}" ]; then
+          echo "ref=refs/pull/${{ inputs.pr_number }}/merge" >> "$GITHUB_OUTPUT"
+        elif [ -n "${{ inputs.ref }}" ]; then
+          echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+        fi
+
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.compute_ref.outputs.ref }}
     
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4

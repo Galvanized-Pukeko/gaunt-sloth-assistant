@@ -22,7 +22,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm i gaunt-sloth-assistant@0.9.7 -g && gth --version
+        run: npm i gaunt-sloth-assistant@0.9.15 -g && gth --version
 
       - name: Extract issue number from PR title
         id: extract_issue
