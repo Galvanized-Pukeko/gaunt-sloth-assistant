@@ -86,6 +86,7 @@ describe('GthLangChainAgent', () => {
       writeOutputToFile: true,
       streamSessionInferenceLog: true,
       canInterruptInferenceWithEsc: true,
+      includeCurrentDateAfterGuidelines: true,
     };
 
     ({ GthLangChainAgent } = await import('#src/core/GthLangChainAgent.js'));

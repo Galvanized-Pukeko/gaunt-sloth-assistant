@@ -1,6 +1,4 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import * as prompt from '#src/utils/llmUtils.js';
-import * as systemUtils from '#src/utils/systemUtils.js';
 import * as fs from 'node:fs';
 import { sep } from 'path';
 import { platform } from 'node:os';
@@ -23,10 +21,13 @@ vi.mock('#src/utils/systemUtils.js', () => ({
  * if .gsloth does not exitst - look for file in projectDir/filename
  * if none of above exists - look for file in install dir
  */
-describe('prompt reading functions', () => {
+describe('prompt reading functions', async () => {
   const prefix = platform() == 'win32' ? 'C:\\' : '/';
   const mockProjectDir = `${prefix}project`;
   const mockInstallDir = `${prefix}install`;
+
+  const systemUtils = await import('#src/utils/systemUtils.js');
+  const prompt = await import('#src/utils/llmUtils.js');
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -115,6 +116,61 @@ describe('prompt reading functions', () => {
           expect(() => func()).toThrow();
         }
       });
+    });
+  });
+
+  describe('readGuidelines formatting with organization', () => {
+    test('appends organization, locale/timezone and date when enabled', () => {
+      const filename = 'guidelines.md';
+      const filePath = `${mockProjectDir}${sep}${filename}`;
+
+      vi.mocked(fs.existsSync).mockImplementation((path) => [filePath].includes(String(path)));
+      vi.mocked(fs.readFileSync).mockReturnValue('Guidelines content');
+
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-08-25T10:20:30.000Z'));
+
+      const cfg = {
+        projectGuidelines: filename,
+        includeCurrentDateAfterGuidelines: true,
+        organization: { name: 'Dancing Kakapo', locale: 'en-NZ', timezone: 'Pacific/Auckland' },
+      };
+
+      const result = (prompt as any).readGuidelines(cfg);
+
+      expect(result).toContain('Guidelines content');
+      expect(result).toContain('Organization: Dancing Kakapo');
+      expect(result).toContain(
+        'Current Date: 2024-08-25T10:20:30.000Z - Sunday, 25 August 2024 at 10:20:30 pm NZST'
+      );
+      expect(fs.readFileSync).toHaveBeenCalledWith(filePath, { encoding: 'utf8' });
+
+      vi.useRealTimers();
+    });
+
+    test('Only includes UTC time when no org details provided', () => {
+      const filename = 'guidelines.md';
+      const filePath = `${mockProjectDir}${sep}${filename}`;
+
+      vi.mocked(fs.existsSync).mockImplementation((path) => [filePath].includes(String(path)));
+      vi.mocked(fs.readFileSync).mockReturnValue('Guidelines content');
+
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-08-25T10:20:30.000Z'));
+
+      const cfg = {
+        projectGuidelines: filename,
+        includeCurrentDateAfterGuidelines: true,
+      };
+
+      const result = (prompt as any).readGuidelines(cfg);
+
+      expect(result).not.toContain('Organization');
+      expect(result).toContain('Current Date: 2024-08-25T10:20:30.000Z');
+      expect(result).not.toContain(' - ');
+      expect(fs.readFileSync).toHaveBeenCalledWith(filePath, { encoding: 'utf8' });
+
+      vi.useRealTimers();
     });
   });
 });

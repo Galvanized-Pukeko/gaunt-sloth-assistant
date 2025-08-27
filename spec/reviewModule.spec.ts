@@ -100,6 +100,7 @@ const BASE_GTH_CONFIG: Pick<
   | 'writeOutputToFile'
   | 'streamSessionInferenceLog'
   | 'canInterruptInferenceWithEsc'
+  | 'includeCurrentDateAfterGuidelines'
 > = {
   contentProvider: 'file',
   requirementsProvider: 'file',
@@ -117,6 +118,7 @@ const BASE_GTH_CONFIG: Pick<
   writeOutputToFile: true,
   streamSessionInferenceLog: true,
   canInterruptInferenceWithEsc: true,
+  includeCurrentDateAfterGuidelines: false,
 };
 
 const mockConfig: GthConfig = {

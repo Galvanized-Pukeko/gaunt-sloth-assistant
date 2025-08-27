@@ -125,6 +125,7 @@ describe('config', async () => {
           pr: { contentProvider: 'github', requirementsProvider: 'github' },
           code: { filesystem: 'all' },
         },
+        includeCurrentDateAfterGuidelines: false,
       });
     });
 
@@ -183,6 +184,7 @@ describe('config', async () => {
           pr: { contentProvider: 'github', requirementsProvider: 'github' },
           code: { filesystem: 'all' },
         },
+        includeCurrentDateAfterGuidelines: false,
       });
     });
 
@@ -241,6 +243,7 @@ describe('config', async () => {
           pr: { contentProvider: 'github', requirementsProvider: 'github' },
           code: { filesystem: 'all' },
         },
+        includeCurrentDateAfterGuidelines: false,
       });
     });
 
@@ -678,6 +681,7 @@ describe('config', async () => {
           pr: { contentProvider: 'github', requirementsProvider: 'github' },
           code: { filesystem: 'all' },
         },
+        includeCurrentDateAfterGuidelines: false,
       });
     });
 
@@ -980,6 +984,7 @@ describe('config', async () => {
           pr: { contentProvider: 'github', requirementsProvider: 'github' },
           code: { filesystem: 'all' },
         },
+        includeCurrentDateAfterGuidelines: false,
       });
     });
 
@@ -1023,6 +1028,7 @@ describe('config', async () => {
           pr: { contentProvider: 'github', requirementsProvider: 'github' },
           code: { filesystem: 'all' },
         },
+        includeCurrentDateAfterGuidelines: false,
       });
     });
 
@@ -1066,6 +1072,7 @@ describe('config', async () => {
           pr: { contentProvider: 'github', requirementsProvider: 'github' },
           code: { filesystem: 'all' },
         },
+        includeCurrentDateAfterGuidelines: false,
       });
     });
 

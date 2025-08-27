@@ -59,8 +59,8 @@ export function prCommand(
       const systemPrompt = readSystemPrompt();
       const systemMessage = [
         readBackstory(),
-        readGuidelines(config.projectGuidelines),
-        readReviewInstructions(config.projectReviewInstructions),
+        readGuidelines(config),
+        readReviewInstructions(config),
       ];
       if (systemPrompt) {
         systemMessage.push(systemPrompt);

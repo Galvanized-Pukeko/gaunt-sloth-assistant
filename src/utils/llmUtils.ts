@@ -10,6 +10,7 @@ import { getGslothConfigReadPath, readFileFromInstallDir } from '#src/utils/file
 import { existsSync, readFileSync } from 'node:fs';
 import { debugLog } from '#src/utils/debugUtils.js';
 import { truncateString } from '#src/utils/stringUtils.js';
+import { GthConfig } from '#src/config.js';
 
 /**
  * Creates new runnable config.
@@ -28,12 +29,51 @@ export function readBackstory(): string {
   return readPromptFile(GSLOTH_BACKSTORY);
 }
 
-export function readGuidelines(guidelinesFilename: string): string {
-  return readPromptFile(guidelinesFilename);
+export function readGuidelines(
+  config:
+    | Pick<GthConfig, 'projectGuidelines' | 'includeCurrentDateAfterGuidelines' | 'organization'>
+    | string
+): string {
+  if (typeof config === 'string') {
+    return readPromptFile(config);
+  }
+  const guidelines = readPromptFile(config.projectGuidelines);
+  if (config.includeCurrentDateAfterGuidelines) {
+    const currentDate = new Date();
+
+    const orgName = config.organization?.name;
+    const locale = config.organization?.locale;
+    const timezone = config.organization?.timezone;
+
+    const hasLocaleOrTimezone = Boolean((locale && locale.trim()) || (timezone && timezone.trim()));
+
+    const humanReadableDate = hasLocaleOrTimezone
+      ? new Intl.DateTimeFormat(locale?.trim() || undefined, {
+          dateStyle: 'full',
+          timeStyle: 'long',
+          timeZone: timezone?.trim() || undefined,
+        }).format(currentDate)
+      : '';
+
+    const lines: string[] = [guidelines];
+    if (orgName) {
+      lines.push(`Organization: ${orgName}`);
+    }
+    lines.push(
+      `Current Date: ${currentDate.toISOString()}${hasLocaleOrTimezone ? ` - ${humanReadableDate}` : ''}`
+    );
+    return lines.join('\n');
+  }
+  return guidelines;
 }
 
-export function readReviewInstructions(reviewInstructions: string): string {
-  return readPromptFile(reviewInstructions);
+export function readReviewInstructions(
+  config: Pick<GthConfig, 'projectReviewInstructions'> | string
+): string {
+  if (typeof config === 'string') {
+    return readPromptFile(config);
+  }
+  return readPromptFile(config.projectReviewInstructions);
 }
 
 export function readSystemPrompt(): string {
