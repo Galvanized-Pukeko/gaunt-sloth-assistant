@@ -7,7 +7,8 @@ import { chatCommand } from '#src/commands/chatCommand.js';
 import { codeCommand } from '#src/commands/codeCommand.js';
 import { argv, getSlothVersion, readStdin } from '#src/utils/systemUtils.js';
 import type { CommandLineConfigOverrides } from '#src/config.js';
-import { coerceBooleanOrString } from '#src/utils/cliUtils.js';
+
+import { coerceBooleanOrString } from '#src/utils/consoleUtils.js';
 
 const program = new Command();
 
