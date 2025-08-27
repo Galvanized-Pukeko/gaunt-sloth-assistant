@@ -39,6 +39,7 @@ describe('GthAgentRunner', () => {
     | 'writeOutputToFile'
     | 'streamSessionInferenceLog'
     | 'canInterruptInferenceWithEsc'
+    | 'includeCurrentDateAfterGuidelines'
   > = {
     projectGuidelines: 'test guidelines',
     streamOutput: false,
@@ -50,6 +51,7 @@ describe('GthAgentRunner', () => {
     writeOutputToFile: true,
     streamSessionInferenceLog: true,
     canInterruptInferenceWithEsc: true,
+    includeCurrentDateAfterGuidelines: true,
   };
 
   beforeEach(async () => {

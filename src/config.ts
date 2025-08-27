@@ -54,7 +54,26 @@ export interface GthConfig {
    */
   contentProvider: string;
   requirementsProvider: string;
+  /**
+   * Path to project-specific guidelines.
+   * The default is `.gsloth.guidelines.md`; this config may be used to point Gaunt Sloth to a different file,
+   * for example, to AGENTS.md
+   */
   projectGuidelines: string;
+  /**
+   * Whether to include the current date in the project review instructions or not.
+   */
+  includeCurrentDateAfterGuidelines: boolean;
+  /**
+   * Organisation name, locale and timezone.
+   * Only used with {@link includeCurrentDateAfterGuidelines}.
+   * timeZone and locale should be in format supported by Intl.DateTimeFormat
+   */
+  organization?: {
+    name?: string;
+    locale?: string;
+    timezone?: string;
+  };
   projectReviewInstructions: string;
   filesystem: string[] | 'all' | 'read' | 'none';
   builtInTools?: string[];
@@ -268,7 +287,16 @@ export interface CommandLineConfigOverrides {
 export const DEFAULT_CONFIG = {
   contentProvider: 'file',
   requirementsProvider: 'file',
+  /**
+   * Path to project-specific guidelines.
+   * The default is `.gsloth.guidelines.md`; this config may be used to point Gaunt Sloth to a different file,
+   * for example, to AGENTS.md
+   */
   projectGuidelines: PROJECT_GUIDELINES,
+  /**
+   * Whether to include the current date in the project review instructions or not.
+   */
+  includeCurrentDateAfterGuidelines: false,
   projectReviewInstructions: PROJECT_REVIEW_INSTRUCTIONS,
   filesystem: 'read',
   debugLog: false,

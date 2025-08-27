@@ -63,7 +63,7 @@ export async function createInteractiveSession(
       flushSessionLog(); // Ensure user input is immediately written to file
       const messages: BaseMessage[] = [];
       if (isFirstMessage) {
-        const systemPromptParts = [readBackstory(), readGuidelines(config.projectGuidelines)];
+        const systemPromptParts = [readBackstory(), readGuidelines(config)];
         const modePrompt = sessionConfig.readModePrompt();
         if (modePrompt) {
           systemPromptParts.push(modePrompt);

@@ -5,5 +5,11 @@
   },
   "filesystem": "none",
   "useColour": false,
-  "writeOutputToFile": "review.md"
+  "writeOutputToFile": "review.md",
+  "includeCurrentDateAfterGuidelines": true,
+  "organization": {
+    "name": "Galvanized Pukeko",
+    "locale": "en-NZ",
+    "timezone": "Pacific/Auckland"
+  }
 }
