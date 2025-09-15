@@ -15,7 +15,7 @@ jobs:
       matrix:
         node-version: [22.x, latest]
         provider: [groq, inception, openrouter]
-      max-parallel: 1
+      max-parallel: 2
 
     steps:
     - uses: actions/checkout@v4
