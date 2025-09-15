@@ -456,6 +456,10 @@ export async function tryJsonConfig(
 
       // Get the configuration for the specific LLM type
       const llmConfig = jsonConfig.llm;
+      if (commandLineConfigOverrides.verbose) {
+        // Necessary to avoid https://github.com/langchain-ai/langchainjs/issues/8705
+        llmConfig.verbose = commandLineConfigOverrides.verbose;
+      }
       // Import the appropriate config module
       const configModule = await import(`./presets/${llmType}.js`);
       if (configModule.processJsonConfig) {
