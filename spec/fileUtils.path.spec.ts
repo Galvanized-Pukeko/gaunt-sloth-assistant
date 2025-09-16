@@ -101,7 +101,7 @@ describe('pathUtils', () => {
 
     const { getGslothConfigReadPath } = await import('#src/utils/fileUtils.js');
 
-    const result = getGslothConfigReadPath('.gsloth.config.json');
+    const result = getGslothConfigReadPath('.gsloth.config.json', undefined);
 
     expect(result).toBe('/test/project/.gsloth/.gsloth-settings/.gsloth.config.json');
   });
@@ -114,8 +114,19 @@ describe('pathUtils', () => {
 
     const { getGslothConfigReadPath } = await import('#src/utils/fileUtils.js');
 
-    const result = getGslothConfigReadPath('.gsloth.config.json');
+    const result = getGslothConfigReadPath('.gsloth.config.json', undefined);
 
     expect(result).toBe('/test/project/.gsloth.config.json');
+  });
+
+  it('getGslothConfigReadPath should return path for identity when identity profile provided', async () => {
+    // Mock existsSync to return true for both .gsloth dir and config file within .gsloth-settings
+    nodeFsMock.existsSync.mockImplementation((_path: string) => true);
+
+    const { getGslothConfigReadPath } = await import('#src/utils/fileUtils.js');
+
+    const result = getGslothConfigReadPath('.gsloth.config.json', 'devops');
+
+    expect(result).toBe('/test/project/.gsloth/.gsloth-settings/devops/.gsloth.config.json');
   });
 });

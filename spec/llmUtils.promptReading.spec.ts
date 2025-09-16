@@ -61,7 +61,7 @@ describe('prompt reading functions', async () => {
         if (acceptsParam) {
           result = func(filename);
         } else {
-          result = func();
+          result = func({} as any);
         }
         expect(result).toBe('gsloth content');
         expect(fs.readFileSync).toHaveBeenCalledWith(filePath, { encoding: 'utf8' });
@@ -78,7 +78,7 @@ describe('prompt reading functions', async () => {
         if (acceptsParam) {
           result = func(filename);
         } else {
-          result = func();
+          result = func({} as any);
         }
         expect(result).toBe('current content');
         expect(fs.readFileSync).toHaveBeenCalledWith(filePath, { encoding: 'utf8' });
@@ -97,7 +97,7 @@ describe('prompt reading functions', async () => {
         if (acceptsParam) {
           result = func(filename);
         } else {
-          result = func();
+          result = func({} as any);
         }
         expect(result).toBe('install content');
         expect(fs.readFileSync).toHaveBeenCalledWith(fileInInstallDir, { encoding: 'utf8' });
@@ -113,7 +113,7 @@ describe('prompt reading functions', async () => {
         if (acceptsParam) {
           expect(() => func(filename)).toThrow();
         } else {
-          expect(() => func()).toThrow();
+          expect(() => func({} as any)).toThrow();
         }
       });
     });

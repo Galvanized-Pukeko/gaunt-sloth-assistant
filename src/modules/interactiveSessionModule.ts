@@ -1,4 +1,4 @@
-import { CommandLineConfigOverrides, initConfig } from '#src/config.js';
+import { CommandLineConfigOverrides, GthConfig, initConfig } from '#src/config.js';
 import {
   defaultStatusCallback,
   display,
@@ -24,7 +24,7 @@ import { readBackstory, readGuidelines, readSystemPrompt } from '#src/utils/llmU
 
 export interface SessionConfig {
   mode: 'chat' | 'code';
-  readModePrompt: () => string | null;
+  readModePrompt: (config: Pick<GthConfig, 'identityProfile'>) => string | null;
   description: string;
   readyMessage: string;
   exitMessage: string;
@@ -63,12 +63,12 @@ export async function createInteractiveSession(
       flushSessionLog(); // Ensure user input is immediately written to file
       const messages: BaseMessage[] = [];
       if (isFirstMessage) {
-        const systemPromptParts = [readBackstory(), readGuidelines(config)];
-        const modePrompt = sessionConfig.readModePrompt();
+        const systemPromptParts = [readBackstory(config), readGuidelines(config)];
+        const modePrompt = sessionConfig.readModePrompt(config);
         if (modePrompt) {
           systemPromptParts.push(modePrompt);
         }
-        const systemPrompt = readSystemPrompt();
+        const systemPrompt = readSystemPrompt(config);
         if (systemPrompt) {
           systemPromptParts.push(systemPrompt);
         }

@@ -21,7 +21,7 @@
   "scripts": {
     "clean": "tsc -b -clean",
     "build": "tsc -b -clean && tsc",
-    "test": "npx tsc -p spec/tsconfig.json --noEmit && npm run build && vitest run",
+    "test": "npm run build && npx tsc -p spec/tsconfig.json --noEmit && vitest run",
     "it": "npm run build && node it.js",
     "lint": "eslint . --ext .js,.ts",
     "lint-n-fix": "eslint . --ext .js,.ts --fix",
