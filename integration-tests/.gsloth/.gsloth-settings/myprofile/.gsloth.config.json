@@ -1,7 +1,0 @@
-{
-  "llm": {
-    "type": "openai",
-    "model": "gpt-4o"
-  },
-  "canInterruptInferenceWithEsc": false
-}

@@ -1,0 +1,5 @@
+{
+  "llm": {},
+  "canInterruptInferenceWithEsc": false,
+  "includeCurrentDateAfterGuidelines": true
+}
