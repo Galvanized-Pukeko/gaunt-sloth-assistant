@@ -149,50 +149,12 @@ describe('questionAnsweringModule', () => {
       new HumanMessage('test-content'),
     ]);
 
-    // Verify that content was appended to the session log file
-    expect(fileUtilsMock.appendToFile).toHaveBeenCalled();
-
-    // Verify that display was called
-    expect(consoleUtilsMock.display).toHaveBeenCalled();
+    expect(consoleUtilsMock.initSessionLogging).toHaveBeenCalled();
 
     // Verify that displaySuccess was called
     expect(consoleUtilsMock.displaySuccess).toHaveBeenCalled();
 
     // Verify that ProgressIndicator.stop() was called
-    expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
-  });
-
-  it('Should handle file write errors with prop drilling', async () => {
-    const testConfig = { ...mockConfig };
-    testConfig.llm = new FakeStreamingChatModel({
-      responses: ['LLM Response' as unknown as BaseMessage],
-    });
-
-    // Mock file write to throw an error
-    const error = new Error('File write error');
-    fileUtilsMock.appendToFile.mockImplementation(() => {
-      throw error;
-    });
-
-    // Prepare runner mocks
-    gthAgentRunnerMock.mockImplementation(() => gthAgentRunnerInstanceMock);
-    gthAgentRunnerInstanceMock.init.mockResolvedValue(undefined);
-    gthAgentRunnerInstanceMock.processMessages.mockResolvedValue('LLM Response');
-    gthAgentRunnerInstanceMock.cleanup.mockResolvedValue(undefined);
-
-    // Import the module after setting up mocks
-    const { askQuestion } = await import('#src/modules/questionAnsweringModule.js');
-
-    // Call the function with config (prop drilling) and wait for it to complete
-    await askQuestion('gth-ASK', 'Test Preamble', 'Test Content', testConfig);
-
-    // Verify error message was displayed
-    expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
-      expect.stringContaining('test-file-path.md')
-    );
-    expect(consoleUtilsMock.displayError).toHaveBeenCalledWith('File write error');
-
-    // Verify that ProgressIndicator.stop() was called even with error
     expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
   });
 
@@ -229,11 +191,7 @@ describe('questionAnsweringModule', () => {
       new HumanMessage('test-content'),
     ]);
 
-    // Verify the output matches what we expect
-    expect(fileUtilsMock.appendToFile).toHaveBeenCalledWith(
-      '/test-file-path.md',
-      'Different LLM Response'
-    );
+    expect(consoleUtilsMock.initSessionLogging).toHaveBeenCalled();
 
     // Since streamOutput is true, display should not be called
     expect(consoleUtilsMock.display).not.toHaveBeenCalled();
