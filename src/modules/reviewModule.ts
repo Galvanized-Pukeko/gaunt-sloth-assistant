@@ -1,7 +1,6 @@
 import type { GthConfig } from '#src/config.js';
 import {
   defaultStatusCallback,
-  display,
   displayDebug,
   displayError,
   displaySuccess,
