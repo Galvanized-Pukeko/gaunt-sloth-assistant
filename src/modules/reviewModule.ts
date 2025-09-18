@@ -1,7 +1,6 @@
 import type { GthConfig } from '#src/config.js';
 import {
   defaultStatusCallback,
-  display,
   displayDebug,
   displayError,
   displaySuccess,
@@ -9,7 +8,7 @@ import {
   initSessionLogging,
   stopSessionLogging,
 } from '#src/utils/consoleUtils.js';
-import { appendToFile, getCommandOutputFilePath } from '#src/utils/fileUtils.js';
+import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
@@ -32,10 +31,9 @@ export async function review(
   }
 
   const runner = new GthAgentRunner(defaultStatusCallback);
-  let outputContent = '';
   try {
     await runner.init(command, config, new MemorySaver());
-    outputContent = await runner.processMessages(messages);
+    await runner.processMessages(messages);
   } catch (error) {
     displayDebug(error instanceof Error ? error : String(error));
     displayError('Failed to run review with agent.');
@@ -45,13 +43,8 @@ export async function review(
 
   progressIndicator?.stop();
 
-  if (!config.streamOutput) {
-    display('\n' + outputContent);
-  }
-
   if (filePath) {
     try {
-      appendToFile(filePath, outputContent);
       flushSessionLog();
       stopSessionLogging();
       displaySuccess(`\n\nThis report can be found in ${filePath}`);

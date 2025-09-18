@@ -23,6 +23,7 @@ program
       'Consider using debugLog from config.ts for less intrusive debug logging.'
   )
   .option('-c, --config <path>', 'Path to custom configuration file')
+  .option('-i, --identity-profile <identity>', 'Identity profile (separate config and prompts)')
   .option(
     '-w, --write-output-to-file <value>',
     'Write output to file. Accepts true/false or a filename. Shortcuts: -wn or -w0 for false.'
@@ -44,6 +45,9 @@ if (program.getOptionValue('verbose')) {
 if (program.getOptionValue('config')) {
   // Set a custom config path
   cliConfigOverrides.customConfigPath = program.getOptionValue('config');
+}
+if (program.getOptionValue('identityProfile')) {
+  cliConfigOverrides.identityProfile = program.getOptionValue('identityProfile');
 }
 
 const writeToFile = program.getOptionValue('writeOutputToFile');

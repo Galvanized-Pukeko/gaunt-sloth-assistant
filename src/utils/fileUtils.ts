@@ -70,14 +70,20 @@ export function getGslothConfigWritePath(filename: string): string {
 /**
  * Gets the path where gsloth should look for configuration files based on .gsloth directory existence
  * @param filename The configuration filename to look for
+ * @param identityProfile The identity profile dir within GSLOTH_SETTINGS_DIR to look for the configuration file in.
  * @returns The resolved path where the configuration file should be found
  */
-export function getGslothConfigReadPath(filename: string): string {
+export function getGslothConfigReadPath(
+  filename: string,
+  identityProfile: string | undefined
+): string {
   const projectDir = getProjectDir();
   if (gslothDirExists()) {
     const gslothDirPath = resolve(projectDir, GSLOTH_DIR);
     const gslothSettingsPath = resolve(gslothDirPath, GSLOTH_SETTINGS_DIR);
-    const configPath = resolve(gslothSettingsPath, filename);
+    const configPath = identityProfile
+      ? resolve(gslothSettingsPath, identityProfile, filename)
+      : resolve(gslothSettingsPath, filename);
 
     if (existsSync(configPath)) {
       return configPath;

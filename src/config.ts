@@ -61,6 +61,15 @@ export interface GthConfig {
    */
   projectGuidelines: string;
   /**
+   * Separate identity profile.
+   * May include separate identity, guidelines and command protocol,
+   * making gsloth behave as an agent different from default profile behaviour.
+   * for example, `devops` profile to detect changes such as properties and environment variables.
+   * Custom config can still win over this one.
+   * This setting requires .gsloth/.gsloth-settings directory to exist.
+   */
+  identityProfile?: string;
+  /**
    * Whether to include the current date in the project review instructions or not.
    */
   includeCurrentDateAfterGuidelines: boolean;
@@ -279,6 +288,17 @@ export interface CommandLineConfigOverrides {
    * Please note the string does not accept absolute path, but allows to exit project with `..` if necessary.
    */
   writeOutputToFile?: boolean | string;
+  /**
+   * Separate identity profile.
+   * May include separate identity, guidelines and command protocol,
+   * making gsloth behave as an agent different from default profile behaviour.
+   * for example, `devops` profile to detect changes such as properties and environment variables.
+   * Custom config can still win over this one.
+   * This setting requires .gsloth/.gsloth-settings directory to exist.
+   * Important to note that the profile directory substitutes the entire config directory,
+   * in the case if some prompt files are missing - a file from the installation directory will be used.
+   */
+  identityProfile?: string;
 }
 
 /**
@@ -350,7 +370,7 @@ export async function initConfig(
 
   const jsonConfigPath =
     commandLineConfigOverrides.customConfigPath ??
-    getGslothConfigReadPath(USER_PROJECT_CONFIG_JSON);
+    getGslothConfigReadPath(USER_PROJECT_CONFIG_JSON, commandLineConfigOverrides.identityProfile);
 
   // Try loading the JSON config file first
   if (jsonConfigPath.endsWith('.json') && existsSync(jsonConfigPath)) {
@@ -387,7 +407,8 @@ async function tryJsConfig(
   commandLineConfigOverrides: CommandLineConfigOverrides
 ): Promise<GthConfig> {
   const jsConfigPath =
-    commandLineConfigOverrides.customConfigPath ?? getGslothConfigReadPath(USER_PROJECT_CONFIG_JS);
+    commandLineConfigOverrides.customConfigPath ??
+    getGslothConfigReadPath(USER_PROJECT_CONFIG_JS, commandLineConfigOverrides.identityProfile);
   if (jsConfigPath.endsWith('.js') && existsSync(jsConfigPath)) {
     try {
       const i = await importExternalFile(jsConfigPath);
@@ -410,7 +431,8 @@ async function tryMjsConfig(
   commandLineConfigOverrides: CommandLineConfigOverrides
 ): Promise<GthConfig> {
   const mjsConfigPath =
-    commandLineConfigOverrides.customConfigPath ?? getGslothConfigReadPath(USER_PROJECT_CONFIG_MJS);
+    commandLineConfigOverrides.customConfigPath ??
+    getGslothConfigReadPath(USER_PROJECT_CONFIG_MJS, commandLineConfigOverrides.identityProfile);
   if (mjsConfigPath.endsWith('.mjs') && existsSync(mjsConfigPath)) {
     try {
       const i = await importExternalFile(mjsConfigPath);
@@ -565,6 +587,11 @@ function mergeConfig(
     ...config,
     commands: { ...DEFAULT_CONFIG.commands, ...(config?.commands ?? {}) },
   };
+
+  if (commandLineConfigOverrides.identityProfile !== undefined) {
+    displayInfo(`Activating profile: ${commandLineConfigOverrides.identityProfile}`);
+    mergedConfig.identityProfile = commandLineConfigOverrides.identityProfile;
+  }
 
   if (commandLineConfigOverrides.verbose !== undefined) {
     mergedConfig.llm.verbose = commandLineConfigOverrides.verbose;

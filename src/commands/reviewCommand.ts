@@ -61,9 +61,9 @@ export function reviewCommand(
     .action(async (contentId: string | undefined, options: ReviewCommandOptions) => {
       const { initConfig } = await import('#src/config.js');
       const config = await initConfig(cliConfigOverrides); // Initialize and get config
-      const systemPrompt = readSystemPrompt();
+      const systemPrompt = readSystemPrompt(config);
       const systemMessage = [
-        readBackstory(),
+        readBackstory(config),
         readGuidelines(config),
         readReviewInstructions(config),
       ];

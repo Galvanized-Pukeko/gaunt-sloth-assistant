@@ -56,9 +56,9 @@ export function prCommand(
       const { initConfig } = await import('#src/config.js');
       const config = await initConfig(commandLineConfigOverrides); // Initialize and get config
 
-      const systemPrompt = readSystemPrompt();
+      const systemPrompt = readSystemPrompt(config);
       const systemMessage = [
-        readBackstory(),
+        readBackstory(config),
         readGuidelines(config),
         readReviewInstructions(config),
       ];

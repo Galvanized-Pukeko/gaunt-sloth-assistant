@@ -25,19 +25,25 @@ export function getNewRunnableConfig(): RunnableConfig {
   };
 }
 
-export function readBackstory(): string {
-  return readPromptFile(GSLOTH_BACKSTORY);
+export function readBackstory(config: Pick<GthConfig, 'identityProfile'>): string {
+  return readPromptFile(GSLOTH_BACKSTORY, config.identityProfile);
 }
 
 export function readGuidelines(
   config:
-    | Pick<GthConfig, 'projectGuidelines' | 'includeCurrentDateAfterGuidelines' | 'organization'>
+    | Pick<
+        GthConfig,
+        | 'projectGuidelines'
+        | 'includeCurrentDateAfterGuidelines'
+        | 'organization'
+        | 'identityProfile'
+      >
     | string
 ): string {
   if (typeof config === 'string') {
-    return readPromptFile(config);
+    return readPromptFile(config, undefined);
   }
-  const guidelines = readPromptFile(config.projectGuidelines);
+  const guidelines = readPromptFile(config.projectGuidelines, config.identityProfile);
   if (config.includeCurrentDateAfterGuidelines) {
     const currentDate = new Date();
 
@@ -68,28 +74,28 @@ export function readGuidelines(
 }
 
 export function readReviewInstructions(
-  config: Pick<GthConfig, 'projectReviewInstructions'> | string
+  config: Pick<GthConfig, 'projectReviewInstructions' | 'identityProfile'> | string
 ): string {
   if (typeof config === 'string') {
-    return readPromptFile(config);
+    return readPromptFile(config, undefined);
   }
-  return readPromptFile(config.projectReviewInstructions);
+  return readPromptFile(config.projectReviewInstructions, config.identityProfile);
 }
 
-export function readSystemPrompt(): string {
-  return readPromptFile(GSLOTH_SYSTEM_PROMPT);
+export function readSystemPrompt(config: Pick<GthConfig, 'identityProfile'>): string {
+  return readPromptFile(GSLOTH_SYSTEM_PROMPT, config.identityProfile);
 }
 
-export function readChatPrompt(): string {
-  return readPromptFile(GSLOTH_CHAT_PROMPT);
+export function readChatPrompt(config: Pick<GthConfig, 'identityProfile'>): string {
+  return readPromptFile(GSLOTH_CHAT_PROMPT, config.identityProfile);
 }
 
-export function readCodePrompt(): string {
-  return readPromptFile(GSLOTH_CODE_PROMPT);
+export function readCodePrompt(config: Pick<GthConfig, 'identityProfile'>): string {
+  return readPromptFile(GSLOTH_CODE_PROMPT, config.identityProfile);
 }
 
-function readPromptFile(filename: string): string {
-  const path = getGslothConfigReadPath(filename);
+function readPromptFile(filename: string, identityProfile: string | undefined): string {
+  const path = getGslothConfigReadPath(filename, identityProfile);
   if (existsSync(path)) {
     return readFileSync(path, { encoding: 'utf8' });
   }

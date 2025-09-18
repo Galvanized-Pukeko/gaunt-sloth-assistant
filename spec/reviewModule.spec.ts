@@ -177,18 +177,7 @@ describe('reviewModule', () => {
       new HumanMessage('test-diff'),
     ]);
 
-    // Verify that content was appended to the session log file
-    expect(fileUtilsMock.appendToFile).toHaveBeenCalledWith(
-      'test-review-file-path.md',
-      'LLM Review Response'
-    );
-    expect(fileUtilsMock.getCommandOutputFilePath).toHaveBeenCalledWith(
-      expect.objectContaining({ writeOutputToFile: true }),
-      'test-source'
-    );
-
-    // Verify that display was called
-    expect(consoleUtilsMock.display).toHaveBeenCalledWith('\nLLM Review Response');
+    expect(consoleUtilsMock.initSessionLogging).toHaveBeenCalled();
 
     // Verify that displaySuccess was called
     expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith(
@@ -223,40 +212,11 @@ describe('reviewModule', () => {
       new SystemMessage('test-preamble'),
       new HumanMessage('test-diff'),
     ]);
-    expect(fileUtilsMock.getCommandOutputFilePath).toHaveBeenCalledWith(
-      expect.objectContaining({ writeOutputToFile: 'custom/review.md' }),
-      'test-source'
-    );
-    expect(fileUtilsMock.appendToFile).toHaveBeenCalledWith(
-      'custom/review.md',
-      'LLM Review Response'
-    );
+    expect(consoleUtilsMock.initSessionLogging).toHaveBeenCalled();
+
     expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith(
       expect.stringContaining('custom/review.md')
     );
-  });
-
-  it('should handle file write errors with prop drilling', async () => {
-    // Mock file append to throw an error (session logging flow)
-    const error = new Error('File write error');
-    fileUtilsMock.appendToFile.mockImplementation(() => {
-      throw error;
-    });
-
-    // Import the module after setting up mocks
-    const { review } = await import('#src/modules/reviewModule.js');
-
-    // Call the function with config (prop drilling) and wait for it to complete
-    await review('test-source', 'test-preamble', 'test-diff', mockConfig);
-
-    // Verify error message was displayed
-    expect(consoleUtilsMock.displayDebug).toHaveBeenCalled();
-    expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to write review to file')
-    );
-
-    // Verify that ProgressIndicator.stop() was called even with error
-    expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
   });
 
   // Specific test to verify that prop drilling works with different config objects
@@ -283,11 +243,7 @@ describe('reviewModule', () => {
       new HumanMessage('test-diff'),
     ]);
 
-    // Verify the output matches what we expect
-    expect(fileUtilsMock.appendToFile).toHaveBeenCalledWith(
-      'test-review-file-path.md',
-      'Different LLM Response'
-    );
+    expect(consoleUtilsMock.initSessionLogging).toHaveBeenCalled();
 
     // Since streamOutput is true, display should not be called
     expect(consoleUtilsMock.display).not.toHaveBeenCalled();

@@ -36,6 +36,32 @@ If the `.gsloth` directory doesn't exist, gsloth will continue writing all files
 
 **Note:** When initializing a project with an existing `.gsloth` directory, the configuration files will be created in the `.gsloth/.gsloth-settings` directory automatically. There is no automated migration for existing configurations - if you create a `.gsloth` directory after initialization, you'll need to manually move your configuration files into the `.gsloth/.gsloth-settings` directory.
 
+### Identity profiles
+
+Sometimes two different teams have different perspectives of a project.
+For example, developers may want to review the code for code quality.
+DevOps may want to be notified when some configuration files or docker image their configurations of Gaunt Sloth
+may be so different that this is better to keep them in complete separation.
+
+Identity profiles may be used to define different Gaunt Sloth identities for different purposes.
+
+Identity profiles can only be activated in directory-based configuration.
+`gth -i devops pr PR_NO` is invoked, the configuration is pulled from `.gsloth/gsloth-settings/devops/` directory,
+which may contain a full set of config files:
+```
+.gsloth.backstory.md
+.gsloth.config.json
+.gsloth.guidelines.md
+.gsloth.review.md
+```
+
+When no identity profile is specified in the command, for example `gth pr PR_NO`,
+the configuration is pulled from the `.gsloth/gsloth-settings/` directory.
+
+`-i` or `-identity-profile` overrides entire configuration directory, which means it should contain
+a configuration file and prompt files. In the case if some prompt files are missing, they will be
+fetched from the installation directory.
+
 ## Configuration Object
 
 Refer to documentation site for [Configuration Interface](https://gaunt-sloth-assistant.github.io/docs/interfaces/config.GthConfig.html)

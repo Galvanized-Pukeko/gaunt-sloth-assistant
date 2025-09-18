@@ -54,14 +54,17 @@ describe('prompt reading functions', async () => {
         vi.mocked(fs.existsSync).mockImplementation((path) =>
           [gslothDirPath, filePath].includes(String(path))
         );
-        vi.mocked(fs.readFileSync).mockReturnValue('gsloth content');
+        vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+          if (String(path) === filePath) return 'gsloth content';
+          throw new Error('not found');
+        });
 
         let func = (prompt as any)[name] as (_?: string) => string;
         let result;
         if (acceptsParam) {
           result = func(filename);
         } else {
-          result = func();
+          result = func({} as any);
         }
         expect(result).toBe('gsloth content');
         expect(fs.readFileSync).toHaveBeenCalledWith(filePath, { encoding: 'utf8' });
@@ -71,14 +74,17 @@ describe('prompt reading functions', async () => {
         const filePath = `${mockProjectDir}${sep}${filename}`;
 
         vi.mocked(fs.existsSync).mockImplementation((path) => [filePath].includes(String(path)));
-        vi.mocked(fs.readFileSync).mockImplementationOnce(() => 'current content'); // Install dir read succeeds
+        vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+          if (String(path) === filePath) return 'current content';
+          throw new Error('not found');
+        });
 
         let func = (prompt as any)[name] as (_?: string) => string;
         let result;
         if (acceptsParam) {
           result = func(filename);
         } else {
-          result = func();
+          result = func({} as any);
         }
         expect(result).toBe('current content');
         expect(fs.readFileSync).toHaveBeenCalledWith(filePath, { encoding: 'utf8' });
@@ -90,14 +96,17 @@ describe('prompt reading functions', async () => {
         vi.mocked(fs.existsSync).mockImplementation((path) =>
           [fileInInstallDir].includes(String(path))
         );
-        vi.mocked(fs.readFileSync).mockImplementationOnce(() => 'install content'); // Install dir read succeeds
+        vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+          if (String(path) === fileInInstallDir) return 'install content';
+          throw new Error('not found');
+        });
 
         let func = (prompt as any)[name] as (_?: string) => string;
         let result;
         if (acceptsParam) {
           result = func(filename);
         } else {
-          result = func();
+          result = func({} as any);
         }
         expect(result).toBe('install content');
         expect(fs.readFileSync).toHaveBeenCalledWith(fileInInstallDir, { encoding: 'utf8' });
@@ -113,7 +122,7 @@ describe('prompt reading functions', async () => {
         if (acceptsParam) {
           expect(() => func(filename)).toThrow();
         } else {
-          expect(() => func()).toThrow();
+          expect(() => func({} as any)).toThrow();
         }
       });
     });
@@ -125,7 +134,10 @@ describe('prompt reading functions', async () => {
       const filePath = `${mockProjectDir}${sep}${filename}`;
 
       vi.mocked(fs.existsSync).mockImplementation((path) => [filePath].includes(String(path)));
-      vi.mocked(fs.readFileSync).mockReturnValue('Guidelines content');
+      vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+        if (String(path) === filePath) return 'Guidelines content';
+        throw new Error('not found');
+      });
 
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2024-08-25T10:20:30.000Z'));
@@ -153,7 +165,10 @@ describe('prompt reading functions', async () => {
       const filePath = `${mockProjectDir}${sep}${filename}`;
 
       vi.mocked(fs.existsSync).mockImplementation((path) => [filePath].includes(String(path)));
-      vi.mocked(fs.readFileSync).mockReturnValue('Guidelines content');
+      vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+        if (String(path) === filePath) return 'Guidelines content';
+        throw new Error('not found');
+      });
 
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2024-08-25T10:20:30.000Z'));
@@ -172,5 +187,118 @@ describe('prompt reading functions', async () => {
 
       vi.useRealTimers();
     });
+  });
+});
+
+// Identity profile variations
+describe('prompt reading with identityProfile variations', async () => {
+  const prefix = platform() == 'win32' ? 'C:\\' : '/';
+  const mockProjectDir = `${prefix}project`;
+  const mockInstallDir = `${prefix}install`;
+
+  const systemUtils = await import('#src/utils/systemUtils.js');
+  const prompt = await import('#src/utils/llmUtils.js');
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.spyOn(systemUtils, 'getProjectDir').mockReturnValue(mockProjectDir);
+    vi.spyOn(systemUtils, 'getInstallDir').mockReturnValue(mockInstallDir);
+    vi.mocked(fs.existsSync).mockReset();
+    vi.mocked(fs.readFileSync).mockReset();
+  });
+
+  test('readBackstory reads from profile-specific .gsloth-settings when present', () => {
+    const profile = 'probox';
+    const gslothDirPath = `${mockProjectDir}${sep}.gsloth`;
+    const profileFilePath = `${gslothDirPath}${sep}.gsloth-settings${sep}${profile}${sep}.gsloth.backstory.md`;
+
+    vi.mocked(fs.existsSync).mockImplementation((path) =>
+      [gslothDirPath, profileFilePath].includes(String(path))
+    );
+    vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+      if (String(path) === profileFilePath) return 'profile content';
+      throw new Error('not found');
+    });
+
+    const result = (prompt as any).readBackstory({ identityProfile: profile });
+    expect(result).toBe('profile content');
+    expect(fs.readFileSync).toHaveBeenCalledWith(profileFilePath, { encoding: 'utf8' });
+  });
+
+  test('readBackstory does NOT fall back to non-profile .gsloth-settings; uses install dir when project root also missing', () => {
+    const profile = 'probox';
+    const gslothDirPath = `${mockProjectDir}${sep}.gsloth`;
+    // No profile-specific file and no project root file -> should read from install dir
+    const installPath = `${mockInstallDir}${sep}.gsloth.backstory.md`;
+
+    vi.mocked(fs.existsSync).mockImplementation((path) =>
+      [gslothDirPath, installPath].includes(String(path))
+    );
+    vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+      if (String(path) === installPath) return 'install content';
+      throw new Error('not found');
+    });
+
+    const result = (prompt as any).readBackstory({ identityProfile: profile });
+    expect(result).toBe('install content');
+    expect(fs.readFileSync).toHaveBeenCalledWith(installPath, { encoding: 'utf8' });
+  });
+
+  test('readBackstory falls back to project root when not in .gsloth-settings', () => {
+    const profile = 'probox';
+    const projectRootPath = `${mockProjectDir}${sep}.gsloth.backstory.md`;
+
+    vi.mocked(fs.existsSync).mockImplementation((path) => [projectRootPath].includes(String(path)));
+    vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+      if (String(path) === projectRootPath) return 'project content';
+      throw new Error('not found');
+    });
+
+    const result = (prompt as any).readBackstory({ identityProfile: profile });
+    expect(result).toBe('project content');
+    expect(fs.readFileSync).toHaveBeenCalledWith(projectRootPath, { encoding: 'utf8' });
+  });
+
+  test('readGuidelines with config uses profile .gsloth-settings/profile/guidelines.md when present', () => {
+    const profile = 'dumpling';
+    const filename = 'guidelines.md';
+    const gslothDirPath = `${mockProjectDir}${sep}.gsloth`;
+    const profileFilePath = `${gslothDirPath}${sep}.gsloth-settings${sep}${profile}${sep}${filename}`;
+
+    vi.mocked(fs.existsSync).mockImplementation((path) =>
+      [gslothDirPath, profileFilePath].includes(String(path))
+    );
+    vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+      if (String(path) === profileFilePath) return 'profile guidelines';
+      throw new Error('not found');
+    });
+
+    const result = (prompt as any).readGuidelines({
+      projectGuidelines: filename,
+      includeCurrentDateAfterGuidelines: false,
+      identityProfile: profile,
+    });
+    expect(result).toBe('profile guidelines');
+    expect(fs.readFileSync).toHaveBeenCalledWith(profileFilePath, { encoding: 'utf8' });
+  });
+
+  test('readGuidelines with config falls back to install dir when not found elsewhere', () => {
+    const profile = 'dumpling';
+    const filename = 'guidelines.md';
+    const installPath = `${mockInstallDir}${sep}${filename}`;
+
+    vi.mocked(fs.existsSync).mockImplementation((path) => [installPath].includes(String(path)));
+    vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+      if (String(path) === installPath) return 'install guidelines';
+      throw new Error('not found');
+    });
+
+    const result = (prompt as any).readGuidelines({
+      projectGuidelines: filename,
+      includeCurrentDateAfterGuidelines: false,
+      identityProfile: profile,
+    });
+    expect(result).toBe('install guidelines');
+    expect(fs.readFileSync).toHaveBeenCalledWith(installPath, { encoding: 'utf8' });
   });
 });

@@ -33,8 +33,8 @@ export function askCommand(
     )
     .action(async (message: string, options: AskCommandOptions) => {
       const config = await initConfig(commandLineConfigOverrides);
-      const systemPrompt = readSystemPrompt();
-      const preamble = [readBackstory(), readGuidelines(config)];
+      const systemPrompt = readSystemPrompt(config);
+      const preamble = [readBackstory(config), readGuidelines(config)];
       if (systemPrompt) {
         preamble.push(systemPrompt);
       }
