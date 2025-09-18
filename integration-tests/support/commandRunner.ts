@@ -9,14 +9,16 @@ import type { ChildProcess } from 'node:child_process';
  * @param command - The main command to run
  * @param args - The command arguments
  * @param endOutput - Output which will terminate the execution
+ * @param workDir - The working directory for the command
  * @returns The command output as a string
  */
 export async function runCommandWithArgs(
   command: string,
   args: string[],
-  endOutput?: string
+  endOutput?: string,
+  workDir?: string
 ): Promise<string> {
-  const testDir = path.resolve('./integration-tests');
+  const testDir = path.resolve(workDir ? workDir : './integration-tests');
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
