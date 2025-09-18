@@ -14,7 +14,7 @@ describe('Review Command Integration Tests', () => {
 
     const favouriteFishOutput = await runCommandWithArgs(
       'npx',
-      ['gth', '-i fisher-alt', 'ask', '"What is your favourite fish?"'],
+      ['gth', 'ask', '"What is your favourite fish?"'],
       undefined,
       './integration-tests/workdir-with-profiles'
     );
