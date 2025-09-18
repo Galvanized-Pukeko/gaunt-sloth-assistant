@@ -9,7 +9,7 @@ import {
   initSessionLogging,
   stopSessionLogging,
 } from '#src/utils/consoleUtils.js';
-import { appendToFile, getCommandOutputFilePath } from '#src/utils/fileUtils.js';
+import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
@@ -51,7 +51,6 @@ export async function review(
 
   if (filePath) {
     try {
-      appendToFile(filePath, outputContent);
       flushSessionLog();
       stopSessionLogging();
       displaySuccess(`\n\nThis report can be found in ${filePath}`);

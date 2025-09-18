@@ -88,12 +88,7 @@ export async function createInteractiveSession(
       }
       messages.push(new HumanMessage(userInput));
 
-      const response = await runner.processMessages(messages);
-      if (!config.streamSessionInferenceLog) {
-        if (logFileName) {
-          appendToFile(logFileName, response);
-        }
-      }
+      await runner.processMessages(messages);
 
       isFirstMessage = false;
     };

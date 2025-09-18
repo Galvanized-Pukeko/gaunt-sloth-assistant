@@ -295,6 +295,8 @@ export interface CommandLineConfigOverrides {
    * for example, `devops` profile to detect changes such as properties and environment variables.
    * Custom config can still win over this one.
    * This setting requires .gsloth/.gsloth-settings directory to exist.
+   * Important to note that the profile directory substitutes the entire config directory,
+   * in the case if some prompt files are missing - a file from the installation directory will be used.
    */
   identityProfile?: string;
 }

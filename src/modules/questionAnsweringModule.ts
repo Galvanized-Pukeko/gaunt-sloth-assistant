@@ -8,7 +8,7 @@ import {
   initSessionLogging,
   stopSessionLogging,
 } from '#src/utils/consoleUtils.js';
-import { appendToFile, getCommandOutputFilePath } from '#src/utils/fileUtils.js';
+import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
@@ -37,10 +37,9 @@ export async function askQuestion(
 
   // Run via Agent Runner (consistent with interactive session)
   const runner = new GthAgentRunner(defaultStatusCallback);
-  let outputContent = '';
   try {
     await runner.init('ask', config, new MemorySaver());
-    outputContent = await runner.processMessages(messages);
+    await runner.processMessages(messages);
   } catch (err) {
     displayError(`Failed to get answer: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
@@ -49,15 +48,11 @@ export async function askQuestion(
 
   progressIndicator?.stop();
 
-  if (!config.streamOutput) {
-    display('\n' + outputContent);
-  }
   if (config.writeOutputToFile === false) {
     display('\n'); // something going on in some terminals, they swallow last line of output
   }
   if (filePath) {
     try {
-      appendToFile(filePath, outputContent);
       flushSessionLog();
       stopSessionLogging();
       displaySuccess(`\n\nThis report can be found in ${filePath}`);
