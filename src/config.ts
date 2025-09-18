@@ -589,6 +589,7 @@ function mergeConfig(
   };
 
   if (commandLineConfigOverrides.identityProfile !== undefined) {
+    displayInfo(`Activating profile: ${commandLineConfigOverrides.identityProfile}`);
     mergedConfig.identityProfile = commandLineConfigOverrides.identityProfile;
   }
 
