@@ -39,16 +39,21 @@ If the `.gsloth` directory doesn't exist, gsloth will continue writing all files
 ### Identity profiles
 
 Sometimes two different teams have different perspectives of a project.
-For example developers may want to review the code for code quality,
-and DevOps may want to be notified when some configuration files or docker image their configurations of Gaunt Sloth
+For example, developers may want to review the code for code quality.
+DevOps may want to be notified when some configuration files or docker image their configurations of Gaunt Sloth
 may be so different that this is better to keep them in complete separation.
 
-Identity profiles may be used to define different configurations for different purposes.
+Identity profiles may be used to define different Gaunt Sloth identities for different purposes.
 
 Identity profiles can only be activated in directory-based configuration.
-`gth -i devops pr PR_NO` is invoked, the configuration is pulled from `.gsloth/gsloth-settings/devops/` directory.
-
-
+`gth -i devops pr PR_NO` is invoked, the configuration is pulled from `.gsloth/gsloth-settings/devops/` directory,
+which may contain a full set of config files:
+```
+.gsloth.backstory.md
+.gsloth.config.json
+.gsloth.guidelines.md
+.gsloth.review.md
+```
 
 When no identity profile is specified in the command, for example `gth pr PR_NO`,
 the configuration is pulled from the `.gsloth/gsloth-settings/` directory.
