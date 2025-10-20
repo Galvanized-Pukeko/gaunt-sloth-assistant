@@ -37,7 +37,7 @@
     "gth": "cli.js"
   },
   "dependencies": {
-    "@langchain/anthropic": "^0.3.27",
+    "@langchain/anthropic": "^1.0.0",
     "@langchain/core": "^0.3.75",
     "@langchain/deepseek": "^0.1.0",
     "@langchain/google-genai": "^0.2.17",
