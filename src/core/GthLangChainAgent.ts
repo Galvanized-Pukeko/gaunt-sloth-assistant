@@ -11,10 +11,9 @@ import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { createAgent, summarizationMiddleware } from 'langchain';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
-import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
@@ -22,7 +21,7 @@ export type StatusUpdateCallback = (level: StatusLevel, message: string) => void
 export class GthLangChainAgent implements GthAgentInterface {
   private statusUpdate: StatusUpdateCallback;
   private mcpClient: MultiServerMCPClient | null = null;
-  private agent: ReturnType<typeof createReactAgent> | null = null;
+  private agent: ReturnType<typeof createAgent> | null = null;
   private config: GthConfig | null = null;
 
   constructor(statusUpdate: StatusUpdateCallback) {
@@ -34,7 +33,7 @@ export class GthLangChainAgent implements GthAgentInterface {
   async init(
     command: GthCommand | undefined,
     configIn: GthConfig,
-    checkpointSaver?: BaseCheckpointSaver | undefined
+    checkpointer?: BaseCheckpointSaver | undefined
   ): Promise<void> {
     debugLog(`GthLangChainAgent.init called with command: ${command || 'default'}`);
 
@@ -81,29 +80,44 @@ export class GthLangChainAgent implements GthAgentInterface {
 
     // Create the React agent
     debugLog('Creating React agent...');
-    this.agent = createReactAgent({
-      llm: this.config.llm,
+
+    console.log("with memory");
+    this.agent = createAgent({
+      model: this.config.llm,
       tools,
-      checkpointSaver,
-      postModelHook: (state) => {
-        debugLogObject('postModel state', state);
-        const lastMessage = state.messages[state.messages.length - 1];
-        if (
-          isAIMessage(lastMessage) &&
-          lastMessage.tool_calls &&
-          lastMessage.tool_calls?.length > 0
-        ) {
-          this.statusUpdate(
-            'info',
-            `\nRequested tools: ${formatToolCalls(lastMessage.tool_calls)}\n`
-          );
-        }
-        if (configIn.hooks?.postModelHook) {
-          return configIn.hooks.postModelHook(state);
-        }
-        return state;
-      },
-      preModelHook: configIn.hooks?.preModelHook,
+      middleware: [
+        summarizationMiddleware({
+          model: this.config.llm, // TODO use small model
+        }),
+      ],
+      checkpointer
+      // TODO V1 use create middleware
+      // checkpointSaver,
+      // middleware: [
+      //   {
+      //     beforeModel: configIn.hooks?.preModelHook,
+      //   },
+      //   {
+      //     afterModel: (state) => {
+      //       debugLogObject('postModel state', state);
+      //       const lastMessage = state.messages[state.messages.length - 1];
+      //       if (f
+      //         isAIMessage(lastMessage) &&
+      //         lastMessage.tool_calls &&
+      //         lastMessage.tool_calls?.length > 0
+      //       ) {
+      //         this.statusUpdate(
+      //           'info',
+      //           `\nRequested tools: ${formatToolCalls(lastMessage.tool_calls)}\n`
+      //         );
+      //       }
+      //       if (configIn.hooks?.postModelHook) {
+      //         return configIn.hooks.postModelHook(state);
+      //       }
+      //       return state;
+      //     },
+      //   },
+      // ],
     });
     debugLog('React agent created successfully');
   }
