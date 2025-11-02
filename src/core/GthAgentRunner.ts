@@ -4,7 +4,6 @@ import { BaseCheckpointSaver } from '@langchain/langgraph';
 import { GthAgentInterface, GthCommand } from '#src/core/types.js';
 import { GthLangChainAgent, StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
 import { RunnableConfig } from '@langchain/core/runnables';
-import { executeHooks } from '#src/utils/llmUtils.js';
 import { getNewRunnableConfig } from '#src/utils/llmUtils.js';
 import {
   initDebugLogging,
@@ -43,27 +42,16 @@ export class GthAgentRunner {
     initDebugLogging(configIn.debugLog ?? false);
     debugLog(`Initializing GthAgentRunner with command: ${command || 'default'}`);
 
-    this.runConfig = this.config.hooks?.createRunnableConfig
-      ? await this.config.hooks.createRunnableConfig(this.config)
-      : getNewRunnableConfig();
+    this.runConfig = getNewRunnableConfig();
 
     debugLogObject('Runnable Config', this.runConfig);
 
-    this.agent = this.config.hooks?.createAgent
-      ? await this.config.hooks?.createAgent(this.config)
-      : new GthLangChainAgent(this.statusUpdate);
-
-    // Call before init hook
-    debugLog('Executing beforeAgentInit hooks...');
-    await executeHooks(this.config.hooks?.beforeAgentInit, this);
+    this.agent = new GthLangChainAgent(this.statusUpdate);
 
     // Initialize the agent
     debugLog('Initializing agent...');
     await this.agent.init(command, configIn, checkpointSaver);
 
-    // Call after init hook
-    debugLog('Executing afterAgentInit hooks...');
-    await executeHooks(this.config.hooks?.afterAgentInit, this);
     debugLog('Agent initialization complete');
   }
 
@@ -77,8 +65,6 @@ export class GthAgentRunner {
 
     debugLog('Processing messages...');
     debugLogObject('Input Messages', messages);
-
-    await executeHooks(this.config.hooks?.beforeProcessMessages, this, messages, this.runConfig);
 
     try {
       // Decision: Use streaming or non-streaming based on config

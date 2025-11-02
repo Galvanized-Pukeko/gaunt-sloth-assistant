@@ -1,16 +1,14 @@
 import { GthConfig } from '#src/config.js';
 import { displayInfo, displayWarning } from '#src/utils/consoleUtils.js';
-import { debugLog, debugLogError } from '#src/utils/debugUtils.js';
+import { debugLog } from '#src/utils/debugUtils.js';
 import { env } from '#src/utils/systemUtils.js';
 import type { AnthropicInput } from '@langchain/anthropic';
 import type {
   BaseChatModel,
   BaseChatModelParams,
 } from '@langchain/core/language_models/chat_models';
-import { AIMessage, isAIMessage } from '@langchain/core/messages';
-import { BinaryOperatorAggregate, Messages, StateType } from '@langchain/langgraph';
-
 import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
+import { createAnthropicServerToolFilterMiddleware } from '#src/middleware/anthropicCaching.js';
 
 /**
  * Function to process JSON config and create Anthropic LLM instance
@@ -51,59 +49,15 @@ export function init(configFileName: string): void {
 }
 
 // noinspection JSUnusedGlobalSymbols
-// TODO V1
-// export function postProcessJsonConfig(config: GthConfig): GthConfig {
-//   // eslint-disable-next-line
-//   if ((config.hooks?.postModelHook as any as string) === 'skip') {
-//     return {
-//       ...config,
-//       hooks: { ...config.hooks, postModelHook: undefined },
-//     };
-//   }
-//   displayInfo('Applying Anthropic post-processing to config.');
-//   return {
-//     ...config,
-//     hooks: { ...config.hooks, postModelHook: config.hooks?.postModelHook || postModelHook },
-//   };
-// }
+export function postProcessJsonConfig(config: GthConfig): GthConfig {
+  displayInfo('Applying Anthropic post-processing to config.');
 
-/**
- * There's something off with calling server tools with ReAct agent,
- * the tool is not added in react_agent_executor because it is not Runnable,
- * but the tool_node explodes because LLM reports calling non-existing tool.
- * This method removes tool calls from messages, leaving the resulting content.
- * This method seems unnecessary with OpenAI, but is needed for Anthropic,
- * OpenAI does not need a name on the tool and does not seem to return server_tool_use.
- */
-// TODO V1
-// export function postModelHook(
-//   state: StateType<{
-//     messages: BinaryOperatorAggregate<AIMessage[], Messages>;
-//   }>
-// ): StateType<{
-//   messages: BinaryOperatorAggregate<AIMessage[], Messages>;
-// }> {
-//   try {
-//     const lastMessage = state.messages[state.messages.length - 1];
-//     if (isAIMessage(lastMessage) && lastMessage.tool_calls && Array.isArray(lastMessage.content)) {
-//       const serverToolsCalled = lastMessage.content
-//         .filter(
-//           (
-//             content
-//           ): content is {
-//             type: string;
-//             name: string;
-//           } => content.type == 'server_tool_use' && content.name
-//         )
-//         .map((content) => content.name);
-//       debugLog('found server tool calls ' + serverToolsCalled.join(','));
-//       lastMessage.tool_calls = lastMessage.tool_calls.filter(
-//         (tc) => !serverToolsCalled.includes(tc.name)
-//       );
-//     }
-//     return state;
-//   } catch (e) {
-//     debugLogError('removeServerToolCalls error', e);
-//     return state;
-//   }
-// }
+  // TODO v1 need to figure out if we still need this server tool filter
+  // Add Anthropic server tool filter middleware
+  const serverToolFilterMiddleware = createAnthropicServerToolFilterMiddleware();
+
+  return {
+    ...config,
+    middleware: [...(config.middleware || []), serverToolFilterMiddleware],
+  };
+}

@@ -11,10 +11,12 @@ import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
-import { createAgent, summarizationMiddleware } from 'langchain';
+import { createAgent } from 'langchain';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
+import { resolveMiddleware } from '#src/middleware/registry.js';
+import { formatToolCalls } from '#src/utils/llmUtils.js';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
@@ -78,62 +80,41 @@ export class GthLangChainAgent implements GthAgentInterface {
       debugLogObject('All Tools', toolNames.split(', '));
     }
 
-    // Warn about deprecated hooks
-    if (configIn.hooks?.preModelHook) {
-      this.statusUpdate(
-        'warning',
-        'Warning: preModelHook is deprecated and will be removed in v1.0.0. Will be replaced with middleware in Gaunt Sloth Assistant v1.0.0.'
-      );
-      debugLog('Warning: preModelHook is deprecated');
-    }
-    if (configIn.hooks?.postModelHook) {
-      this.statusUpdate(
-        'warning',
-        'Warning: postModelHook is deprecated and will be removed in v1.0.0. Will be replaced with middleware in Gaunt Sloth Assistant v1.0.0.'
-      );
-      debugLog('Warning: postModelHook is deprecated');
-    }
-
     // Create the React agent
     debugLog('Creating React agent...');
 
-    console.log("with memory");
+    // Resolve middleware from config
+    const configuredMiddleware = resolveMiddleware(this.config.middleware, this.config);
+    debugLog(`Loaded ${configuredMiddleware.length} middleware(s)`);
+
+    // Add tool call status update middleware
+    const toolCallStatusMiddleware = {
+      name: 'tool-call-status-update',
+      afterModel: (state: any) => {
+        debugLogObject('postModel state', state);
+        const lastMessage = state.messages[state.messages.length - 1];
+        if (
+          isAIMessage(lastMessage) &&
+          lastMessage.tool_calls &&
+          lastMessage.tool_calls?.length > 0
+        ) {
+          this.statusUpdate(
+            'info',
+            `\nRequested tools: ${formatToolCalls(lastMessage.tool_calls)}\n`
+          );
+        }
+        return state;
+      },
+    };
+
+    // Combine all middleware
+    const middleware = [...configuredMiddleware, toolCallStatusMiddleware];
+
     this.agent = createAgent({
       model: this.config.llm,
       tools,
-      middleware: [
-        summarizationMiddleware({
-          model: this.config.llm, // TODO use small model
-        }),
-      ],
-      checkpointer
-      // TODO V1 use create middleware
-      // checkpointSaver,
-      // middleware: [
-      //   {
-      //     beforeModel: configIn.hooks?.preModelHook,
-      //   },
-      //   {
-      //     afterModel: (state) => {
-      //       debugLogObject('postModel state', state);
-      //       const lastMessage = state.messages[state.messages.length - 1];
-      //       if (f
-      //         isAIMessage(lastMessage) &&
-      //         lastMessage.tool_calls &&
-      //         lastMessage.tool_calls?.length > 0
-      //       ) {
-      //         this.statusUpdate(
-      //           'info',
-      //           `\nRequested tools: ${formatToolCalls(lastMessage.tool_calls)}\n`
-      //         );
-      //       }
-      //       if (configIn.hooks?.postModelHook) {
-      //         return configIn.hooks.postModelHook(state);
-      //       }
-      //       return state;
-      //     },
-      //   },
-      // ],
+      middleware,
+      checkpointer,
     });
     debugLog('React agent created successfully');
   }
