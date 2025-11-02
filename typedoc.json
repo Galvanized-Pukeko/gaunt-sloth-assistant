@@ -7,6 +7,7 @@
   "out": "./docs-generated",
   "projectDocuments": ["docs/COMMANDS.md", "docs/CONFIGURATION.md", "docs/DEVELOPMENT.md"],
   "sourceLinkExternal": true,
+  "includeVersion": true,
   "navigationLinks": {
     "GitHub": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant"
   },

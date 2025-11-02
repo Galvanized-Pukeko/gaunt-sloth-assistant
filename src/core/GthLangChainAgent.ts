@@ -78,6 +78,22 @@ export class GthLangChainAgent implements GthAgentInterface {
       debugLogObject('All Tools', toolNames.split(', '));
     }
 
+    // Warn about deprecated hooks
+    if (configIn.hooks?.preModelHook) {
+      this.statusUpdate(
+        'warning',
+        'Warning: preModelHook is deprecated and will be removed in v1.0.0. Will be replaced with middleware in Gaunt Sloth Assistant v1.0.0.'
+      );
+      debugLog('Warning: preModelHook is deprecated');
+    }
+    if (configIn.hooks?.postModelHook) {
+      this.statusUpdate(
+        'warning',
+        'Warning: postModelHook is deprecated and will be removed in v1.0.0. Will be replaced with middleware in Gaunt Sloth Assistant v1.0.0.'
+      );
+      debugLog('Warning: postModelHook is deprecated');
+    }
+
     // Create the React agent
     debugLog('Creating React agent...');
 

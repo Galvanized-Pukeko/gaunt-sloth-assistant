@@ -44,3 +44,14 @@ or
 `npm install typescript --no-save`
 
 This will allow switching between environments and run tests in both.
+
+## Generate and Publish documentation.
+
+git@github.com:gaunt-sloth-assistant/gaunt-sloth-assistant.github.io.git should be cloned in the same parent dir as `gaunt-sloth-assistant`.
+
+Run
+```
+./update-docs.sh
+```
+
+Commit and push from `gaunt-sloth-assistant.github.io`
