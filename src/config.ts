@@ -89,6 +89,11 @@ export interface GthConfig {
   tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
   /**
    * Hooks are only available on JS config
+   * @deprecated LangChain v1 replaces hooks with middleware. Hooks will be removed in Gaunt Sloth v1.0.0.
+   * - `preModelHook` → Will be replaced with middleware pattern with `beforeModel` method in v1.0.0
+   * - `postModelHook` → Will be replaced with middleware pattern with `afterModel` method in v1.0.0
+   * See LangChain migration guide: https://docs.langchain.com/oss/javascript/migrate/langchain-v1
+   * The 0.9.x release line will continue to support hooks for backward compatibility.
    */
   hooks?: {
     createRunnableConfig?: (config: GthConfig) => Promise<RunnableConfig>;
@@ -102,11 +107,13 @@ export interface GthConfig {
     /**
      * LangGraph preModelHook
      * Provide 'skip' if you don't need default hook.
+     * @deprecated Will be removed in v1.0.0. Will be replaced with middleware pattern in Gaunt Sloth Assistant v1.0.0.
      */
     preModelHook?: LangChainHook;
     /**
      * LangGraph postModelHook
      * Provide 'skip' if you don't need default hook.
+     * @deprecated Will be removed in v1.0.0. Will be replaced with middleware pattern in Gaunt Sloth Assistant v1.0.0.
      */
     postModelHook?: LangChainHook;
   };
