@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GthConfig } from '#src/config.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const displayDebugMock = vi.fn();
 const displayWarningMock = vi.fn();
@@ -16,10 +16,10 @@ vi.mock('#src/utils/debugUtils.js', () => ({
 }));
 
 const summarizationMiddlewareMock = vi.fn();
-const humanInTheLoopMiddlewareMock = vi.fn();
+const anthropicPromptCachingMiddlewareMock = vi.fn();
 vi.mock('langchain', () => ({
   summarizationMiddleware: summarizationMiddlewareMock,
-  humanInTheLoopMiddleware: humanInTheLoopMiddlewareMock,
+  anthropicPromptCachingMiddleware: anthropicPromptCachingMiddlewareMock,
 }));
 
 const createAnthropicCachingMiddlewareMock = vi.fn();
@@ -99,20 +99,20 @@ describe('Middleware Registry', () => {
       const { resolveMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
       const mockSummarizationMiddleware = { beforeModel: vi.fn() };
-      const mockHumanInLoopMiddleware = { beforeModel: vi.fn() };
+      const mockAnthropicPromptCachingMiddleware = { beforeModel: vi.fn() };
       const customMiddleware = { name: 'custom', afterModel: vi.fn() };
 
       summarizationMiddlewareMock.mockReturnValue(mockSummarizationMiddleware);
-      humanInTheLoopMiddlewareMock.mockReturnValue(mockHumanInLoopMiddleware);
+      anthropicPromptCachingMiddlewareMock.mockReturnValue(mockAnthropicPromptCachingMiddleware);
 
       const result = await resolveMiddleware(
-        ['summarization', { name: 'human-in-loop' }, customMiddleware],
+        ['summarization', { name: 'anthropic-prompt-caching' }, customMiddleware],
         mockConfig
       );
 
       expect(result).toHaveLength(3);
       expect(result[0]).toBe(mockSummarizationMiddleware);
-      expect(result[1]).toBe(mockHumanInLoopMiddleware);
+      expect(result[1]).toBe(mockAnthropicPromptCachingMiddleware);
       expect(result[2]).toBe(customMiddleware);
     });
 
@@ -171,7 +171,7 @@ describe('Middleware Registry', () => {
       expect(result).toBe(mockMiddleware);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
         model: mockConfig.llm,
-        maxTokensBeforeSummary: undefined,
+        maxTokensBeforeSummary: 10000,
         messagesToKeep: undefined,
         summaryPrompt: undefined,
       });
@@ -198,43 +198,6 @@ describe('Middleware Registry', () => {
         maxTokensBeforeSummary: 6000,
         messagesToKeep: 5,
         summaryPrompt: 'Custom prompt',
-      });
-    });
-  });
-
-  describe('createHumanInLoopMiddleware', () => {
-    it('should create human-in-loop middleware with default config', async () => {
-      const { createHumanInLoopMiddleware } = await import('#src/middleware/registry.js');
-      const mockConfig = { llm: {} } as GthConfig;
-      const mockMiddleware = { beforeModel: vi.fn() };
-      humanInTheLoopMiddlewareMock.mockReturnValue(mockMiddleware);
-
-      const result = await createHumanInLoopMiddleware({}, mockConfig);
-
-      expect(result).toBe(mockMiddleware);
-      expect(humanInTheLoopMiddlewareMock).toHaveBeenCalledWith({
-        interruptOn: {},
-      });
-    });
-
-    it('should create human-in-loop middleware with custom interruptOn', async () => {
-      const { createHumanInLoopMiddleware } = await import('#src/middleware/registry.js');
-      const mockConfig = { llm: {} } as GthConfig;
-      const mockMiddleware = { beforeModel: vi.fn() };
-      humanInTheLoopMiddlewareMock.mockReturnValue(mockMiddleware);
-
-      const interruptConfig = {
-        'dangerous-tool': { allowAccept: true, allowEdit: false },
-      };
-
-      const result = await createHumanInLoopMiddleware(
-        { interruptOn: interruptConfig },
-        mockConfig
-      );
-
-      expect(result).toBe(mockMiddleware);
-      expect(humanInTheLoopMiddlewareMock).toHaveBeenCalledWith({
-        interruptOn: interruptConfig,
       });
     });
   });
