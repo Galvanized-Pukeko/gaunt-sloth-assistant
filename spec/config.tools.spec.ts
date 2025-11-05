@@ -24,6 +24,7 @@ vi.mock('#src/tools/GthFileSystemToolkit.js', () => ({
 
 vi.mock('#src/utils/systemUtils.js', () => ({
   getProjectDir: () => '/test/dir',
+  getUseColour: () => false,
 }));
 
 describe('Config Tool Functions', () => {

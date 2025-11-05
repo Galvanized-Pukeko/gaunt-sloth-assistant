@@ -12,7 +12,7 @@ describe('gthSequentialThinkingTool', () => {
   beforeEach(() => {
     config = {} as GthConfig;
     mockDisplayInfo = vi.mocked(displayInfo);
-    mockDisplayInfo.mockReset();
+    vi.clearAllMocks();
     process.env.DISABLE_THOUGHT_LOGGING = '';
   });
 

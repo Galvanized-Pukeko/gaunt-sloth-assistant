@@ -22,11 +22,6 @@ vi.mock('langchain', () => ({
   anthropicPromptCachingMiddleware: anthropicPromptCachingMiddlewareMock,
 }));
 
-const createAnthropicCachingMiddlewareMock = vi.fn();
-vi.mock('#src/middleware/anthropicCaching.js', () => ({
-  createAnthropicCachingMiddleware: createAnthropicCachingMiddlewareMock,
-}));
-
 describe('Middleware Registry', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -54,7 +49,7 @@ describe('Middleware Registry', () => {
       expect(result[0]).toBe(mockMiddleware);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
         model: mockConfig.llm,
-        maxTokensBeforeSummary: undefined,
+        maxTokensBeforeSummary: 10000,  // Default value is now 10000
         messagesToKeep: undefined,
         summaryPrompt: undefined,
       });
@@ -136,12 +131,12 @@ describe('Middleware Registry', () => {
       );
       const mockConfig = { llm: {} } as GthConfig;
       const mockMiddleware = { beforeModel: vi.fn() };
-      createAnthropicCachingMiddlewareMock.mockReturnValue(mockMiddleware);
+      anthropicPromptCachingMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await createAnthropicPromptCachingMiddleware({}, mockConfig);
 
       expect(result).toBe(mockMiddleware);
-      expect(createAnthropicCachingMiddlewareMock).toHaveBeenCalledWith({}, mockConfig);
+      expect(anthropicPromptCachingMiddlewareMock).toHaveBeenCalledWith({ ttl: undefined });
     });
 
     it('should create Anthropic caching middleware with custom TTL', async () => {
@@ -150,12 +145,12 @@ describe('Middleware Registry', () => {
       );
       const mockConfig = { llm: {} } as GthConfig;
       const mockMiddleware = { beforeModel: vi.fn() };
-      createAnthropicCachingMiddlewareMock.mockReturnValue(mockMiddleware);
+      anthropicPromptCachingMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await createAnthropicPromptCachingMiddleware({ ttl: '1h' }, mockConfig);
 
       expect(result).toBe(mockMiddleware);
-      expect(createAnthropicCachingMiddlewareMock).toHaveBeenCalledWith({ ttl: '1h' }, mockConfig);
+      expect(anthropicPromptCachingMiddlewareMock).toHaveBeenCalledWith({ ttl: '1h' });
     });
   });
 
