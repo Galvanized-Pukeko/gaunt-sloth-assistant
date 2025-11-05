@@ -3,11 +3,7 @@ import { AIMessage, AIMessageChunk, HumanMessage } from '@langchain/core/message
 import { MemorySaver } from '@langchain/langgraph';
 import type { GthConfig } from '#src/config.js';
 import type { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
-import {
-  FakeChatInput,
-  FakeListChatModel,
-  FakeStreamingChatModel,
-} from '@langchain/core/utils/testing';
+import { FakeListChatModel, FakeStreamingChatModel } from '@langchain/core/utils/testing';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import type { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
 
@@ -65,7 +61,7 @@ vi.mock('langchain', () => ({
   anthropicPromptCachingMiddleware: vi.fn(),
 }));
 
-// Mock middleware registry  
+// Mock middleware registry
 const resolveMiddlewareMock = vi.fn();
 vi.mock('#src/middleware/registry.js', () => ({
   resolveMiddleware: resolveMiddlewareMock,
@@ -255,9 +251,7 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call, ignoring other info/warning messages
-      const displayCalls = statusUpdateCallback.mock.calls.filter(
-        (call) => call[0] === 'display'
-      );
+      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === 'display');
       expect(displayCalls.length).toBeGreaterThan(0);
       expect(displayCalls[0]).toEqual(['display', 'test response']);
       expect(result).toBe('test response');
@@ -265,7 +259,7 @@ describe('GthLangChainAgent', () => {
 
     it('should display tool usage in non-streaming mode', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
-      
+
       // Mock agent to return a message with tool calls
       agentMock.invoke.mockResolvedValue({
         messages: [
@@ -305,10 +299,10 @@ describe('GthLangChainAgent', () => {
 
     it('should handle errors in non-streaming mode', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
-      
+
       // Mock agent to reject with an error
       agentMock.invoke.mockRejectedValue(new Error('Test error'));
-      
+
       const fakeListChatModel = new FakeListChatModel({
         responses: [],
       });
@@ -355,9 +349,7 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call, ignoring other info/warning messages
-      const displayCalls = statusUpdateCallback.mock.calls.filter(
-        (call) => call[0] === 'display'
-      );
+      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === 'display');
       expect(displayCalls.length).toBeGreaterThan(0);
       expect(displayCalls[0]).toEqual(['display', 'test response']);
       expect(result).toBe('test response');
@@ -365,7 +357,7 @@ describe('GthLangChainAgent', () => {
 
     it('should display tool usage in non-streaming mode', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
-      
+
       // Mock agent to return a message with a single tool call
       agentMock.invoke.mockResolvedValue({
         messages: [
@@ -375,7 +367,7 @@ describe('GthLangChainAgent', () => {
           }),
         ],
       });
-      
+
       const fakeListChatModel = new FakeListChatModel({
         responses: ['response done'],
       });
@@ -403,7 +395,7 @@ describe('GthLangChainAgent', () => {
 
     it('should handle multiple tool calls in non-streaming mode', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
-      
+
       // Mock agent to return a message with multiple tool calls
       agentMock.invoke.mockResolvedValue({
         messages: [
@@ -416,7 +408,7 @@ describe('GthLangChainAgent', () => {
           }),
         ],
       });
-      
+
       const fakeListChatModel = new FakeListChatModel({
         responses: ['chunk content bye'],
       });
@@ -510,9 +502,7 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call to verify result
-      const displayCalls = statusUpdateCallback.mock.calls.filter(
-        (call) => call[0] === 'display'
-      );
+      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === 'display');
       if (displayCalls.length > 0) {
         expect(displayCalls[0]).toEqual(['display', 'test response']);
       }
@@ -535,21 +525,21 @@ describe('GthLangChainAgent', () => {
 
     it('should stream agent responses', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
-      
+
       // Mock agent stream to return an async generator
       const mockStreamChunks = [
         [new AIMessageChunk({ content: 'chunk1' }), {}],
         [new AIMessageChunk({ content: 'chunk2' }), {}],
       ];
-      
+
       async function* mockStreamGenerator() {
         for (const chunk of mockStreamChunks) {
           yield chunk;
         }
       }
-      
+
       agentMock.stream.mockResolvedValue(mockStreamGenerator());
-      
+
       const fakeStreamingChatModel = new FakeStreamingChatModel({
         chunks: [
           new AIMessageChunk({ content: 'chunk1' }),

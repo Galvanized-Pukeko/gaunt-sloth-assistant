@@ -49,7 +49,7 @@ describe('Middleware Registry', () => {
       expect(result[0]).toBe(mockMiddleware);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
         model: mockConfig.llm,
-        maxTokensBeforeSummary: 10000,  // Default value is now 10000
+        maxTokensBeforeSummary: 10000, // Default value is now 10000
         messagesToKeep: undefined,
         summaryPrompt: undefined,
       });
