@@ -9,35 +9,31 @@
  * Some config params can be overriden from command line, see {@link CommandLineConfigOverrides}
  */
 import {
-  displayDebug,
-  displayError,
-  displayInfo,
-  displayWarning,
-} from '#src/utils/consoleUtils.js';
-import {
   PROJECT_GUIDELINES,
   PROJECT_REVIEW_INSTRUCTIONS,
   USER_PROJECT_CONFIG_JS,
   USER_PROJECT_CONFIG_JSON,
   USER_PROJECT_CONFIG_MJS,
 } from '#src/constants.js';
-import type { GthAgentRunner } from '#src/core/GthAgentRunner.js';
-import type { GthAgentInterface } from '#src/core/types.js';
+import type { MiddlewareConfig } from '#src/middleware/types.js';
+import { JiraConfig } from '#src/providers/types.js';
+import {
+  displayDebug,
+  displayError,
+  displayInfo,
+  displayWarning,
+} from '#src/utils/consoleUtils.js';
 import {
   getGslothConfigReadPath,
   getGslothConfigWritePath,
   importExternalFile,
   writeFileIfNotExistsWithMessages,
 } from '#src/utils/fileUtils.js';
-import type { Message } from '#src/modules/types.js';
-import { JiraConfig } from '#src/providers/types.js';
 import { error, exit, isTTY, setUseColour } from '#src/utils/systemUtils.js';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { RunnableConfig } from '@langchain/core/runnables';
 import type { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import type { Connection } from '@langchain/mcp-adapters';
 import { existsSync, readFileSync } from 'node:fs';
-import type { MiddlewareConfig } from '#src/middleware/types.js';
 
 /**
  * This is a processed Gaunt Sloth config ready to be passed down into components.
@@ -117,12 +113,6 @@ export interface GthConfig {
    * Available predefined middleware:
    * - `anthropic-prompt-caching`: Reduces API costs by caching prompts (Anthropic only)
    * - `summarization`: Condenses conversation history when approaching token limits
-   * - `human-in-loop`: Requires human approval before sensitive tool calls
-   * - `model-limiter`: Enforces maximum model invocations
-   * - `tool-limiter`: Restricts tool usage
-   * - `model-fallback`: Switches to alternative models on failure
-   * - `pii-detection`: Identifies and handles sensitive information
-   * - `planning`: Adds todo list management
    */
   middleware?: MiddlewareConfig[];
   /**

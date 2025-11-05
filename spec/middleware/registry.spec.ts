@@ -37,7 +37,7 @@ describe('Middleware Registry', () => {
       const { resolveMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
 
-      const result = resolveMiddleware(undefined, mockConfig);
+      const result = await resolveMiddleware(undefined, mockConfig);
 
       expect(result).toEqual([]);
     });
@@ -48,7 +48,7 @@ describe('Middleware Registry', () => {
       const mockMiddleware = { beforeModel: vi.fn() };
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
-      const result = resolveMiddleware(['summarization'], mockConfig);
+      const result = await resolveMiddleware(['summarization'], mockConfig);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(mockMiddleware);
@@ -66,7 +66,7 @@ describe('Middleware Registry', () => {
       const mockMiddleware = { beforeModel: vi.fn() };
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
-      const result = resolveMiddleware(
+      const result = await resolveMiddleware(
         [{ name: 'summarization', maxTokensBeforeSummary: 5000, messagesToKeep: 10 }],
         mockConfig
       );
@@ -89,7 +89,7 @@ describe('Middleware Registry', () => {
         afterModel: vi.fn(),
       };
 
-      const result = resolveMiddleware([customMiddleware], mockConfig);
+      const result = await resolveMiddleware([customMiddleware], mockConfig);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(customMiddleware);
@@ -105,7 +105,7 @@ describe('Middleware Registry', () => {
       summarizationMiddlewareMock.mockReturnValue(mockSummarizationMiddleware);
       humanInTheLoopMiddlewareMock.mockReturnValue(mockHumanInLoopMiddleware);
 
-      const result = resolveMiddleware(
+      const result = await resolveMiddleware(
         ['summarization', { name: 'human-in-loop' }, customMiddleware],
         mockConfig
       );
@@ -120,7 +120,7 @@ describe('Middleware Registry', () => {
       const { resolveMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
 
-      const result = resolveMiddleware(['unknown-middleware'], mockConfig);
+      const result = await resolveMiddleware(['unknown-middleware'], mockConfig);
 
       expect(result).toHaveLength(0);
       expect(displayWarningMock).toHaveBeenCalledWith(
@@ -138,7 +138,7 @@ describe('Middleware Registry', () => {
       const mockMiddleware = { beforeModel: vi.fn() };
       createAnthropicCachingMiddlewareMock.mockReturnValue(mockMiddleware);
 
-      const result = createAnthropicPromptCachingMiddleware({}, mockConfig);
+      const result = await createAnthropicPromptCachingMiddleware({}, mockConfig);
 
       expect(result).toBe(mockMiddleware);
       expect(createAnthropicCachingMiddlewareMock).toHaveBeenCalledWith({}, mockConfig);
@@ -152,7 +152,7 @@ describe('Middleware Registry', () => {
       const mockMiddleware = { beforeModel: vi.fn() };
       createAnthropicCachingMiddlewareMock.mockReturnValue(mockMiddleware);
 
-      const result = createAnthropicPromptCachingMiddleware({ ttl: '1h' }, mockConfig);
+      const result = await createAnthropicPromptCachingMiddleware({ ttl: '1h' }, mockConfig);
 
       expect(result).toBe(mockMiddleware);
       expect(createAnthropicCachingMiddlewareMock).toHaveBeenCalledWith({ ttl: '1h' }, mockConfig);
@@ -166,7 +166,7 @@ describe('Middleware Registry', () => {
       const mockMiddleware = { beforeModel: vi.fn() };
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
-      const result = createSummarizationMiddleware({}, mockConfig);
+      const result = await createSummarizationMiddleware({}, mockConfig);
 
       expect(result).toBe(mockMiddleware);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
@@ -183,7 +183,7 @@ describe('Middleware Registry', () => {
       const mockMiddleware = { beforeModel: vi.fn() };
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
-      const result = createSummarizationMiddleware(
+      const result = await createSummarizationMiddleware(
         {
           maxTokensBeforeSummary: 6000,
           messagesToKeep: 5,
@@ -209,7 +209,7 @@ describe('Middleware Registry', () => {
       const mockMiddleware = { beforeModel: vi.fn() };
       humanInTheLoopMiddlewareMock.mockReturnValue(mockMiddleware);
 
-      const result = createHumanInLoopMiddleware({}, mockConfig);
+      const result = await createHumanInLoopMiddleware({}, mockConfig);
 
       expect(result).toBe(mockMiddleware);
       expect(humanInTheLoopMiddlewareMock).toHaveBeenCalledWith({
@@ -227,7 +227,10 @@ describe('Middleware Registry', () => {
         'dangerous-tool': { allowAccept: true, allowEdit: false },
       };
 
-      const result = createHumanInLoopMiddleware({ interruptOn: interruptConfig }, mockConfig);
+      const result = await createHumanInLoopMiddleware(
+        { interruptOn: interruptConfig },
+        mockConfig
+      );
 
       expect(result).toBe(mockMiddleware);
       expect(humanInTheLoopMiddlewareMock).toHaveBeenCalledWith({

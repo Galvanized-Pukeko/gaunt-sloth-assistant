@@ -1,14 +1,11 @@
-import { GthConfig } from '#src/config.js';
-import { displayInfo, displayWarning } from '#src/utils/consoleUtils.js';
-import { debugLog } from '#src/utils/debugUtils.js';
+import { displayWarning } from '#src/utils/consoleUtils.js';
+import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 import { env } from '#src/utils/systemUtils.js';
 import type { AnthropicInput } from '@langchain/anthropic';
 import type {
   BaseChatModel,
   BaseChatModelParams,
 } from '@langchain/core/language_models/chat_models';
-import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
-import { createAnthropicServerToolFilterMiddleware } from '#src/middleware/anthropicCaching.js';
 
 /**
  * Function to process JSON config and create Anthropic LLM instance
@@ -46,18 +43,4 @@ export function init(configFileName: string): void {
     `You need to update your ${configFileName} to add your Anthropic API key, ` +
       'or define ANTHROPIC_API_KEY environment variable.'
   );
-}
-
-// noinspection JSUnusedGlobalSymbols
-export function postProcessJsonConfig(config: GthConfig): GthConfig {
-  displayInfo('Applying Anthropic post-processing to config.');
-
-  // TODO v1 need to figure out if we still need this server tool filter
-  // Add Anthropic server tool filter middleware
-  const serverToolFilterMiddleware = createAnthropicServerToolFilterMiddleware();
-
-  return {
-    ...config,
-    middleware: [...(config.middleware || []), serverToolFilterMiddleware],
-  };
 }

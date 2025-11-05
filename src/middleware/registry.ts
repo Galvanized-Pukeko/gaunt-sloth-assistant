@@ -7,29 +7,18 @@
  */
 
 import type { GthConfig } from '#src/config.js';
-import { displayDebug, displayWarning } from '#src/utils/consoleUtils.js';
-import { debugLog } from '#src/utils/debugUtils.js';
 import type {
   AnthropicPromptCachingConfig,
-  CustomMiddleware,
-  HumanInLoopConfig,
   MiddlewareConfig,
-  ModelFallbackConfig,
-  ModelLimiterConfig,
-  PiiDetectionConfig,
-  PlanningConfig,
   PredefinedMiddlewareConfig,
   SummarizationConfig,
-  ToolLimiterConfig,
 } from '#src/middleware/types.js';
+import { displayWarning } from '#src/utils/consoleUtils.js';
+import { debugLog } from '#src/utils/debugUtils.js';
 import {
-  humanInTheLoopMiddleware,
+  anthropicPromptCachingMiddleware,
   summarizationMiddleware,
-  // modelCallLimitMiddleware,
-  // toolCallLimitMiddleware,
-  // modelFallbackMiddleware,
-  // piiDetectionMiddleware,
-  // planningMiddleware,
+  type AgentMiddleware,
 } from 'langchain';
 
 /**
@@ -40,16 +29,14 @@ import {
  * @param gthConfig - Full Gaunt Sloth configuration
  * @returns Middleware object
  */
-export function createAnthropicPromptCachingMiddleware(
+export async function createAnthropicPromptCachingMiddleware(
   config: AnthropicPromptCachingConfig,
-  gthConfig: GthConfig
-): CustomMiddleware {
+  _: GthConfig
+): Promise<AgentMiddleware> {
   debugLog(`Creating Anthropic prompt caching middleware with TTL: ${config.ttl || 'default'}`);
 
-  // This will be implemented in anthropicCaching.ts
-  // For now, return a placeholder that will be replaced
-  const { createAnthropicCachingMiddleware } = require('#src/middleware/anthropicCaching.js');
-  return createAnthropicCachingMiddleware(config, gthConfig);
+  // Dynamic import for async initialization
+  return Promise.resolve(anthropicPromptCachingMiddleware({ ttl: config.ttl }));
 }
 
 /**
@@ -60,168 +47,20 @@ export function createAnthropicPromptCachingMiddleware(
  * @param gthConfig - Full Gaunt Sloth configuration
  * @returns Middleware object
  */
-export function createSummarizationMiddleware(
+export async function createSummarizationMiddleware(
   config: SummarizationConfig,
   gthConfig: GthConfig
-): any {
+): Promise<AgentMiddleware> {
   debugLog('Creating summarization middleware');
 
-  return summarizationMiddleware({
-    model: config.model || gthConfig.llm,
-    maxTokensBeforeSummary: config.maxTokensBeforeSummary,
-    messagesToKeep: config.messagesToKeep,
-    summaryPrompt: config.summaryPrompt,
-  });
-}
-
-/**
- * Create human-in-the-loop middleware.
- * This middleware pauses execution for human approval before sensitive tool calls.
- *
- * @param config - Configuration for the middleware
- * @param _gthConfig - Full Gaunt Sloth configuration (unused)
- * @returns Middleware object
- */
-export function createHumanInLoopMiddleware(config: HumanInLoopConfig, _gthConfig: GthConfig): any {
-  debugLog('Creating human-in-the-loop middleware');
-
-  return humanInTheLoopMiddleware({
-    interruptOn: (config.interruptOn as any) || {},
-  });
-}
-
-/**
- * Create model call limiter middleware.
- * This middleware enforces maximum model invocations per thread or run.
- *
- * @param config - Configuration for the middleware
- * @param _gthConfig - Full Gaunt Sloth configuration (unused)
- * @returns Middleware object
- */
-export function createModelLimiterMiddleware(
-  config: ModelLimiterConfig,
-  _gthConfig: GthConfig
-): CustomMiddleware {
-  debugLog(`Creating model limiter middleware with max calls: ${config.maxCalls || 'unlimited'}`);
-
-  displayWarning(
-    'Model limiter middleware is not yet available in LangChain. This middleware will be skipped.'
+  return Promise.resolve(
+    summarizationMiddleware({
+      model: config.model || gthConfig.llm,
+      maxTokensBeforeSummary: config.maxTokensBeforeSummary || 10000,
+      messagesToKeep: config.messagesToKeep,
+      summaryPrompt: config.summaryPrompt,
+    })
   );
-
-  // TODO: Implement when available in LangChain
-  // return modelCallLimitMiddleware({
-  //   maxCalls: config.maxCalls,
-  //   onLimitExceeded: config.onLimitExceeded,
-  // });
-
-  return { name: 'model-limiter-placeholder' };
-}
-
-/**
- * Create tool call limiter middleware.
- * This middleware restricts specific tool usage or all tools collectively.
- *
- * @param config - Configuration for the middleware
- * @param _gthConfig - Full Gaunt Sloth configuration (unused)
- * @returns Middleware object
- */
-export function createToolLimiterMiddleware(
-  config: ToolLimiterConfig,
-  _gthConfig: GthConfig
-): CustomMiddleware {
-  debugLog(`Creating tool limiter middleware with max calls: ${config.maxCalls || 'unlimited'}`);
-
-  displayWarning(
-    'Tool limiter middleware is not yet available in LangChain. This middleware will be skipped.'
-  );
-
-  // TODO: Implement when available in LangChain
-  // return toolCallLimitMiddleware({
-  //   maxCalls: config.maxCalls,
-  //   toolLimits: config.toolLimits,
-  //   onLimitExceeded: config.onLimitExceeded,
-  // });
-
-  return { name: 'tool-limiter-placeholder' };
-}
-
-/**
- * Create model fallback middleware.
- * This middleware automatically switches to alternative models when primary ones fail.
- *
- * @param config - Configuration for the middleware
- * @param _gthConfig - Full Gaunt Sloth configuration (unused)
- * @returns Middleware object
- */
-export function createModelFallbackMiddleware(
-  config: ModelFallbackConfig,
-  _gthConfig: GthConfig
-): CustomMiddleware {
-  debugLog(
-    `Creating model fallback middleware with fallbacks: ${config.fallbackModels.join(', ')}`
-  );
-
-  displayWarning(
-    'Model fallback middleware is not yet available in LangChain. This middleware will be skipped.'
-  );
-
-  // TODO: Implement when available in LangChain
-  // return modelFallbackMiddleware(...config.fallbackModels);
-
-  return { name: 'model-fallback-placeholder' };
-}
-
-/**
- * Create PII detection middleware.
- * This middleware identifies sensitive information with various strategies.
- *
- * @param config - Configuration for the middleware
- * @param _gthConfig - Full Gaunt Sloth configuration (unused)
- * @returns Middleware object
- */
-export function createPiiDetectionMiddleware(
-  config: PiiDetectionConfig,
-  _gthConfig: GthConfig
-): CustomMiddleware {
-  debugLog(`Creating PII detection middleware with strategy: ${config.strategy || 'redact'}`);
-
-  displayWarning(
-    'PII detection middleware is not yet available in LangChain. This middleware will be skipped.'
-  );
-
-  // TODO: Implement when available in LangChain
-  // return piiDetectionMiddleware({
-  //   strategy: config.strategy,
-  //   customPatterns: config.customPatterns,
-  // });
-
-  return { name: 'pii-detection-placeholder' };
-}
-
-/**
- * Create planning middleware.
- * This middleware adds todo list management via automatic write_todos tool.
- *
- * @param config - Configuration for the middleware
- * @param _gthConfig - Full Gaunt Sloth configuration (unused)
- * @returns Middleware object
- */
-export function createPlanningMiddleware(
-  config: PlanningConfig,
-  _gthConfig: GthConfig
-): CustomMiddleware {
-  debugLog(`Creating planning middleware: ${config.enabled ? 'enabled' : 'disabled'}`);
-
-  displayWarning(
-    'Planning middleware is not yet available in LangChain. This middleware will be skipped.'
-  );
-
-  // TODO: Implement when available in LangChain
-  // return planningMiddleware({
-  //   enabled: config.enabled,
-  // });
-
-  return { name: 'planning-placeholder' };
 }
 
 /**
@@ -232,31 +71,39 @@ export function createPlanningMiddleware(
  * @param gthConfig - Full Gaunt Sloth configuration
  * @returns Array of middleware instances
  */
-export function resolveMiddleware(
+export async function resolveMiddleware(
   configs: MiddlewareConfig[] | undefined,
   gthConfig: GthConfig
-): any[] {
+): Promise<AgentMiddleware[]> {
   if (!configs || configs.length === 0) {
     return [];
   }
 
-  const middleware: any[] = [];
+  const middleware: AgentMiddleware[] = [];
+
+  // List of predefined middleware names
+  const predefinedNames = ['anthropic-prompt-caching', 'summarization'];
 
   for (const config of configs) {
     try {
       // Handle string configuration (predefined middleware with defaults)
       if (typeof config === 'string') {
-        middleware.push(createPredefinedMiddleware(config, {}, gthConfig));
+        middleware.push(await createPredefinedMiddleware(config, {}, gthConfig));
       }
       // Handle predefined middleware with custom settings
-      else if (typeof config === 'object' && 'name' in config) {
+      else if (
+        typeof config === 'object' &&
+        'name' in config &&
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        predefinedNames.includes((config as any).name)
+      ) {
         const { name, ...settings } = config as PredefinedMiddlewareConfig;
-        middleware.push(createPredefinedMiddleware(name, settings, gthConfig));
+        middleware.push(await createPredefinedMiddleware(name, settings, gthConfig));
       }
       // Handle custom middleware object (JS config only)
       else {
         debugLog('Adding custom middleware');
-        middleware.push(config as CustomMiddleware);
+        middleware.push(config as AgentMiddleware);
       }
     } catch (error) {
       displayWarning(
@@ -276,11 +123,11 @@ export function resolveMiddleware(
  * @param gthConfig - Full Gaunt Sloth configuration
  * @returns Middleware instance
  */
-function createPredefinedMiddleware(
+async function createPredefinedMiddleware(
   name: string,
   settings: Record<string, unknown>,
   gthConfig: GthConfig
-): CustomMiddleware {
+): Promise<AgentMiddleware> {
   switch (name) {
     case 'anthropic-prompt-caching':
       return createAnthropicPromptCachingMiddleware(
@@ -290,28 +137,6 @@ function createPredefinedMiddleware(
 
     case 'summarization':
       return createSummarizationMiddleware(settings as SummarizationConfig, gthConfig);
-
-    case 'human-in-loop':
-      return createHumanInLoopMiddleware(settings as HumanInLoopConfig, gthConfig);
-
-    case 'model-limiter':
-      return createModelLimiterMiddleware(settings as ModelLimiterConfig, gthConfig);
-
-    case 'tool-limiter':
-      return createToolLimiterMiddleware(settings as ToolLimiterConfig, gthConfig);
-
-    case 'model-fallback':
-      // Validate that fallbackModels exists
-      if (!('fallbackModels' in settings) || !Array.isArray((settings as any).fallbackModels)) {
-        throw new Error('model-fallback middleware requires "fallbackModels" array');
-      }
-      return createModelFallbackMiddleware(settings as unknown as ModelFallbackConfig, gthConfig);
-
-    case 'pii-detection':
-      return createPiiDetectionMiddleware(settings as PiiDetectionConfig, gthConfig);
-
-    case 'planning':
-      return createPlanningMiddleware(settings as PlanningConfig, gthConfig);
 
     default:
       throw new Error(`Unknown predefined middleware: ${name}`);

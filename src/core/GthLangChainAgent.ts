@@ -1,22 +1,22 @@
 import { getDefaultTools } from '#src/builtInToolsConfig.js';
 import { GthConfig, ServerTool } from '#src/config.js';
-import { displayInfo } from '#src/utils/consoleUtils.js';
 import { GthAgentInterface, GthCommand, StatusLevel } from '#src/core/types.js';
-import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
 import { createAuthProviderAndAuthenticate } from '#src/mcp/OAuthClientProviderImpl.js';
+import { resolveMiddleware } from '#src/middleware/registry.js';
 import type { Message } from '#src/modules/types.js';
+import { displayInfo } from '#src/utils/consoleUtils.js';
+import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
+import { formatToolCalls } from '#src/utils/llmUtils.js';
+import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
 import { isAIMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
-import { createAgent } from 'langchain';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
-import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
-import { resolveMiddleware } from '#src/middleware/registry.js';
-import { formatToolCalls } from '#src/utils/llmUtils.js';
+import { createAgent } from 'langchain';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
@@ -84,12 +84,12 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLog('Creating React agent...');
 
     // Resolve middleware from config
-    const configuredMiddleware = resolveMiddleware(this.config.middleware, this.config);
-    debugLog(`Loaded ${configuredMiddleware.length} middleware(s)`);
+    const configuredMiddleware = await resolveMiddleware(this.config.middleware, this.config);
 
     // Add tool call status update middleware
     const toolCallStatusMiddleware = {
-      name: 'tool-call-status-update',
+      name: 'GthMiddlewareToolCallStatusUpdate',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       afterModel: (state: any) => {
         debugLogObject('postModel state', state);
         const lastMessage = state.messages[state.messages.length - 1];
@@ -109,6 +109,8 @@ export class GthLangChainAgent implements GthAgentInterface {
 
     // Combine all middleware
     const middleware = [...configuredMiddleware, toolCallStatusMiddleware];
+
+    this.statusUpdate('info', `Loaded middleware: ${middleware.map((m) => m.name).join(', ')}`);
 
     this.agent = createAgent({
       model: this.config.llm,
