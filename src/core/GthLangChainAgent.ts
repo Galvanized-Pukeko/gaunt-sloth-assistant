@@ -1,28 +1,29 @@
 import { getDefaultTools } from '#src/builtInToolsConfig.js';
 import { GthConfig, ServerTool } from '#src/config.js';
-import { displayInfo } from '#src/utils/consoleUtils.js';
 import { GthAgentInterface, GthCommand, StatusLevel } from '#src/core/types.js';
-import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
 import { createAuthProviderAndAuthenticate } from '#src/mcp/OAuthClientProviderImpl.js';
+import { resolveMiddleware } from '#src/middleware/registry.js';
 import type { Message } from '#src/modules/types.js';
+import { displayInfo } from '#src/utils/consoleUtils.js';
+import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
+import { formatToolCalls } from '#src/utils/llmUtils.js';
+import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
 import { isAIMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
-import { formatToolCalls } from '#src/utils/llmUtils.js';
-import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
+import { createAgent } from 'langchain';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
 export class GthLangChainAgent implements GthAgentInterface {
   private statusUpdate: StatusUpdateCallback;
   private mcpClient: MultiServerMCPClient | null = null;
-  private agent: ReturnType<typeof createReactAgent> | null = null;
+  private agent: ReturnType<typeof createAgent> | null = null;
   private config: GthConfig | null = null;
 
   constructor(statusUpdate: StatusUpdateCallback) {
@@ -34,7 +35,7 @@ export class GthLangChainAgent implements GthAgentInterface {
   async init(
     command: GthCommand | undefined,
     configIn: GthConfig,
-    checkpointSaver?: BaseCheckpointSaver | undefined
+    checkpointer?: BaseCheckpointSaver | undefined
   ): Promise<void> {
     debugLog(`GthLangChainAgent.init called with command: ${command || 'default'}`);
 
@@ -79,29 +80,17 @@ export class GthLangChainAgent implements GthAgentInterface {
       debugLogObject('All Tools', toolNames.split(', '));
     }
 
-    // Warn about deprecated hooks
-    if (configIn.hooks?.preModelHook) {
-      this.statusUpdate(
-        'warning',
-        'Warning: preModelHook is deprecated and will be removed in v1.0.0. Will be replaced with middleware in Gaunt Sloth Assistant v1.0.0.'
-      );
-      debugLog('Warning: preModelHook is deprecated');
-    }
-    if (configIn.hooks?.postModelHook) {
-      this.statusUpdate(
-        'warning',
-        'Warning: postModelHook is deprecated and will be removed in v1.0.0. Will be replaced with middleware in Gaunt Sloth Assistant v1.0.0.'
-      );
-      debugLog('Warning: postModelHook is deprecated');
-    }
-
     // Create the React agent
     debugLog('Creating React agent...');
-    this.agent = createReactAgent({
-      llm: this.config.llm,
-      tools,
-      checkpointSaver,
-      postModelHook: (state) => {
+
+    // Resolve middleware from config
+    const configuredMiddleware = await resolveMiddleware(this.config.middleware, this.config);
+
+    // Add tool call status update middleware
+    const toolCallStatusMiddleware = {
+      name: 'GthMiddlewareToolCallStatusUpdate',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      afterModel: (state: any) => {
         debugLogObject('postModel state', state);
         const lastMessage = state.messages[state.messages.length - 1];
         if (
@@ -114,12 +103,20 @@ export class GthLangChainAgent implements GthAgentInterface {
             `\nRequested tools: ${formatToolCalls(lastMessage.tool_calls)}\n`
           );
         }
-        if (configIn.hooks?.postModelHook) {
-          return configIn.hooks.postModelHook(state);
-        }
         return state;
       },
-      preModelHook: configIn.hooks?.preModelHook,
+    };
+
+    // Combine all middleware
+    const middleware = [...configuredMiddleware, toolCallStatusMiddleware];
+
+    this.statusUpdate('info', `Loaded middleware: ${middleware.map((m) => m.name).join(', ')}`);
+
+    this.agent = createAgent({
+      model: this.config.llm,
+      tools,
+      middleware,
+      checkpointer,
     });
     debugLog('React agent created successfully');
   }

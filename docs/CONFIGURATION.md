@@ -736,6 +736,129 @@ Example configuration including dev tools (from .gsloth.config.json):
 Note: For `run_single_test`, the command can include a placeholder like `${testPath}` for the test file path. p
 Security validations are in place to prevent path traversal or injection.
 
+## Middleware Configuration
+
+Gaunt Sloth supports middleware to intercept and control agent execution at critical points. Middleware provides hooks for cost optimization, conversation management, and custom logic.
+
+### Predefined Middleware
+
+There are two predefined middleware types available:
+
+#### Anthropic Prompt Caching Middleware
+
+Reduces API costs by caching prompts (Anthropic models only):
+
+```json
+{
+  "llm": {
+    "type": "anthropic",
+    "model": "claude-3-5-sonnet-20241022"
+  },
+  "middleware": [
+    "anthropic-prompt-caching"
+  ]
+}
+```
+
+With custom TTL configuration:
+
+```json
+{
+  "middleware": [
+    {
+      "name": "anthropic-prompt-caching",
+      "ttl": "5m"
+    }
+  ]
+}
+```
+
+TTL options: `"5m"` (5 minutes) or `"1h"` (1 hour)
+
+#### Summarization Middleware
+
+Automatically condenses conversation history when approaching token limits:
+
+```json
+{
+  "middleware": [
+    "summarization"
+  ]
+}
+```
+
+With custom configuration:
+
+```json
+{
+  "middleware": [
+    {
+      "name": "summarization",
+      "maxTokensBeforeSummary": 8000,
+      "messagesToKeep": 5
+    }
+  ]
+}
+```
+
+Configuration options:
+- `maxTokensBeforeSummary`: Maximum tokens before triggering summarization (default: 10000)
+- `messagesToKeep`: Number of recent messages to keep after summarization
+- `summaryPrompt`: Custom prompt template for summarization
+- `model`: Custom model for summarization (defaults to main LLM)
+
+### Multiple Middleware
+
+You can combine multiple middleware:
+
+```json
+{
+  "llm": {
+    "type": "anthropic",
+    "model": "claude-3-5-sonnet-20241022"
+  },
+  "middleware": [
+    "anthropic-prompt-caching",
+    {
+      "name": "summarization",
+      "maxTokensBeforeSummary": 12000
+    }
+  ]
+}
+```
+
+### Custom Middleware (JavaScript Config Only)
+
+Custom middleware objects are only available in JavaScript configurations:
+
+```javascript
+// .gsloth.config.mjs
+export async function configure() {
+  const anthropic = await import('@langchain/anthropic');
+  
+  return {
+    llm: new anthropic.ChatAnthropic({
+      model: "claude-3-5-sonnet-20241022"
+    }),
+    middleware: [
+      "summarization",
+      {
+        beforeModel: (state) => {
+          // Custom logic before model execution
+          console.log('Processing request...');
+          return state;
+        },
+        afterModel: (state) => {
+          // Custom logic after model execution
+          console.log('Model completed');
+          return state;
+        }
+      }
+    ]
+  };
+}
+```
+
 ## Server Tools Configuration
 
 Some AI providers provide integrated server tools, such as web search.

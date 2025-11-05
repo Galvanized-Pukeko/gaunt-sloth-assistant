@@ -9,34 +9,29 @@
  * Some config params can be overriden from command line, see {@link CommandLineConfigOverrides}
  */
 import {
-  displayDebug,
-  displayError,
-  displayInfo,
-  displayWarning,
-} from '#src/utils/consoleUtils.js';
-import {
   PROJECT_GUIDELINES,
   PROJECT_REVIEW_INSTRUCTIONS,
   USER_PROJECT_CONFIG_JS,
   USER_PROJECT_CONFIG_JSON,
   USER_PROJECT_CONFIG_MJS,
 } from '#src/constants.js';
-import type { GthAgentRunner } from '#src/core/GthAgentRunner.js';
-import type { GthAgentInterface } from '#src/core/types.js';
+import type { MiddlewareConfig } from '#src/middleware/types.js';
+import { JiraConfig } from '#src/providers/types.js';
+import {
+  displayDebug,
+  displayError,
+  displayInfo,
+  displayWarning,
+} from '#src/utils/consoleUtils.js';
 import {
   getGslothConfigReadPath,
   getGslothConfigWritePath,
   importExternalFile,
   writeFileIfNotExistsWithMessages,
 } from '#src/utils/fileUtils.js';
-import type { Message } from '#src/modules/types.js';
-import { JiraConfig } from '#src/providers/types.js';
 import { error, exit, isTTY, setUseColour } from '#src/utils/systemUtils.js';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage } from '@langchain/core/messages';
-import { RunnableConfig } from '@langchain/core/runnables';
 import type { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
-import { BinaryOperatorAggregate, Messages, StateType } from '@langchain/langgraph';
 import type { Connection } from '@langchain/mcp-adapters';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -88,35 +83,38 @@ export interface GthConfig {
   builtInTools?: string[];
   tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
   /**
-   * Hooks are only available on JS config
-   * @deprecated LangChain v1 replaces hooks with middleware. Hooks will be removed in Gaunt Sloth v1.0.0.
-   * - `preModelHook` → Will be replaced with middleware pattern with `beforeModel` method in v1.0.0
-   * - `postModelHook` → Will be replaced with middleware pattern with `afterModel` method in v1.0.0
-   * See LangChain migration guide: https://docs.langchain.com/oss/javascript/migrate/langchain-v1
-   * The 0.9.x release line will continue to support hooks for backward compatibility.
+   * Middleware configuration for LangChain v1.
+   * Middleware provides hooks to intercept and control agent execution at critical points.
+   *
+   * Middleware can be:
+   * - Predefined middleware (string or config object) - works in both JSON and JS configs
+   * - Custom middleware objects - only available in JS configs
+   *
+   * Example (JSON config):
+   * ```json
+   * {
+   *   "middleware": [
+   *     "summarization",
+   *     { "name": "anthropic-prompt-caching", "ttl": "5m" }
+   *   ]
+   * }
+   * ```
+   *
+   * Example (JS config):
+   * ```js
+   * {
+   *   middleware: [
+   *     "summarization",
+   *     { beforeModel: (state) => { /* custom logic *\/ return state; } }
+   *   ]
+   * }
+   * ```
+   *
+   * Available predefined middleware:
+   * - `anthropic-prompt-caching`: Reduces API costs by caching prompts (Anthropic only)
+   * - `summarization`: Condenses conversation history when approaching token limits
    */
-  hooks?: {
-    createRunnableConfig?: (config: GthConfig) => Promise<RunnableConfig>;
-    createAgent?: (config: GthConfig) => Promise<GthAgentInterface>;
-    beforeAgentInit?: RunnerHook | RunnerHook[];
-    /**
-     * After agent init.
-     */
-    afterAgentInit?: RunnerHook | RunnerHook[];
-    beforeProcessMessages?: BeforeMessageHook | BeforeMessageHook[];
-    /**
-     * LangGraph preModelHook
-     * Provide 'skip' if you don't need default hook.
-     * @deprecated Will be removed in v1.0.0. Will be replaced with middleware pattern in Gaunt Sloth Assistant v1.0.0.
-     */
-    preModelHook?: LangChainHook;
-    /**
-     * LangGraph postModelHook
-     * Provide 'skip' if you don't need default hook.
-     * @deprecated Will be removed in v1.0.0. Will be replaced with middleware pattern in Gaunt Sloth Assistant v1.0.0.
-     */
-    postModelHook?: LangChainHook;
-  };
+  middleware?: MiddlewareConfig[];
   /**
    * Stream output. Some models do not support streaming. Set value to `false` for them.
    *
@@ -196,29 +194,11 @@ export interface ServerTool extends Record<string, unknown> {
   name?: string;
 }
 
-type LangChainHook = (
-  state: StateType<{
-    messages: BinaryOperatorAggregate<AIMessage[], Messages>;
-  }>
-) => StateType<{
-  messages: BinaryOperatorAggregate<AIMessage[], Messages>;
-}>;
-
-type RunnerHook = (runner: GthAgentRunner) => Promise<void>;
-
-type BeforeMessageHook = (
-  runner: GthAgentRunner,
-  message: Message[],
-  runConfig: RunnableConfig
-) => Promise<void>;
-
 /**
  * Raw, unprocessed Gaunt Sloth config.
  */
 export interface RawGthConfig extends Omit<GthConfig, 'llm'> {
   llm: LLMConfig;
-  preModelHook?: LangChainHook | 'skip';
-  postModelHook?: LangChainHook | 'skip';
 }
 
 export type CustomToolsConfig = Record<string, object>;
