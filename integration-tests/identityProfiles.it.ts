@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runCommandWithArgs } from './support/commandRunner.ts';
+import { runCommandExpectingExitCode, runCommandWithArgs } from './support/commandRunner.ts';
 
 describe('Review Command Integration Tests', () => {
   it('should work with default profile', async () => {
@@ -41,10 +41,10 @@ describe('Review Command Integration Tests', () => {
 
     expect(spellReviewOutput).toContain('AXIOS');
 
-    const failedSpellOutput = await runCommandWithArgs(
+    const failedSpellOutput = await runCommandExpectingExitCode(
       'npx',
       ['gth', '-i sorcerer', 'review', 'bad-spell.txt'],
-      undefined,
+      1,
       './integration-tests/workdir-with-profiles'
     );
 
