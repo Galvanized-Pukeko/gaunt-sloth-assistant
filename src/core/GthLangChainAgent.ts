@@ -9,7 +9,7 @@ import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.j
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
-import { AIMessage, isAIMessage } from '@langchain/core/messages';
+import { AIMessage, BaseMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
@@ -17,7 +17,7 @@ import { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
 import { createAgent, toolStrategy } from 'langchain';
-import { RateSchema, isRatingEnabled } from '#src/core/ratingSchema.js';
+import { isRatingEnabled, RateSchema } from '#src/core/ratingSchema.js';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
@@ -164,7 +164,7 @@ export class GthLangChainAgent implements GthAgentInterface {
           return '';
         }
 
-        const lastMessage: any = response.messages[response.messages.length - 1];
+        const lastMessage: BaseMessage = response.messages[response.messages.length - 1];
 
         // Check if this is a structured response (tool call result)
         // This happens when using toolStrategy for rating responses
