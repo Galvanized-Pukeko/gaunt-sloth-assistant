@@ -9,6 +9,7 @@
   "sourceLinkExternal": true,
   "includeVersion": true,
   "navigationLinks": {
+    "0.9 (legacy docs)": "https://gaunt-sloth-assistant.github.io/docs-0.9/",
     "GitHub": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant"
   },
   "highlightLanguages": ["typescript", "javascript", "markdown", "json", "bash"],
