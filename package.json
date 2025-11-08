@@ -15,8 +15,8 @@
     "cli"
   ],
   "engines": {
-    "node": ">=22.0.0",
-    "npm": ">=10.9.0"
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
   },
   "scripts": {
     "clean": "tsc -b -clean",
@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@langchain/anthropic": "^1.0.0",
-    "@langchain/core": "^1.0.2",
+    "@langchain/core": "^1.0.3",
     "@langchain/deepseek": "^1.0.0",
     "@langchain/google-genai": "^1.0.0",
     "@langchain/google-vertexai": "^1.0.0",
@@ -50,17 +50,17 @@
     "commander": "^14.0.2",
     "diff": "^8.0.2",
     "express": "^5.1.0",
-    "langchain": "^1.0.2",
+    "langchain": "^1.0.3",
     "minimatch": "^10.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
     "@types/express": "^5.0.5",
-    "@types/node": "^24.9.2",
+    "@types/node": "^24.10.0",
     "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.2",
-    "@typescript-eslint/parser": "^8.46.2",
-    "eslint": "^9.39.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "globals": "^16.5.0",
