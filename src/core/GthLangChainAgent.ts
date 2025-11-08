@@ -9,7 +9,7 @@ import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.j
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
-import { isAIMessage } from '@langchain/core/messages';
+import { AIMessage, isAIMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
@@ -95,7 +95,7 @@ export class GthLangChainAgent implements GthAgentInterface {
         debugLogObject('postModel state', state);
         const lastMessage = state.messages[state.messages.length - 1];
         if (
-          isAIMessage(lastMessage) &&
+          AIMessage.isInstance(lastMessage) &&
           lastMessage.tool_calls &&
           lastMessage.tool_calls?.length > 0
         ) {
@@ -170,7 +170,7 @@ export class GthLangChainAgent implements GthAgentInterface {
         // This happens when using toolStrategy for rating responses
         if (
           lastMessage &&
-          isAIMessage(lastMessage) &&
+          AIMessage.isInstance(lastMessage) &&
           'tool_calls' in lastMessage &&
           lastMessage.tool_calls &&
           Array.isArray(lastMessage.tool_calls) &&
@@ -241,7 +241,7 @@ export class GthLangChainAgent implements GthAgentInterface {
 
           for await (const [chunk, _metadata] of stream) {
             debugLogObject('Stream chunk', { chunk, _metadata });
-            if (isAIMessage(chunk)) {
+            if (AIMessage.isInstance(chunk)) {
               const text = chunk.text as string;
               totalChunks++;
 
