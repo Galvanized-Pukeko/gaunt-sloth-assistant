@@ -861,7 +861,7 @@ export async function configure() {
 
 ## Review Rating Configuration
 
-The `review` and `pr` commands can be configured to provide automated review scoring with configurable pass/fail thresholds. When enabled, the AI will conclude the review with a numerical rating (0-10) and a comment explaining the rating.
+The `review` and `pr` commands **automatically provide** automated review scoring with configurable pass/fail thresholds. **Rating is enabled by default** - the AI concludes every review with a numerical rating (0-10) and a comment explaining the rating.
 
 ### Rating Scale
 
@@ -869,30 +869,49 @@ The `review` and `pr` commands can be configured to provide automated review sco
 - **3-5**: Code needs significant changes (equivalent to REQUEST_CHANGES)
 - **6-10**: Code is acceptable (equivalent to APPROVE)
 
+### Default Behavior
+
+**Out of the box, without any configuration:**
+- ✅ Rating is **enabled**
+- ✅ Pass threshold is **6/10**
+- ✅ Failed reviews (< 6) **exit with code 1** for CI/CD integration
+
 ### Configuration Options
 
-Rating can be configured separately for `review` and `pr` commands under `commands.review.rating` or `commands.pr.rating`:
+You can customize rating behavior for `review` and `pr` commands under `commands.review.rating` or `commands.pr.rating`:
 
-- **`enabled`** (boolean, default: `true` when config exists): Enable or disable review rating
+- **`enabled`** (boolean, default: `true`): Enable or disable review rating
 - **`passThreshold`** (number 0-10, default: `6`): Minimum score required to pass the review
 - **`errorOnReviewFail`** (boolean, default: `true`): Exit with error code 1 when review fails (below threshold)
 
 ### Example Configurations
 
-**Basic rating configuration:**
+**Default configuration (no config needed):**
+
+Rating works out of the box with no configuration required! The defaults provide sensible CI/CD integration.
+
+**Disable rating:**
 
 ```json
 {
-  "llm": {
-    "type": "anthropic",
-    "model": "claude-sonnet-4-5"
-  },
   "commands": {
     "review": {
       "rating": {
-        "enabled": true,
-        "passThreshold": 6,
-        "errorOnReviewFail": true
+        "enabled": false
+      }
+    }
+  }
+}
+```
+
+**Custom threshold:**
+
+```json
+{
+  "commands": {
+    "review": {
+      "rating": {
+        "passThreshold": 8
       }
     }
   }

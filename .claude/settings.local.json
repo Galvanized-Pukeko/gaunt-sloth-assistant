@@ -5,7 +5,8 @@
       "Bash(npm run build:*)",
       "Bash(npm run lint)",
       "Bash(npm run lint:fix:*)",
-      "Bash(npm run lint-n-fix:*)"
+      "Bash(npm run lint-n-fix:*)",
+      "Bash(npm run it:*)"
     ],
     "deny": [],
     "ask": []

@@ -56,6 +56,56 @@ export async function runCommandWithArgs(
   });
 }
 
+/**
+ * Runs a command expecting it to exit with a specific code
+ * @param command - The main command to run
+ * @param args - The command arguments
+ * @param expectedExitCode - The expected exit code
+ * @param workDir - The working directory for the command
+ * @returns Object containing output and exit code
+ */
+export async function runCommandExpectingExitCode(
+  command: string,
+  args: string[],
+  expectedExitCode: number,
+  workDir?: string
+): Promise<{ output: string; exitCode: number }> {
+  const testDir = path.resolve(workDir ? workDir : './integration-tests');
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+
+    const childProcess = spawn(command, args, {
+      cwd: testDir,
+      env: {
+        ...process.env,
+      },
+      shell: platform().includes('win'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    childProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    childProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    childProcess.on('close', (code) => {
+      if (code === expectedExitCode) {
+        resolve({ output: stdout.trim(), exitCode: code });
+      } else {
+        reject(
+          new Error(
+            `Command exited with code ${code}, expected ${expectedExitCode}\n${stderr}\n${stdout}`
+          )
+        );
+      }
+    });
+  });
+}
+
 export function startChildProcess(command: string, args: string[], stdin: 'ignore' | 'pipe') {
   const testDir = path.resolve('./integration-tests');
   const childProcess = spawn(command, args, {

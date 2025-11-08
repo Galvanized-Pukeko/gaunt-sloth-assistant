@@ -17,18 +17,7 @@ import { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
 import { createAgent, toolStrategy } from 'langchain';
-import * as z from 'zod';
-
-/**
- * Schema for review rating response.
- * Used when rating is enabled for review/pr commands.
- */
-export const RateSchema = z.object({
-  rate: z.number().min(0).max(10).describe('Review rating from 0 to 10'),
-  comment: z.string().describe('Comment explaining the rating'),
-});
-
-export type RateResponse = z.infer<typeof RateSchema>;
+import { RateSchema, isRatingEnabled } from '#src/core/ratingSchema.js';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
@@ -129,8 +118,7 @@ export class GthLangChainAgent implements GthAgentInterface {
       command && (command === 'review' || command === 'pr')
         ? this.config.commands?.[command]?.rating
         : undefined;
-    // Rating is enabled if config exists and enabled is not explicitly false (default: true)
-    const ratingEnabled = ratingConfig !== undefined && (ratingConfig.enabled ?? true);
+    const ratingEnabled = isRatingEnabled(command, ratingConfig);
 
     if (ratingEnabled) {
       this.statusUpdate('info', 'Review rating enabled');
@@ -169,8 +157,35 @@ export class GthLangChainAgent implements GthAgentInterface {
         debugLog('Calling agent.invoke...');
         const response = await this.agent.invoke({ messages }, runConfig);
 
-        const aiMessage = response.messages[response.messages.length - 1].content as string;
+        // Safety check for response structure
+        if (!response?.messages || response.messages.length === 0) {
+          debugLogError('invoke', 'No messages in response');
+          this.statusUpdate('warning', 'No messages in response');
+          return '';
+        }
 
+        const lastMessage: any = response.messages[response.messages.length - 1];
+
+        // Check if this is a structured response (tool call result)
+        // This happens when using toolStrategy for rating responses
+        if (
+          lastMessage &&
+          isAIMessage(lastMessage) &&
+          'tool_calls' in lastMessage &&
+          lastMessage.tool_calls &&
+          Array.isArray(lastMessage.tool_calls) &&
+          lastMessage.tool_calls.length > 0
+        ) {
+          // Extract the structured data from the tool call
+          const toolCall = lastMessage.tool_calls[0];
+          const structuredData = JSON.stringify(toolCall.args);
+          debugLog(`Structured response extracted from tool_calls: ${structuredData}`);
+          // Don't display - let the consumer handle it
+          return structuredData;
+        }
+
+        // Regular response - use original extraction logic
+        const aiMessage = lastMessage?.content as string;
         this.statusUpdate('display', aiMessage);
         return aiMessage;
       } catch (e) {

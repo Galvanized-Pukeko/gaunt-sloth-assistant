@@ -15,7 +15,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
-import { RateResponse } from '#src/core/GthLangChainAgent.js';
+import { RateResponse, isRatingEnabled } from '#src/core/ratingSchema.js';
 import { exit } from '#src/utils/systemUtils.js';
 
 export async function review(
@@ -48,30 +48,25 @@ export async function review(
 
   progressIndicator?.stop();
 
-  if (filePath) {
-    try {
-      flushSessionLog();
-      stopSessionLogging();
-      displaySuccess(`\n\nThis report can be found in ${filePath}`);
-    } catch (error) {
-      displayDebug(error instanceof Error ? error : String(error));
-      displayError(`Failed to write review to file: ${filePath}`);
-    }
-  }
-
-  // Handle rating if enabled
+  // Handle rating if enabled - do this BEFORE closing the file
   const ratingConfig = config.commands?.[command]?.rating;
-  const ratingEnabled = ratingConfig !== undefined && (ratingConfig.enabled ?? true);
+  const ratingEnabledForCommand = isRatingEnabled(command, ratingConfig);
 
-  if (ratingEnabled && result) {
+  if (ratingEnabledForCommand && result) {
     try {
       // Parse the structured rating response
-      const rating: RateResponse = JSON.parse(result);
+      // Extract JSON from the result - it might have prefix text like "Returning structured response:"
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in rating response');
+      }
+      const rating: RateResponse = JSON.parse(jsonMatch[0]);
+      // Defaults are set in DEFAULT_CONFIG, but TypeScript needs fallbacks for type safety
       const passThreshold = ratingConfig?.passThreshold ?? 6;
       const errorOnReviewFail = ratingConfig?.errorOnReviewFail ?? true;
       const passed = rating.rate >= passThreshold;
 
-      // Display rating with clear formatting
+      // Display rating with clear formatting (will be written to file if logging is enabled)
       displayInfo('\n' + '='.repeat(60));
       displayInfo('REVIEW RATING');
       displayInfo('='.repeat(60));
@@ -92,6 +87,18 @@ export async function review(
     } catch (error) {
       displayDebug(error instanceof Error ? error : String(error));
       displayWarning('Failed to parse rating response. Review completed without rating.');
+    }
+  }
+
+  // Close the file AFTER rating is written
+  if (filePath) {
+    try {
+      flushSessionLog();
+      stopSessionLogging();
+      displaySuccess(`\n\nThis report can be found in ${filePath}`);
+    } catch (error) {
+      displayDebug(error instanceof Error ? error : String(error));
+      displayError(`Failed to write review to file: ${filePath}`);
     }
   }
 }

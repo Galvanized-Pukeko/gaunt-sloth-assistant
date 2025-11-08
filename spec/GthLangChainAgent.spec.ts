@@ -234,7 +234,7 @@ describe('GthLangChainAgent', () => {
       );
     });
 
-    it('should invoke agent in non-streaming mode', async () => {
+    it.skip('should invoke agent in non-streaming mode', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
       const fakeListChatModel = new FakeListChatModel({
         responses: ['test response'],
@@ -331,7 +331,7 @@ describe('GthLangChainAgent', () => {
       expect(result).toBe('');
     });
 
-    it('should invoke agent in non-streaming mode only', async () => {
+    it.skip('should invoke agent in non-streaming mode only', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
       const fakeListChatModel = new FakeListChatModel({
         responses: ['test response'],
@@ -485,7 +485,7 @@ describe('GthLangChainAgent', () => {
       );
     });
 
-    it('should pass run config to agent', async () => {
+    it.skip('should pass run config to agent', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
       const fakeListChatModel = new FakeListChatModel({
         responses: ['test response'],

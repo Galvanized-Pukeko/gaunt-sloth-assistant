@@ -345,6 +345,18 @@ export const DEFAULT_CONFIG = {
     pr: {
       contentProvider: 'github',
       requirementsProvider: 'github',
+      rating: {
+        enabled: true,
+        passThreshold: 6,
+        errorOnReviewFail: true,
+      },
+    },
+    review: {
+      rating: {
+        enabled: true,
+        passThreshold: 6,
+        errorOnReviewFail: true,
+      },
     },
     code: {
       filesystem: 'all',
