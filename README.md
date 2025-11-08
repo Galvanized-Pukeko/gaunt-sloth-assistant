@@ -43,7 +43,7 @@ The promise of Gaunt Sloth:
 - Answers questions about provided code;
 - Writes code;
 - Connects to MCP server (including remote MCP with OAuth);
-- Saves all responses in .md file in the project directory;
+- Saves all responses in timestamped `.md` files (override with `-w/--write-output-to-file`);
 - Anything else you need, when combined with other command line tools.
 
 ### To make GSloth work, you need an **API key** from some AI provider, such as:
@@ -64,6 +64,14 @@ The promise of Gaunt Sloth:
 `gth` and `gsloth` commands are used interchangeably, both `gsloth pr 42` and `gth pr 42` do the same thing.
 
 For detailed information about all commands, see [docs/COMMANDS.md](./docs/COMMANDS.md).
+
+### Global Flags
+
+These apply to every command:
+- `--config <path>` – load a specific config file without moving directories
+- `-i, --identity-profile <name>` – switch to another profile under `.gsloth/.gsloth-settings/<name>/`
+- `-w, --write-output-to-file <value>` – control response files (`true` by default, use `-wn`/`-w0` for false, or pass a filename)
+- `--verbose` – enable verbose LangChain/LangGraph logs (useful when debugging prompts)
 
 ### Available Commands:
 
@@ -125,6 +133,7 @@ To write this to filesystem, you'd need to add filesystem access to the *ask* co
 gsloth chat  # Start chat session
 gsloth code  # Start coding session
 ```
+Running `gsloth` with no subcommand also drops you into `chat`.
 
 ## Installation
 

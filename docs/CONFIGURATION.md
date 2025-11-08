@@ -25,7 +25,7 @@ For a tidier project structure, you can create a `.gsloth` directory in your pro
 Example directory structure when using the `.gsloth` directory:
 
 ```
-.gsloth/.gsloth-settings/.gsloth-config.json
+.gsloth/.gsloth-settings/.gsloth.config.json
 .gsloth/.gsloth-settings/.gsloth.guidelines.md
 .gsloth/.gsloth-settings/.gsloth.review.md
 .gsloth/gth_2025-05-18_09-34-38_ASK.md
@@ -46,7 +46,7 @@ may be so different that this is better to keep them in complete separation.
 Identity profiles may be used to define different Gaunt Sloth identities for different purposes.
 
 Identity profiles can only be activated in directory-based configuration.
-`gth -i devops pr PR_NO` is invoked, the configuration is pulled from `.gsloth/gsloth-settings/devops/` directory,
+`gth -i devops pr PR_NO` is invoked, the configuration is pulled from `.gsloth/.gsloth-settings/devops/` directory,
 which may contain a full set of config files:
 ```
 .gsloth.backstory.md
@@ -56,11 +56,21 @@ which may contain a full set of config files:
 ```
 
 When no identity profile is specified in the command, for example `gth pr PR_NO`,
-the configuration is pulled from the `.gsloth/gsloth-settings/` directory.
+the configuration is pulled from the `.gsloth/.gsloth-settings/` directory.
 
 `-i` or `-identity-profile` overrides entire configuration directory, which means it should contain
 a configuration file and prompt files. In the case if some prompt files are missing, they will be
 fetched from the installation directory.
+
+### Controlling Output Files
+
+By default, Gaunt Sloth writes each response to `gth_<timestamp>_<COMMAND>.md` under `.gsloth/` (or the project root).
+Set `writeOutputToFile` in your config to:
+- `true` (default) for standard filenames,
+- `false` to skip writing files,
+- a relative path (e.g. `"reviews/last.md"`) to always use that location.
+
+Override the setting per run with `-w/--write-output-to-file true|false|<filename>`. Shortcuts `-wn` or `-w0` map to `false`.
 
 ## Configuration Object
 
@@ -72,7 +82,7 @@ It is always worth checking sourcecode in [config.ts](../src/config.ts) for more
 
 ## Config initialization
 Configuration can be created with `gsloth init [vendor]` command.
-Currently, anthropic, groq, deepseek, openai, google-genai, vertexai and xai can be configured with `gsloth init [vendor]`.
+Currently, anthropic, groq, deepseek, openai, google-genai, vertexai, openrouter and xai can be configured with `gsloth init [vendor]`.
 For providers using OpenAI format (like Inception), use `gsloth init openai` and then modify the configuration.
 
 ### Google GenAI (AI Studio)
@@ -641,6 +651,25 @@ export async function configure() {
 }
 ```
 
+##### Automatic work logging for Jira reviews
+
+When you pass a Jira issue ID to `gsloth pr` and use the modern Jira provider (`requirementsProvider: "jira"`),
+you can ask Gaunt Sloth to log review time back to that issue automatically by setting
+`commands.pr.logWorkForReviewInSeconds`. The value is recorded as worklog seconds after each PR review.
+
+```json
+{
+  "commands": {
+    "pr": {
+      "requirementsProvider": "jira",
+      "logWorkForReviewInSeconds": 600
+    }
+  }
+}
+```
+
+This automation only runs when a `requirementsId` is supplied on the command line and the provider resolves to `jira`.
+
 #### 2. Legacy Jira REST API (Unscoped Token)
 
 Jira API is used with `pr` and `review` commands.
@@ -733,7 +762,7 @@ Example configuration including dev tools (from .gsloth.config.json):
 }
 ```
 
-Note: For `run_single_test`, the command can include a placeholder like `${testPath}` for the test file path. p
+Note: For `run_single_test`, the command can include a placeholder like `${testPath}` for the test file path.
 Security validations are in place to prevent path traversal or injection.
 
 ## Middleware Configuration
