@@ -1,0 +1,113 @@
+# Gaunt Sloth Assistant project guidelines
+
+This file provides guidance to any AI coding agent (Claude Code, Cursor, etc.) working with this repository.
+
+**IMPORTANT: Always read and follow .gsloth.guidelines.md first for development principles, testing patterns, and workflow.**
+
+## Integration tests
+
+Running all integration tests (takes ~10 minutes):
+
+```bash
+npm run it vertexai
+```
+
+Command accepts another argument which is a partial file name to filter tests,
+
+for example `npm run it vertexai review` will run all tests that contain `review` in the file name.
+
+Faster integration tests have `simple` suffix, which allows running a subset of tests quickly,
+this also helps with less intelligent models:
+
+```bash
+npm run it vertexai simple
+```
+
+### Building and Testing
+
+```bash
+# Build the project
+npm run build
+
+# Run tests
+npm run test
+
+# Run linting
+npm run lint
+
+# Format code
+npm run format
+
+# Install globally for development
+npm install -g ./
+```
+
+### Release Process
+
+```bash
+# For patch release (e.g., 0.0.8 -> 0.0.9)
+npm version patch -m "Release notes"
+git push
+git push --tags
+
+# For minor release (e.g., 0.0.8 -> 0.1.0)
+npm version minor -m "Release notes"
+git push
+git push --tags
+
+# Create GitHub release
+gh release create --notes-from-tag
+
+# Publish to NPM
+npm login
+npm publish
+```
+
+## Codebase Architecture
+
+Gaunt Sloth Assistant is a command line AI assistant for software developers, primarily focused on code reviews and question answering.
+
+### High-Level Structure
+
+1. **Commands**: The CLI exposes dedicated commands for each workflow:
+   - `askCommand`: Q&A against supplied files, diffs, or providers
+   - `reviewCommand`: General diff reviews (stdin, files, providers)
+   - `prCommand`: Review GitHub pull requests with optional requirements ingestion
+   - `chatCommand`: Starts an interactive chat session (default command)
+   - `codeCommand`: Interactive coding session with full workspace FS access
+   - `initCommand`: Bootstraps `.gsloth.config.*` for a chosen provider
+
+2. **Modules**:
+   - `questionAnsweringModule`: Builds prompts and orchestrates Q&A runs
+   - `reviewModule`: Handles diff/pr reviews and requirement stitching
+   - `interactiveSessionModule`: Powers chat/code sessions via `createInteractiveSession`
+
+3. **LLM Providers**: Via LangChain the tool works with:
+   - Anthropic (Claude), Google Vertex AI (Gemini), Google AI Studio, Groq
+   - DeepSeek, OpenAI & OpenAI-compatible (e.g., Inception, OpenRouter)
+   - xAI and any other provider configured through JS configs
+
+4. **Content Providers / Inputs**:
+   - `file`: Reads local project files
+   - `text`: Passes literal strings/stdin
+   - `ghPrDiffProvider`: Uses GitHub CLI to fetch PR diffs
+   - `ghIssueProvider`: Pulls GitHub issue descriptions
+   - `jiraIssueProvider`: Jira REST API (PAT)
+   - `jiraIssueLegacyProvider`: Jira REST API v2 with legacy tokens
+
+### Configuration System
+
+- Configurations are stored in `.gsloth.config.js`, `.gsloth.config.json`, or `.gsloth.config.mjs`
+- Guidelines are in `.gsloth.guidelines.md`
+- Output files are saved to project root or `.gsloth/` directory if it exists
+- Environment variables can be used for API keys (e.g., `ANTHROPIC_API_KEY`, `GROQ_API_KEY`)
+
+## Important Architectural Concepts
+
+1. **Command Pattern**: Commands are separated into module and handler code
+2. **Provider Pattern**: Abstract interfaces for fetching content
+3. **Configuration-driven**: Heavy use of configuration files
+4. **Output Persistence**: All outputs are saved to local files
+5. **Integration**: GitHub CLI and Jira integration for PR reviews
+
+**Note: For development workflow, testing patterns, imports, and other development principles, refer to .gsloth.guidelines.md**
