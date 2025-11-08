@@ -16,7 +16,19 @@ import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
-import { createAgent } from 'langchain';
+import { createAgent, toolStrategy } from 'langchain';
+import * as z from 'zod';
+
+/**
+ * Schema for review rating response.
+ * Used when rating is enabled for review/pr commands.
+ */
+export const RateSchema = z.object({
+  rate: z.number().min(0).max(10).describe('Review rating from 0 to 10'),
+  comment: z.string().describe('Comment explaining the rating'),
+});
+
+export type RateResponse = z.infer<typeof RateSchema>;
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
@@ -112,11 +124,26 @@ export class GthLangChainAgent implements GthAgentInterface {
 
     this.statusUpdate('info', `Loaded middleware: ${middleware.map((m) => m.name).join(', ')}`);
 
+    // Determine if rating should be enabled for this command
+    const ratingConfig =
+      command && (command === 'review' || command === 'pr')
+        ? this.config.commands?.[command]?.rating
+        : undefined;
+    // Rating is enabled if config exists and enabled is not explicitly false (default: true)
+    const ratingEnabled = ratingConfig !== undefined && (ratingConfig.enabled ?? true);
+
+    if (ratingEnabled) {
+      this.statusUpdate('info', 'Review rating enabled');
+      debugLog('Rating enabled - using structured response format');
+    }
+
+    // Create agent with optional rating response format
     this.agent = createAgent({
       model: this.config.llm,
       tools,
       middleware,
       checkpointer,
+      ...(ratingEnabled && { responseFormat: toolStrategy(RateSchema) }),
     });
     debugLog('React agent created successfully');
   }

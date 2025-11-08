@@ -36,6 +36,7 @@ vi.mock('node:path', () => pathMock);
 // Mock systemUtils module
 const systemUtilsMock = {
   getProjectDir: vi.fn(),
+  exit: vi.fn(),
   stdout: {
     write: vi.fn(),
   },
@@ -48,6 +49,8 @@ const consoleUtilsMock = {
   displaySuccess: vi.fn(),
   displayError: vi.fn(),
   displayDebug: vi.fn(),
+  displayInfo: vi.fn(),
+  displayWarning: vi.fn(),
   defaultStatusCallback: vi.fn(),
   initSessionLogging: vi.fn(),
   flushSessionLog: vi.fn(),
@@ -247,5 +250,160 @@ describe('reviewModule', () => {
 
     // Since streamOutput is true, display should not be called
     expect(consoleUtilsMock.display).not.toHaveBeenCalled();
+  });
+
+  describe('Rating functionality', () => {
+    it('should display PASS rating when review passes threshold', async () => {
+      const configWithRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+            },
+          },
+        },
+      };
+
+      const ratingResponse = JSON.stringify({
+        rate: 8,
+        comment: 'Good code quality, minor improvements needed',
+      });
+      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
+
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+        expect.stringContaining('REVIEW RATING')
+      );
+      expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith('PASS 8/10 (threshold: 6)');
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+        expect.stringContaining('Good code quality')
+      );
+      expect(systemUtilsMock.exit).not.toHaveBeenCalled();
+    });
+
+    it('should display FAIL rating and exit with code 1 when review fails and errorOnReviewFail is true', async () => {
+      const configWithRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+            },
+          },
+        },
+      };
+
+      const ratingResponse = JSON.stringify({
+        rate: 4,
+        comment: 'Significant issues found',
+      });
+      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
+
+      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith('FAIL 4/10 (threshold: 6)');
+      expect(systemUtilsMock.exit).toHaveBeenCalledWith(1);
+    });
+
+    it('should display FAIL rating but not exit when errorOnReviewFail is false', async () => {
+      const configWithRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: false,
+            },
+          },
+        },
+      };
+
+      const ratingResponse = JSON.stringify({
+        rate: 3,
+        comment: 'Major refactoring needed',
+      });
+      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
+
+      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith('FAIL 3/10 (threshold: 6)');
+      expect(systemUtilsMock.exit).not.toHaveBeenCalled();
+    });
+
+    it('should not display rating when rating config is not provided', async () => {
+      const configWithoutRating: GthConfig = {
+        ...mockConfig,
+        commands: {},
+      };
+
+      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue('Regular review response');
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithoutRating, 'review');
+
+      expect(consoleUtilsMock.displayInfo).not.toHaveBeenCalledWith(
+        expect.stringContaining('REVIEW RATING')
+      );
+    });
+
+    it('should use default values when rating config is empty object', async () => {
+      const configWithEmptyRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {},
+          },
+        },
+      };
+
+      const ratingResponse = JSON.stringify({
+        rate: 7,
+        comment: 'Meets standards',
+      });
+      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithEmptyRating, 'review');
+
+      // Should use default threshold of 6 and default errorOnReviewFail of true
+      expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith('PASS 7/10 (threshold: 6)');
+    });
+
+    it('should handle pr command with rating config', async () => {
+      const configWithPrRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          pr: {
+            rating: {
+              enabled: true,
+              passThreshold: 7,
+              errorOnReviewFail: true,
+            },
+          },
+        },
+      };
+
+      const ratingResponse = JSON.stringify({
+        rate: 9,
+        comment: 'Excellent PR',
+      });
+      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('PR-123', 'test-preamble', 'test-diff', configWithPrRating, 'pr');
+
+      expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith('PASS 9/10 (threshold: 7)');
+      expect(systemUtilsMock.exit).not.toHaveBeenCalled();
+    });
   });
 });

@@ -51,12 +51,14 @@ vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 // Mock createAgent from langchain
 const createAgentMock = vi.fn();
+const toolStrategyMock = vi.fn();
 const agentMock = {
   invoke: vi.fn(),
   stream: vi.fn(),
 };
 vi.mock('langchain', () => ({
   createAgent: createAgentMock,
+  toolStrategy: toolStrategyMock,
   summarizationMiddleware: vi.fn(),
   anthropicPromptCachingMiddleware: vi.fn(),
 }));
@@ -84,6 +86,7 @@ describe('GthLangChainAgent', () => {
 
     // Setup createAgent mock
     createAgentMock.mockReturnValue(agentMock);
+    toolStrategyMock.mockReturnValue({ type: 'tool_strategy', schema: {} });
     agentMock.invoke.mockResolvedValue({
       messages: [{ content: 'test response' }],
     });
@@ -724,6 +727,144 @@ describe('GthLangChainAgent', () => {
         'warning',
         'Model does not seem to support tools.'
       );
+    });
+  });
+
+  describe('Rating responseFormat', () => {
+    it('should add responseFormat when rating is enabled for review command', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const configWithRating = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+            },
+          },
+        },
+      } as GthConfig;
+
+      mcpClientInstanceMock.getTools.mockResolvedValue([]);
+      await agent.init('review', configWithRating);
+
+      expect(createAgentMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          responseFormat: expect.anything(),
+        })
+      );
+      expect(statusUpdateCallback).toHaveBeenCalledWith('info', 'Review rating enabled');
+    });
+
+    it('should add responseFormat when rating is enabled for pr command', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const configWithRating = {
+        ...mockConfig,
+        commands: {
+          pr: {
+            rating: {
+              enabled: true,
+              passThreshold: 7,
+            },
+          },
+        },
+      } as GthConfig;
+
+      mcpClientInstanceMock.getTools.mockResolvedValue([]);
+      await agent.init('pr', configWithRating);
+
+      expect(createAgentMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          responseFormat: expect.anything(),
+        })
+      );
+    });
+
+    it('should not add responseFormat when rating config does not exist', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const configWithoutRating = {
+        ...mockConfig,
+        commands: {},
+      } as GthConfig;
+
+      mcpClientInstanceMock.getTools.mockResolvedValue([]);
+      await agent.init('review', configWithoutRating);
+
+      expect(createAgentMock).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          responseFormat: expect.anything(),
+        })
+      );
+      expect(statusUpdateCallback).not.toHaveBeenCalledWith('info', 'Review rating enabled');
+    });
+
+    it('should not add responseFormat when rating is explicitly disabled', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const configWithDisabledRating = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: false,
+            },
+          },
+        },
+      } as GthConfig;
+
+      mcpClientInstanceMock.getTools.mockResolvedValue([]);
+      await agent.init('review', configWithDisabledRating);
+
+      expect(createAgentMock).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          responseFormat: expect.anything(),
+        })
+      );
+    });
+
+    it('should not add responseFormat for non-review commands', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const configWithRating = {
+        ...mockConfig,
+        commands: {
+          ask: {
+            rating: {
+              enabled: true,
+            },
+          },
+        },
+      } as GthConfig;
+
+      mcpClientInstanceMock.getTools.mockResolvedValue([]);
+      await agent.init('ask', configWithRating);
+
+      expect(createAgentMock).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          responseFormat: expect.anything(),
+        })
+      );
+    });
+
+    it('should enable rating by default when config exists with no explicit enabled value', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const configWithEmptyRating = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {},
+          },
+        },
+      } as GthConfig;
+
+      mcpClientInstanceMock.getTools.mockResolvedValue([]);
+      await agent.init('review', configWithEmptyRating);
+
+      expect(createAgentMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          responseFormat: expect.anything(),
+        })
+      );
+      expect(statusUpdateCallback).toHaveBeenCalledWith('info', 'Review rating enabled');
     });
   });
 });

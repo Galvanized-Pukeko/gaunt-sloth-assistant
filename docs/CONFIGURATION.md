@@ -168,7 +168,7 @@ JSON configuration is simpler but less flexible than JavaScript configuration. I
   "llm": {
     "type": "anthropic",
     "apiKey": "your-api-key-here",
-    "model": "claude-3-5-sonnet-20241022"
+    "model": "claude-sonnet-4-5"
   }
 }
 ```
@@ -313,7 +313,7 @@ export async function configure() {
     return {
         llm: new anthropic.ChatAnthropic({
             apiKey: process.env.ANTHROPIC_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-            model: "claude-3-5-sonnet-20241022"
+            model: "claude-sonnet-4-5"
         })
     };
 }
@@ -752,7 +752,7 @@ Reduces API costs by caching prompts (Anthropic models only):
 {
   "llm": {
     "type": "anthropic",
-    "model": "claude-3-5-sonnet-20241022"
+    "model": "claude-sonnet-4-5"
   },
   "middleware": [
     "anthropic-prompt-caching"
@@ -815,7 +815,7 @@ You can combine multiple middleware:
 {
   "llm": {
     "type": "anthropic",
-    "model": "claude-3-5-sonnet-20241022"
+    "model": "claude-sonnet-4-5"
   },
   "middleware": [
     "anthropic-prompt-caching",
@@ -838,7 +838,7 @@ export async function configure() {
   
   return {
     llm: new anthropic.ChatAnthropic({
-      model: "claude-3-5-sonnet-20241022"
+      model: "claude-sonnet-4-5"
     }),
     middleware: [
       "summarization",
@@ -857,6 +857,129 @@ export async function configure() {
     ]
   };
 }
+```
+
+## Review Rating Configuration
+
+The `review` and `pr` commands can be configured to provide automated review scoring with configurable pass/fail thresholds. When enabled, the AI will conclude the review with a numerical rating (0-10) and a comment explaining the rating.
+
+### Rating Scale
+
+- **0-2**: Bad code with syntax errors or critical issues (equivalent to REJECT)
+- **3-5**: Code needs significant changes (equivalent to REQUEST_CHANGES)
+- **6-10**: Code is acceptable (equivalent to APPROVE)
+
+### Configuration Options
+
+Rating can be configured separately for `review` and `pr` commands under `commands.review.rating` or `commands.pr.rating`:
+
+- **`enabled`** (boolean, default: `true` when config exists): Enable or disable review rating
+- **`passThreshold`** (number 0-10, default: `6`): Minimum score required to pass the review
+- **`errorOnReviewFail`** (boolean, default: `true`): Exit with error code 1 when review fails (below threshold)
+
+### Example Configurations
+
+**Basic rating configuration:**
+
+```json
+{
+  "llm": {
+    "type": "anthropic",
+    "model": "claude-sonnet-4-5"
+  },
+  "commands": {
+    "review": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 6,
+        "errorOnReviewFail": true
+      }
+    }
+  }
+}
+```
+
+**Different thresholds for review and PR:**
+
+```json
+{
+  "llm": {
+    "type": "anthropic",
+    "model": "claude-sonnet-4-5"
+  },
+  "commands": {
+    "review": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 6,
+        "errorOnReviewFail": true
+      }
+    },
+    "pr": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 7,
+        "errorOnReviewFail": true
+      }
+    }
+  }
+}
+```
+
+**Rating without failing the build:**
+
+```json
+{
+  "commands": {
+    "review": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 6,
+        "errorOnReviewFail": false
+      }
+    }
+  }
+}
+```
+
+### Output Format
+
+When rating is enabled, the review will conclude with a clearly formatted rating section:
+
+```
+============================================================
+REVIEW RATING
+============================================================
+PASS 8/10 (threshold: 6)
+
+Comment: Code quality is good with minor improvements needed.
+Well-structured and follows best practices.
+============================================================
+```
+
+For failing reviews:
+
+```
+============================================================
+REVIEW RATING
+============================================================
+FAIL 4/10 (threshold: 6)
+
+Comment: Significant issues found requiring refactoring
+before this code can be merged.
+============================================================
+```
+
+### CI/CD Integration
+
+When `errorOnReviewFail` is set to `true` (default), failed reviews will exit with code 1, which will fail CI/CD pipeline steps. This is useful for enforcing code quality standards in automated workflows.
+
+Example usage in GitHub Actions:
+
+```yaml
+- name: Run code review
+  run: gsloth review -f changed-files.diff
+  # This step will fail if rating is below threshold
 ```
 
 ## Server Tools Configuration
@@ -881,7 +1004,7 @@ Some AI providers provide integrated server tools, such as web search.
 {
   "llm": {
     "type": "anthropic",
-    "model": "claude-sonnet-4-20250514"
+    "model": "claude-sonnet-4-5"
   },
   "tools": [
     {

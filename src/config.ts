@@ -159,12 +159,14 @@ export interface GthConfig {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       logWorkForReviewInSeconds?: number;
+      rating?: RatingConfig;
     };
     review?: {
       requirementsProvider?: string;
       contentProvider?: string;
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      rating?: RatingConfig;
     };
     ask?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
@@ -205,6 +207,29 @@ export type CustomToolsConfig = Record<string, object>;
 export type BuiltInToolsConfig = {
   jira: JiraConfig;
 };
+
+/**
+ * Configuration for review rating feature.
+ * Allows configuring automated review scoring with pass/fail thresholds.
+ */
+export interface RatingConfig {
+  /**
+   * Enable or disable review rating.
+   * @default true
+   */
+  enabled?: boolean;
+  /**
+   * Minimum score (0-10) required to pass the review.
+   * @default 6
+   */
+  passThreshold?: number;
+  /**
+   * Exit with error code 1 when review fails (below threshold).
+   * When false, exits normally (code 0) regardless of rating.
+   * @default true
+   */
+  errorOnReviewFail?: boolean;
+}
 
 /**
  * Config for {@link GthDevToolkit}.

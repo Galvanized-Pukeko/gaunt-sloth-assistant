@@ -7,12 +7,16 @@ import {
   flushSessionLog,
   initSessionLogging,
   stopSessionLogging,
+  displayInfo,
+  displayWarning,
 } from '#src/utils/consoleUtils.js';
 import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
+import { RateResponse } from '#src/core/GthLangChainAgent.js';
+import { exit } from '#src/utils/systemUtils.js';
 
 export async function review(
   source: string,
@@ -31,9 +35,10 @@ export async function review(
   }
 
   const runner = new GthAgentRunner(defaultStatusCallback);
+  let result = '';
   try {
     await runner.init(command, config, new MemorySaver());
-    await runner.processMessages(messages);
+    result = await runner.processMessages(messages);
   } catch (error) {
     displayDebug(error instanceof Error ? error : String(error));
     displayError('Failed to run review with agent.');
@@ -51,6 +56,42 @@ export async function review(
     } catch (error) {
       displayDebug(error instanceof Error ? error : String(error));
       displayError(`Failed to write review to file: ${filePath}`);
+    }
+  }
+
+  // Handle rating if enabled
+  const ratingConfig = config.commands?.[command]?.rating;
+  const ratingEnabled = ratingConfig !== undefined && (ratingConfig.enabled ?? true);
+
+  if (ratingEnabled && result) {
+    try {
+      // Parse the structured rating response
+      const rating: RateResponse = JSON.parse(result);
+      const passThreshold = ratingConfig?.passThreshold ?? 6;
+      const errorOnReviewFail = ratingConfig?.errorOnReviewFail ?? true;
+      const passed = rating.rate >= passThreshold;
+
+      // Display rating with clear formatting
+      displayInfo('\n' + '='.repeat(60));
+      displayInfo('REVIEW RATING');
+      displayInfo('='.repeat(60));
+
+      if (passed) {
+        displaySuccess(`PASS ${rating.rate}/10 (threshold: ${passThreshold})`);
+      } else {
+        displayError(`FAIL ${rating.rate}/10 (threshold: ${passThreshold})`);
+      }
+
+      displayInfo(`\nComment: ${rating.comment}\n`);
+      displayInfo('='.repeat(60) + '\n');
+
+      // Exit with appropriate code if review failed
+      if (!passed && errorOnReviewFail) {
+        exit(1);
+      }
+    } catch (error) {
+      displayDebug(error instanceof Error ? error : String(error));
+      displayWarning('Failed to parse rating response. Review completed without rating.');
     }
   }
 }
