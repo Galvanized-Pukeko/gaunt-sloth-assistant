@@ -1,12 +1,15 @@
 {
   "name": "gaunt-sloth-assistant",
-  "version": "1.0.0-alpha.0",
+  "version": "1.0.0-alpha.1",
   "description": "",
   "license": "MIT",
   "author": "Andrew Kondratev",
   "type": "module",
   "main": "dist/cli.js",
-  "repository": "github:Galvanized-Pukeko/gaunt-sloth-assistant",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant.git"
+  },
   "keywords": [
     "ai",
     "agent",
