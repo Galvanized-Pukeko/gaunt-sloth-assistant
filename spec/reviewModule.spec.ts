@@ -36,6 +36,8 @@ vi.mock('node:path', () => pathMock);
 // Mock systemUtils module
 const systemUtilsMock = {
   getProjectDir: vi.fn(),
+  exit: vi.fn(),
+  setExitCode: vi.fn(),
   stdout: {
     write: vi.fn(),
   },
@@ -48,6 +50,8 @@ const consoleUtilsMock = {
   displaySuccess: vi.fn(),
   displayError: vi.fn(),
   displayDebug: vi.fn(),
+  displayInfo: vi.fn(),
+  displayWarning: vi.fn(),
   defaultStatusCallback: vi.fn(),
   initSessionLogging: vi.fn(),
   flushSessionLog: vi.fn(),
@@ -75,6 +79,12 @@ const ProgressIndicatorInstanceMock = {
 vi.mock('#src/utils/ProgressIndicator.js', () => ({
   ProgressIndicator: ProgressIndicatorMock,
 }));
+
+const artifactStoreMock = {
+  getArtifact: vi.fn(),
+  deleteArtifact: vi.fn(),
+};
+vi.mock('#src/state/artifactStore.js', () => artifactStoreMock);
 
 // Mock llmUtils module
 const llmUtilsMock = {
@@ -136,6 +146,7 @@ vi.mock('#src/config.js', () => ({
 describe('reviewModule', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    artifactStoreMock.getArtifact.mockReturnValue(undefined);
 
     // Setup mock for our new generateStandardFileName function
     fileUtilsMock.generateStandardFileName.mockReturnValue('gth_2025-05-17_21-00-00_REVIEW.md');
@@ -186,6 +197,7 @@ describe('reviewModule', () => {
 
     // Verify that ProgressIndicator.stop() was called
     expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
+    expect(artifactStoreMock.deleteArtifact).toHaveBeenCalledWith('gsloth.review.rate');
   });
 
   it('should write review to a specified string path when writeOutputToFile is a string', async () => {
@@ -247,5 +259,195 @@ describe('reviewModule', () => {
 
     // Since streamOutput is true, display should not be called
     expect(consoleUtilsMock.display).not.toHaveBeenCalled();
+  });
+
+  describe('Rating functionality', () => {
+    it('should display PASS rating when review passes threshold', async () => {
+      const configWithRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+            },
+          },
+        },
+      };
+
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
+        rate: 8,
+        comment: 'Good code quality, minor improvements needed',
+        passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
+      });
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
+
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+        expect.stringContaining('REVIEW RATING')
+      );
+      expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith('PASS 8/10 (threshold: 6)');
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+        expect.stringContaining('Good code quality')
+      );
+      expect(systemUtilsMock.setExitCode).not.toHaveBeenCalled();
+      expect(artifactStoreMock.deleteArtifact).toHaveBeenCalledWith('gsloth.review.rate');
+    });
+
+    it('should display FAIL rating and exit with code 1 when review fails and errorOnReviewFail is true', async () => {
+      const configWithRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+            },
+          },
+        },
+      };
+
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
+        rate: 4,
+        comment: 'Significant issues found',
+        passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
+      });
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
+
+      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith('FAIL 4/10 (threshold: 6)');
+      expect(systemUtilsMock.setExitCode).toHaveBeenCalledWith(1);
+    });
+
+    it('should display FAIL rating but not exit when errorOnReviewFail is false', async () => {
+      const configWithRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: false,
+            },
+          },
+        },
+      };
+
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
+        rate: 3,
+        comment: 'Major refactoring needed',
+        passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
+      });
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
+
+      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith('FAIL 3/10 (threshold: 6)');
+      expect(systemUtilsMock.setExitCode).not.toHaveBeenCalled();
+    });
+
+    it('should not display rating when rating config is not provided', async () => {
+      const configWithoutRating: GthConfig = {
+        ...mockConfig,
+        commands: {},
+      };
+
+      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue('Regular review response');
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithoutRating, 'review');
+
+      expect(consoleUtilsMock.displayInfo).not.toHaveBeenCalledWith(
+        expect.stringContaining('REVIEW RATING')
+      );
+      expect(artifactStoreMock.getArtifact).not.toHaveBeenCalled();
+      expect(artifactStoreMock.deleteArtifact).toHaveBeenCalledWith('gsloth.review.rate');
+    });
+
+    it('should use default values when rating config is empty object', async () => {
+      const configWithEmptyRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {},
+          },
+        },
+      };
+
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
+        rate: 7,
+        comment: 'Meets standards',
+        passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
+      });
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithEmptyRating, 'review');
+
+      // Should use default threshold of 6 and default errorOnReviewFail of true
+      expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith('PASS 7/10 (threshold: 6)');
+    });
+
+    it('should handle pr command with rating config', async () => {
+      const configWithPrRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          pr: {
+            rating: {
+              enabled: true,
+              passThreshold: 7,
+              errorOnReviewFail: true,
+            },
+          },
+        },
+      };
+
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
+        rate: 9,
+        comment: 'Excellent PR',
+        passThreshold: 7,
+        minRating: 0,
+        maxRating: 10,
+      });
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('PR-123', 'test-preamble', 'test-diff', configWithPrRating, 'pr');
+
+      expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith('PASS 9/10 (threshold: 7)');
+      expect(systemUtilsMock.setExitCode).not.toHaveBeenCalled();
+    });
+
+    it('should warn when rating artifact is missing', async () => {
+      const configWithRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+            },
+          },
+        },
+      };
+
+      artifactStoreMock.getArtifact.mockReturnValueOnce(undefined);
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
+
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        'Rating middleware did not return a score for review command.'
+      );
+    });
   });
 });

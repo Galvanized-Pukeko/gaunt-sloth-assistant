@@ -1,7 +1,9 @@
 export function extractReviewScore(output: string): number | null {
-  const reviewMatch = output.match(/<REVIEW>(\d+(?:\.\d+)?)<\/REVIEW>/);
-  if (reviewMatch && reviewMatch[1]) {
-    return parseFloat(reviewMatch[1]);
+  // Rating format: "PASS 8/10" or "FAIL 4/10"
+  const ratingMatch = output.match(/(?:PASS|FAIL)\s+(\d+)\/10/);
+  if (ratingMatch && ratingMatch[1]) {
+    return parseInt(ratingMatch[1], 10);
   }
+
   return null;
 }

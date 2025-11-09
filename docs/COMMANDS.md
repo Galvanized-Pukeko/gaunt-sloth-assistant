@@ -6,6 +6,15 @@ This document provides detailed information about all available commands in Gaun
 
 Gaunt Sloth Assistant provides several commands to help with code review, analysis, and interaction. All commands can be executed using either `gsloth` or `gth`.
 
+## Global Options
+
+Every command supports these shared flags:
+
+- `--config <path>` – load a specific configuration file (without changing directories)
+- `-i, --identity-profile <name>` – use prompts/configs from `.gsloth/.gsloth-settings/<name>/`
+- `-w, --write-output-to-file <value>` – control output files (`true` by default, use `-wn`/`-w0` for false, or pass a relative filename)
+- `--verbose` – enable verbose LangChain/LangGraph logs for troubleshooting
+
 ## init
 
 Initialize Gaunt Sloth Assistant in your project.
@@ -15,7 +24,7 @@ gsloth init <type>
 ```
 
 ### Arguments
-- `<type>` - Configuration type. Available options: `anthropic`, `groq`, `deepseek`, `openai`, `google-genai`, `vertexai`
+- `<type>` - Configuration type. Available options: `anthropic`, `groq`, `deepseek`, `openai`, `google-genai`, `vertexai`, `openrouter`, `xai`
 
 ### Description
 Creates the necessary configuration files for your project. If a `.gsloth` directory exists, files will be placed in `.gsloth/.gsloth-settings/`. Otherwise, they will be created in the project root.
@@ -44,6 +53,7 @@ gsloth pr <prId> [requirementsId]
 ### Options
 - `-p, --requirements-provider <provider>` - Requirements provider for this review
 - `-f, --file [files...]` - Input files to add before the diff
+- `-m, --message <message>` - Additional reviewer instructions inserted before the diff
 
 ### Prerequisites
 - GitHub CLI (`gh`) must be installed and authenticated
@@ -149,7 +159,7 @@ It is possible to press Escape during inference to interrupt it.
 - `[message]` - Initial message to start the chat
 
 ### Description
-Opens an interactive chat session where you can have a conversation with the AI. The session maintains context throughout the conversation. Chat history is saved to `.gsloth/CHAT_<timestamp>.md`.
+Opens an interactive chat session where you can have a conversation with the AI. The session maintains context throughout the conversation. Chat history is saved as `gth_<timestamp>_CHAT.md` (in `.gsloth/` when present, otherwise the project root). Running `gsloth` with no subcommand starts this chat mode automatically.
 
 ### Features
 - Interactive conversation with context memory
@@ -206,7 +216,7 @@ Commands can be configured individually in your configuration file. See [CONFIGU
 {
   "llm": {
     "type": "anthropic",
-    "model": "claude-3-5-sonnet-20241022"
+    "model": "claude-sonnet-4-5"
   },
   "commands": {
     "pr": {
@@ -227,6 +237,7 @@ All command outputs are saved as markdown files:
 - If `.gsloth` directory exists: Files are saved to `.gsloth/`
 - Otherwise: Files are saved to the project root
 - File naming: `gth_<timestamp>_<COMMAND>.md` for interactive sessions (same as for other commands)
+- Control this behavior with `-w/--write-output-to-file` or the `writeOutputToFile` config option.
 
 ## Exit Codes
 

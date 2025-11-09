@@ -51,12 +51,14 @@ vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 // Mock createAgent from langchain
 const createAgentMock = vi.fn();
+const toolStrategyMock = vi.fn();
 const agentMock = {
   invoke: vi.fn(),
   stream: vi.fn(),
 };
 vi.mock('langchain', () => ({
   createAgent: createAgentMock,
+  toolStrategy: toolStrategyMock,
   summarizationMiddleware: vi.fn(),
   anthropicPromptCachingMiddleware: vi.fn(),
 }));
@@ -84,6 +86,7 @@ describe('GthLangChainAgent', () => {
 
     // Setup createAgent mock
     createAgentMock.mockReturnValue(agentMock);
+    toolStrategyMock.mockReturnValue({ type: 'tool_strategy', schema: {} });
     agentMock.invoke.mockResolvedValue({
       messages: [{ content: 'test response' }],
     });
@@ -233,6 +236,16 @@ describe('GthLangChainAgent', () => {
 
     it('should invoke agent in non-streaming mode', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
+
+      // Explicitly mock the agent response
+      agentMock.invoke.mockResolvedValue({
+        messages: [
+          new AIMessage({
+            content: 'test response',
+          }),
+        ],
+      });
+
       const fakeListChatModel = new FakeListChatModel({
         responses: ['test response'],
       });

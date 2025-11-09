@@ -25,7 +25,7 @@ For a tidier project structure, you can create a `.gsloth` directory in your pro
 Example directory structure when using the `.gsloth` directory:
 
 ```
-.gsloth/.gsloth-settings/.gsloth-config.json
+.gsloth/.gsloth-settings/.gsloth.config.json
 .gsloth/.gsloth-settings/.gsloth.guidelines.md
 .gsloth/.gsloth-settings/.gsloth.review.md
 .gsloth/gth_2025-05-18_09-34-38_ASK.md
@@ -46,7 +46,7 @@ may be so different that this is better to keep them in complete separation.
 Identity profiles may be used to define different Gaunt Sloth identities for different purposes.
 
 Identity profiles can only be activated in directory-based configuration.
-`gth -i devops pr PR_NO` is invoked, the configuration is pulled from `.gsloth/gsloth-settings/devops/` directory,
+`gth -i devops pr PR_NO` is invoked, the configuration is pulled from `.gsloth/.gsloth-settings/devops/` directory,
 which may contain a full set of config files:
 ```
 .gsloth.backstory.md
@@ -56,11 +56,21 @@ which may contain a full set of config files:
 ```
 
 When no identity profile is specified in the command, for example `gth pr PR_NO`,
-the configuration is pulled from the `.gsloth/gsloth-settings/` directory.
+the configuration is pulled from the `.gsloth/.gsloth-settings/` directory.
 
 `-i` or `-identity-profile` overrides entire configuration directory, which means it should contain
 a configuration file and prompt files. In the case if some prompt files are missing, they will be
 fetched from the installation directory.
+
+### Controlling Output Files
+
+By default, Gaunt Sloth writes each response to `gth_<timestamp>_<COMMAND>.md` under `.gsloth/` (or the project root).
+Set `writeOutputToFile` in your config to:
+- `true` (default) for standard filenames,
+- `false` to skip writing files,
+- a relative path (e.g. `"reviews/last.md"`) to always use that location.
+
+Override the setting per run with `-w/--write-output-to-file true|false|<filename>`. Shortcuts `-wn` or `-w0` map to `false`.
 
 ## Configuration Object
 
@@ -72,7 +82,7 @@ It is always worth checking sourcecode in [config.ts](../src/config.ts) for more
 
 ## Config initialization
 Configuration can be created with `gsloth init [vendor]` command.
-Currently, anthropic, groq, deepseek, openai, google-genai, vertexai and xai can be configured with `gsloth init [vendor]`.
+Currently, anthropic, groq, deepseek, openai, google-genai, vertexai, openrouter and xai can be configured with `gsloth init [vendor]`.
 For providers using OpenAI format (like Inception), use `gsloth init openai` and then modify the configuration.
 
 ### Google GenAI (AI Studio)
@@ -168,7 +178,7 @@ JSON configuration is simpler but less flexible than JavaScript configuration. I
   "llm": {
     "type": "anthropic",
     "apiKey": "your-api-key-here",
-    "model": "claude-3-5-sonnet-20241022"
+    "model": "claude-sonnet-4-5"
   }
 }
 ```
@@ -313,7 +323,7 @@ export async function configure() {
     return {
         llm: new anthropic.ChatAnthropic({
             apiKey: process.env.ANTHROPIC_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-            model: "claude-3-5-sonnet-20241022"
+            model: "claude-sonnet-4-5"
         })
     };
 }
@@ -641,6 +651,25 @@ export async function configure() {
 }
 ```
 
+##### Automatic work logging for Jira reviews
+
+When you pass a Jira issue ID to `gsloth pr` and use the modern Jira provider (`requirementsProvider: "jira"`),
+you can ask Gaunt Sloth to log review time back to that issue automatically by setting
+`commands.pr.logWorkForReviewInSeconds`. The value is recorded as worklog seconds after each PR review.
+
+```json
+{
+  "commands": {
+    "pr": {
+      "requirementsProvider": "jira",
+      "logWorkForReviewInSeconds": 600
+    }
+  }
+}
+```
+
+This automation only runs when a `requirementsId` is supplied on the command line and the provider resolves to `jira`.
+
 #### 2. Legacy Jira REST API (Unscoped Token)
 
 Jira API is used with `pr` and `review` commands.
@@ -733,7 +762,7 @@ Example configuration including dev tools (from .gsloth.config.json):
 }
 ```
 
-Note: For `run_single_test`, the command can include a placeholder like `${testPath}` for the test file path. p
+Note: For `run_single_test`, the command can include a placeholder like `${testPath}` for the test file path.
 Security validations are in place to prevent path traversal or injection.
 
 ## Middleware Configuration
@@ -752,7 +781,7 @@ Reduces API costs by caching prompts (Anthropic models only):
 {
   "llm": {
     "type": "anthropic",
-    "model": "claude-3-5-sonnet-20241022"
+    "model": "claude-sonnet-4-5"
   },
   "middleware": [
     "anthropic-prompt-caching"
@@ -815,7 +844,7 @@ You can combine multiple middleware:
 {
   "llm": {
     "type": "anthropic",
-    "model": "claude-3-5-sonnet-20241022"
+    "model": "claude-sonnet-4-5"
   },
   "middleware": [
     "anthropic-prompt-caching",
@@ -838,7 +867,7 @@ export async function configure() {
   
   return {
     llm: new anthropic.ChatAnthropic({
-      model: "claude-3-5-sonnet-20241022"
+      model: "claude-sonnet-4-5"
     }),
     middleware: [
       "summarization",
@@ -857,6 +886,150 @@ export async function configure() {
     ]
   };
 }
+```
+
+## Review Rating Configuration
+
+The `review` and `pr` commands **automatically provide** automated review scoring with configurable pass/fail thresholds. **Rating is enabled by default** - the AI concludes every review with a numerical rating (0-10) and a comment explaining the rating.
+
+### Rating Scale
+
+- **0-2**: Bad code with syntax errors or critical issues (equivalent to REJECT)
+- **3-5**: Code needs significant changes (equivalent to REQUEST_CHANGES)
+- **6-10**: Code is acceptable (equivalent to APPROVE)
+
+### Default Behavior
+
+**Out of the box, without any configuration:**
+- ✅ Rating is **enabled**
+- ✅ Pass threshold is **6/10**
+- ✅ Failed reviews (< 6) **exit with code 1** for CI/CD integration
+
+### Configuration Options
+
+You can customize rating behavior for `review` and `pr` commands under `commands.review.rating` or `commands.pr.rating`:
+
+- **`enabled`** (boolean, default: `true`): Enable or disable review rating
+- **`passThreshold`** (number 0-10, default: `6`): Minimum score required to pass the review
+- **`minRating`** (number, default: `0`): Lower bound for the rating scale
+- **`maxRating`** (number, default: `10`): Upper bound for the rating scale
+- **`errorOnReviewFail`** (boolean, default: `true`): Exit with error code 1 when review fails (below threshold)
+
+### Example Configurations
+
+**Default configuration (no config needed):**
+
+Rating works out of the box with no configuration required! The defaults provide sensible CI/CD integration.
+
+**Disable rating:**
+
+```json
+{
+  "commands": {
+    "review": {
+      "rating": {
+        "enabled": false
+      }
+    }
+  }
+}
+```
+
+**Custom threshold:**
+
+```json
+{
+  "commands": {
+    "review": {
+      "rating": {
+        "passThreshold": 8
+      }
+    }
+  }
+}
+```
+
+**Different thresholds for review and PR:**
+
+```json
+{
+  "llm": {
+    "type": "anthropic",
+    "model": "claude-sonnet-4-5"
+  },
+  "commands": {
+    "review": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 6,
+        "errorOnReviewFail": true
+      }
+    },
+    "pr": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 7,
+        "errorOnReviewFail": true
+      }
+    }
+  }
+}
+```
+
+**Rating without failing the build:**
+
+```json
+{
+  "commands": {
+    "review": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 6,
+        "errorOnReviewFail": false
+      }
+    }
+  }
+}
+```
+
+### Output Format
+
+When rating is enabled, the review will conclude with a clearly formatted rating section:
+
+```
+============================================================
+REVIEW RATING
+============================================================
+PASS 8/10 (threshold: 6)
+
+Comment: Code quality is good with minor improvements needed.
+Well-structured and follows best practices.
+============================================================
+```
+
+For failing reviews:
+
+```
+============================================================
+REVIEW RATING
+============================================================
+FAIL 4/10 (threshold: 6)
+
+Comment: Significant issues found requiring refactoring
+before this code can be merged.
+============================================================
+```
+
+### CI/CD Integration
+
+When `errorOnReviewFail` is set to `true` (default), failed reviews will exit with code 1, which will fail CI/CD pipeline steps. This is useful for enforcing code quality standards in automated workflows.
+
+Example usage in GitHub Actions:
+
+```yaml
+- name: Run code review
+  run: gsloth review -f changed-files.diff
+  # This step will fail if rating is below threshold
 ```
 
 ## Server Tools Configuration
@@ -881,7 +1054,7 @@ Some AI providers provide integrated server tools, such as web search.
 {
   "llm": {
     "type": "anthropic",
-    "model": "claude-sonnet-4-20250514"
+    "model": "claude-sonnet-4-5"
   },
   "tools": [
     {

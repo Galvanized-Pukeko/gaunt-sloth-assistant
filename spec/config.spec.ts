@@ -122,10 +122,30 @@ describe('config', async () => {
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
         commands: {
-          pr: { contentProvider: 'github', requirementsProvider: 'github' },
+          pr: {
+            contentProvider: 'github',
+            requirementsProvider: 'github',
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
           code: { filesystem: 'all' },
         },
         includeCurrentDateAfterGuidelines: false,
+        modelDisplayName: undefined,
       });
     });
 
@@ -181,7 +201,26 @@ describe('config', async () => {
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
         commands: {
-          pr: { contentProvider: 'github', requirementsProvider: 'github' },
+          pr: {
+            contentProvider: 'github',
+            requirementsProvider: 'github',
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
           code: { filesystem: 'all' },
         },
         includeCurrentDateAfterGuidelines: false,
@@ -240,7 +279,26 @@ describe('config', async () => {
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
         commands: {
-          pr: { contentProvider: 'github', requirementsProvider: 'github' },
+          pr: {
+            contentProvider: 'github',
+            requirementsProvider: 'github',
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
           code: { filesystem: 'all' },
         },
         includeCurrentDateAfterGuidelines: false,
@@ -678,7 +736,26 @@ describe('config', async () => {
         filesystem: 'read',
         debugLog: false,
         commands: {
-          pr: { contentProvider: 'github', requirementsProvider: 'github' },
+          pr: {
+            contentProvider: 'github',
+            requirementsProvider: 'github',
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
           code: { filesystem: 'all' },
         },
         includeCurrentDateAfterGuidelines: false,
@@ -981,7 +1058,26 @@ describe('config', async () => {
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {
-          pr: { contentProvider: 'github', requirementsProvider: 'github' },
+          pr: {
+            contentProvider: 'github',
+            requirementsProvider: 'github',
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
           code: { filesystem: 'all' },
         },
         includeCurrentDateAfterGuidelines: false,
@@ -1025,7 +1121,26 @@ describe('config', async () => {
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {
-          pr: { contentProvider: 'github', requirementsProvider: 'github' },
+          pr: {
+            contentProvider: 'github',
+            requirementsProvider: 'github',
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
           code: { filesystem: 'all' },
         },
         includeCurrentDateAfterGuidelines: false,
@@ -1069,7 +1184,26 @@ describe('config', async () => {
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {
-          pr: { contentProvider: 'github', requirementsProvider: 'github' },
+          pr: {
+            contentProvider: 'github',
+            requirementsProvider: 'github',
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
+          review: {
+            rating: {
+              enabled: true,
+              passThreshold: 6,
+              errorOnReviewFail: true,
+              maxRating: 10,
+              minRating: 0,
+            },
+          },
           code: { filesystem: 'all' },
         },
         includeCurrentDateAfterGuidelines: false,

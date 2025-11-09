@@ -9,7 +9,7 @@ import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.j
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
-import { isAIMessage } from '@langchain/core/messages';
+import { AIMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
@@ -94,7 +94,7 @@ export class GthLangChainAgent implements GthAgentInterface {
         debugLogObject('postModel state', state);
         const lastMessage = state.messages[state.messages.length - 1];
         if (
-          isAIMessage(lastMessage) &&
+          AIMessage.isInstance(lastMessage) &&
           lastMessage.tool_calls &&
           lastMessage.tool_calls?.length > 0
         ) {
@@ -112,6 +112,7 @@ export class GthLangChainAgent implements GthAgentInterface {
 
     this.statusUpdate('info', `Loaded middleware: ${middleware.map((m) => m.name).join(', ')}`);
 
+    // Create agent with configured middleware
     this.agent = createAgent({
       model: this.config.llm,
       tools,
@@ -141,9 +142,7 @@ export class GthLangChainAgent implements GthAgentInterface {
       try {
         debugLog('Calling agent.invoke...');
         const response = await this.agent.invoke({ messages }, runConfig);
-
         const aiMessage = response.messages[response.messages.length - 1].content as string;
-
         this.statusUpdate('display', aiMessage);
         return aiMessage;
       } catch (e) {
@@ -199,7 +198,7 @@ export class GthLangChainAgent implements GthAgentInterface {
 
           for await (const [chunk, _metadata] of stream) {
             debugLogObject('Stream chunk', { chunk, _metadata });
-            if (isAIMessage(chunk)) {
+            if (AIMessage.isInstance(chunk)) {
               const text = chunk.text as string;
               totalChunks++;
 
