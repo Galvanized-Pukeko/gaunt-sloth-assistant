@@ -19,6 +19,7 @@ sdfsd
 
       - name: Perform code review
         id: review
+        continue-on-error: true
         run: |
           if [ -z "${{ steps.extract_issue.outputs.issue_number }}" ]; then
             echo "ℹ️ **Tip:** To link this PR to an issue, start your PR title with the issue number followed by a space (e.g., '123 Fix authentication bug')" | tee review.md
@@ -83,3 +84,9 @@ sdfsd
               repo: context.repo.repo,
               body: newCommentBody
             });
+
+      - name: Check review step result
+        if: steps.review.outcome == 'failure'
+        run: |
+          echo "Code review step failed with exit code 1"
+          exit 1
