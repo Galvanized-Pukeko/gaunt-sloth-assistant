@@ -1,4 +1,4 @@
-# v1.0.0-alpha.1 Middleware Rollout
+# v1.0.0-alpha.2 Review Rater
 
 ## Breaking Changes
 - Runtime baseline moved to Node 24.x / npm 11 and LangChain v1 APIs; the CLI now depends on the 1.0 versions of `langchain`, `langgraph`, MCP adapters, and provider SDKs.
