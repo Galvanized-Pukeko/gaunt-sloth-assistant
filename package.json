@@ -6,7 +6,10 @@
   "author": "Andrew Kondratev",
   "type": "module",
   "main": "dist/cli.js",
-  "repository": "github:Galvanized-Pukeko/gaunt-sloth-assistant",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant.git"
+  },
   "keywords": [
     "ai",
     "agent",
