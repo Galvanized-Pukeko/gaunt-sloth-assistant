@@ -83,10 +83,7 @@ export async function review(
   deleteArtifact(REVIEW_RATE_ARTIFACT_KEY);
 }
 
-function handleRatingResult(
-  rateConfig: RatingConfig | undefined,
-  command: 'pr' | 'review'
-): void {
+function handleRatingResult(rateConfig: RatingConfig | undefined, command: 'pr' | 'review'): void {
   if (!rateConfig || rateConfig.enabled === false) {
     return;
   }

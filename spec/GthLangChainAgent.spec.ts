@@ -739,5 +739,4 @@ describe('GthLangChainAgent', () => {
       );
     });
   });
-
 });
