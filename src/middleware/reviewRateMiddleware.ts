@@ -6,8 +6,7 @@
  * and stores the structured result inside the global artifact store.
  */
 
-import type { BaseMessage } from '@langchain/core/messages';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { HumanMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { createAgent, createMiddleware, type AgentMiddleware } from 'langchain';
 import * as z from 'zod';
@@ -65,6 +64,8 @@ export function normalizeRatingConfig(config: RatingConfig | undefined): Normali
   };
 }
 
+const REVIEW_RATE_TOOL_NAME = 'gth_review_rate';
+
 export function createReviewRateMiddleware(
   settings: ReviewRateMiddlewareSettings,
   gthConfig: GthConfig
@@ -82,7 +83,7 @@ export function createReviewRateMiddleware(
       return `Stored rating ${input.rate}/${normalizedConfig.maxRating}`;
     },
     {
-      name: 'gth_review_rate',
+      name: REVIEW_RATE_TOOL_NAME,
       description: 'Stores the final review rating and summary comment.',
       schema: RateSchema,
     }
@@ -103,25 +104,16 @@ export function createReviewRateMiddleware(
 
         deleteArtifact(REVIEW_RATE_ARTIFACT_KEY);
 
-        const conversation = renderConversation(state.messages);
-        const instructions = buildRatingInstructions(normalizedConfig);
+        const ratingPrompt = buildRatingInstructions(normalizedConfig);
 
         debugLog('ReviewRateMiddleware: requesting rating evaluation');
 
         try {
+          const ratingMessages = [...state.messages, new HumanMessage(ratingPrompt)];
+
           await ratingAgent.invoke(
             {
-              messages: [
-                new SystemMessage(instructions),
-                new HumanMessage(
-                  [
-                    'Below is the full conversation that produced the final review.',
-                    'Read it carefully and determine the correct rating.',
-                    conversation,
-                    'Call the gth_review_rate tool exactly once with your numeric rating and short summary.',
-                  ].join('\n\n')
-                ),
-              ],
+              messages: ratingMessages,
             },
             getNewRunnableConfig()
           );
@@ -142,51 +134,18 @@ function buildRatingInstructions(config: NormalizedRatingConfig): string {
   const middle = formatScore((config.passThreshold + config.maxRating) / 2);
 
   return [
-    `At the end of the review you need to provide your rating (${formattedMin}-${formattedMax}) for the code and give a final short summary.`,
+    'A reviewer just finished assessing a code change.',
+    'Your job is to inspect the entire conversation above, focus on the code being discussed (not the review quality),',
+    'and call the ' + REVIEW_RATE_TOOL_NAME + ' tool exactly once.',
+    `Assign a score between ${formattedMin}-${formattedMax} that reflects the code quality only.`,
     `Pass threshold is ${formattedThreshold}, everything below will be considered a fail.`,
     '',
     'Additional guidelines:',
     `- Never give ${formattedThreshold}/${formattedMax} or more to code which would explode with syntax error.`,
     `- Rate excellent code as ${formattedMax}/${formattedMax}`,
     `- Rate code needing improvements as ${middle}/${formattedMax}`,
-    '- Use the comment field of the tool call for the short summary.',
+    '- Use the comment field of the tool call for a concise summary referencing the code state.',
   ].join('\n');
-}
-
-function renderConversation(messages: BaseMessage[]): string {
-  return messages
-    .map((message) => {
-      const role = message._getType().toUpperCase();
-      const content = formatMessageContent(message);
-      return `${role}:\n${content}`;
-    })
-    .join('\n\n---\n\n');
-}
-
-function formatMessageContent(message: BaseMessage): string {
-  const { content } = message;
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (typeof part === 'string') {
-          return part;
-        }
-        if ('text' in part && part.text) {
-          return part.text;
-        }
-        if ('type' in part) {
-          return `${part.type}: ${JSON.stringify(part, null, 2)}`;
-        }
-        return JSON.stringify(part);
-      })
-      .join('\n');
-  }
-
-  return JSON.stringify(content);
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -23,6 +23,11 @@ this also helps with less intelligent models:
 npm run it vertexai simple
 ```
 
+Run multiple integration test patterns:
+```bash
+npm run it vertexai prCommand reviewCommand
+```
+
 ### Building and Testing
 
 ```bash
