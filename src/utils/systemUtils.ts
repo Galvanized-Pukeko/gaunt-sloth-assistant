@@ -162,6 +162,9 @@ export const stdin = process.stdin;
 export const stdout = process.stdout;
 export const argv = process.argv;
 export const env = process.env;
+export const setExitCode = (code: number): void => {
+  process.exitCode = code;
+};
 export { createInterface };
 export type { ReadLineInterface };
 
