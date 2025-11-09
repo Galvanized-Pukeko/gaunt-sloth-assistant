@@ -31,16 +31,28 @@ type PredefinedMiddlewareFactory = (
 ) => Promise<AgentMiddleware>;
 
 const predefinedMiddlewareFactories = {
+  /**
+   * Anthropic prompt caching middleware. see https://docs.langchain.com/oss/javascript/langchain/middleware#anthropic-prompt-caching
+   */
   'anthropic-prompt-caching': (
     settings: Record<string, unknown>,
     gthConfig: GthConfig
   ): Promise<AgentMiddleware> =>
     createAnthropicPromptCachingMiddleware(settings as AnthropicPromptCachingConfig, gthConfig),
+  /**
+   * Summarization middleware. see https://docs.langchain.com/oss/javascript/langchain/middleware#summarization
+   */
   summarization: (
     settings: Record<string, unknown>,
     gthConfig: GthConfig
   ): Promise<AgentMiddleware> =>
     createSummarizationMiddleware(settings as SummarizationConfig, gthConfig),
+  /**
+   * Review rating middleware.
+   * After the agent finishes, it will invoke another model,
+   * which will consume the conversation history and rate the code being reviewed.
+   * This workflow adds a result to the artifact store using {@link REVIEW_RATE_ARTIFACT_KEY}.
+   */
   'review-rate': (
     settings: Record<string, unknown>,
     gthConfig: GthConfig
@@ -69,10 +81,6 @@ function isPredefinedMiddlewareObject(
 /**
  * Create Anthropic prompt caching middleware.
  * This middleware adds cache control headers to reduce API costs.
- *
- * @param config - Configuration for the middleware
- * @param gthConfig - Full Gaunt Sloth configuration
- * @returns Middleware object
  */
 export async function createAnthropicPromptCachingMiddleware(
   config: AnthropicPromptCachingConfig,
