@@ -7,21 +7,7 @@ on:
     branches:
       - 'main'
 
-jobs:
-  ai-code-review:
-    runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.head_ref, 'dependabot') }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Use Node.js 24.x
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24.x
-          cache: 'npm'
-
-      - name: Install dependencies
+sdfsd
         run: npm i gaunt-sloth-assistant@1.0.0-alpha.2 -g && gth --version
 
       - name: Extract issue number from PR title
