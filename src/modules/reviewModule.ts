@@ -1,22 +1,26 @@
-import type { GthConfig } from '#src/config.js';
+import type { GthConfig, RatingConfig } from '#src/config.js';
 import {
   defaultStatusCallback,
   displayDebug,
   displayError,
+  displayInfo,
   displaySuccess,
+  displayWarning,
   flushSessionLog,
   initSessionLogging,
   stopSessionLogging,
-  displayInfo,
-  displayWarning,
 } from '#src/utils/consoleUtils.js';
 import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
-import { RateResponse, isRatingEnabled } from '#src/core/ratingSchema.js';
-import { exit } from '#src/utils/systemUtils.js';
+import {
+  REVIEW_RATE_ARTIFACT_KEY,
+  type ReviewRatingArtifact,
+} from '#src/middleware/reviewRateMiddleware.js';
+import { deleteArtifact, getArtifact } from '#src/state/artifactStore.js';
+import { setExitCode } from '#src/utils/systemUtils.js';
 
 export async function review(
   source: string,
@@ -34,11 +38,25 @@ export async function review(
     initSessionLogging(filePath, config.streamSessionInferenceLog);
   }
 
+  const rateConfig = config.commands?.[command]?.rating;
+  if (rateConfig && rateConfig.enabled !== false) {
+    const confMiddleware = config.middleware || [];
+    const middlewareWithoutReviewRate = confMiddleware.filter((mw) => {
+      return !(
+        typeof mw === 'object' &&
+        mw !== null &&
+        'name' in mw &&
+        (mw as { name?: string }).name === 'review-rate'
+      );
+    });
+
+    config.middleware = [...middlewareWithoutReviewRate, { name: 'review-rate', ...rateConfig }];
+  }
+
   const runner = new GthAgentRunner(defaultStatusCallback);
-  let result = '';
   try {
     await runner.init(command, config, new MemorySaver());
-    result = await runner.processMessages(messages);
+    await runner.processMessages(messages);
   } catch (error) {
     displayDebug(error instanceof Error ? error : String(error));
     displayError('Failed to run review with agent.');
@@ -48,47 +66,7 @@ export async function review(
 
   progressIndicator?.stop();
 
-  // Handle rating if enabled - do this BEFORE closing the file
-  const ratingConfig = config.commands?.[command]?.rating;
-  const ratingEnabledForCommand = isRatingEnabled(command, ratingConfig);
-
-  if (ratingEnabledForCommand && result) {
-    try {
-      // Parse the structured rating response
-      // Extract JSON from the result - it might have prefix text like "Returning structured response:"
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in rating response');
-      }
-      const rating: RateResponse = JSON.parse(jsonMatch[0]);
-      // Defaults are set in DEFAULT_CONFIG, but TypeScript needs fallbacks for type safety
-      const passThreshold = ratingConfig?.passThreshold ?? 6;
-      const errorOnReviewFail = ratingConfig?.errorOnReviewFail ?? true;
-      const passed = rating.rate >= passThreshold;
-
-      // Display rating with clear formatting (will be written to file if logging is enabled)
-      displayInfo('\n' + '='.repeat(60));
-      displayInfo('REVIEW RATING');
-      displayInfo('='.repeat(60));
-
-      if (passed) {
-        displaySuccess(`PASS ${rating.rate}/10 (threshold: ${passThreshold})`);
-      } else {
-        displayError(`FAIL ${rating.rate}/10 (threshold: ${passThreshold})`);
-      }
-
-      displayInfo(`\nComment: ${rating.comment}\n`);
-      displayInfo('='.repeat(60) + '\n');
-
-      // Exit with appropriate code if review failed
-      if (!passed && errorOnReviewFail) {
-        exit(1);
-      }
-    } catch (error) {
-      displayDebug(error instanceof Error ? error : String(error));
-      displayWarning('Failed to parse rating response. Review completed without rating.');
-    }
-  }
+  handleRatingResult(rateConfig, command);
 
   // Close the file AFTER rating is written
   if (filePath) {
@@ -100,5 +78,40 @@ export async function review(
       displayDebug(error instanceof Error ? error : String(error));
       displayError(`Failed to write review to file: ${filePath}`);
     }
+  }
+
+  deleteArtifact(REVIEW_RATE_ARTIFACT_KEY);
+}
+
+function handleRatingResult(
+  rateConfig: RatingConfig | undefined,
+  command: 'pr' | 'review'
+): void {
+  if (!rateConfig || rateConfig.enabled === false) {
+    return;
+  }
+
+  const rating = getArtifact<ReviewRatingArtifact>(REVIEW_RATE_ARTIFACT_KEY);
+  if (!rating) {
+    displayWarning(`Rating middleware did not return a score for ${command} command.`);
+    return;
+  }
+
+  const threshold = rateConfig.passThreshold ?? rating.passThreshold;
+  const maxRating = rateConfig.maxRating ?? rating.maxRating;
+  const verdictText = `${rating.rate}/${maxRating} (threshold: ${threshold})`;
+  displayInfo('\nREVIEW RATING');
+
+  if (rating.rate >= threshold) {
+    displaySuccess(`PASS ${verdictText}`);
+  } else {
+    displayError(`FAIL ${verdictText}`);
+    if (rateConfig.errorOnReviewFail ?? true) {
+      setExitCode(1);
+    }
+  }
+
+  if (rating.comment) {
+    displayInfo(rating.comment);
   }
 }

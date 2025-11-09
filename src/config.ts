@@ -224,6 +224,16 @@ export interface RatingConfig {
    */
   passThreshold?: number;
   /**
+   * Highest allowed value on the rating scale.
+   * @default 10
+   */
+  maxRating?: number;
+  /**
+   * Lowest allowed value on the rating scale.
+   * @default 0
+   */
+  minRating?: number;
+  /**
    * Exit with error code 1 when review fails (below threshold).
    * When false, exits normally (code 0) regardless of rating.
    * @default true
@@ -348,6 +358,8 @@ export const DEFAULT_CONFIG = {
       rating: {
         enabled: true,
         passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
         errorOnReviewFail: true,
       },
     },
@@ -355,6 +367,8 @@ export const DEFAULT_CONFIG = {
       rating: {
         enabled: true,
         passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
         errorOnReviewFail: true,
       },
     },

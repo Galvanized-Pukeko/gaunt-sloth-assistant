@@ -20,6 +20,57 @@ import {
   summarizationMiddleware,
   type AgentMiddleware,
 } from 'langchain';
+import {
+  createReviewRateMiddleware,
+  type ReviewRateMiddlewareSettings,
+} from '#src/middleware/reviewRateMiddleware.js';
+
+type PredefinedMiddlewareFactory = (
+  settings: Record<string, unknown>,
+  gthConfig: GthConfig
+) => Promise<AgentMiddleware>;
+
+const predefinedMiddlewareFactories = {
+  'anthropic-prompt-caching': (
+    settings: Record<string, unknown>,
+    gthConfig: GthConfig
+  ): Promise<AgentMiddleware> =>
+    createAnthropicPromptCachingMiddleware(settings as AnthropicPromptCachingConfig, gthConfig),
+  summarization: (
+    settings: Record<string, unknown>,
+    gthConfig: GthConfig
+  ): Promise<AgentMiddleware> =>
+    createSummarizationMiddleware(settings as SummarizationConfig, gthConfig),
+  'review-rate': (
+    settings: Record<string, unknown>,
+    gthConfig: GthConfig
+  ): Promise<AgentMiddleware> =>
+    createReviewRateMiddleware(settings as ReviewRateMiddlewareSettings, gthConfig),
+} satisfies Record<string, PredefinedMiddlewareFactory>;
+
+type ExtendedPredefinedMiddlewareConfig =
+  | PredefinedMiddlewareConfig
+  | {
+      name: 'review-rate';
+    } & ReviewRateMiddlewareSettings;
+
+function isPredefinedMiddlewareName(
+  name: string
+): name is keyof typeof predefinedMiddlewareFactories {
+  return name in predefinedMiddlewareFactories;
+}
+
+function isPredefinedMiddlewareObject(
+  config: MiddlewareConfig
+): config is ExtendedPredefinedMiddlewareConfig {
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    'name' in config &&
+    typeof (config as { name: unknown }).name === 'string' &&
+    isPredefinedMiddlewareName((config as { name: string }).name)
+  );
+}
 
 /**
  * Create Anthropic prompt caching middleware.
@@ -81,9 +132,6 @@ export async function resolveMiddleware(
 
   const middleware: AgentMiddleware[] = [];
 
-  // List of predefined middleware names
-  const predefinedNames = ['anthropic-prompt-caching', 'summarization'];
-
   for (const config of configs) {
     try {
       // Handle string configuration (predefined middleware with defaults)
@@ -91,13 +139,8 @@ export async function resolveMiddleware(
         middleware.push(await createPredefinedMiddleware(config, {}, gthConfig));
       }
       // Handle predefined middleware with custom settings
-      else if (
-        typeof config === 'object' &&
-        'name' in config &&
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        predefinedNames.includes((config as any).name)
-      ) {
-        const { name, ...settings } = config as PredefinedMiddlewareConfig;
+      else if (isPredefinedMiddlewareObject(config)) {
+        const { name, ...settings } = config;
         middleware.push(await createPredefinedMiddleware(name, settings, gthConfig));
       }
       // Handle custom middleware object (JS config only)
@@ -128,17 +171,10 @@ async function createPredefinedMiddleware(
   settings: Record<string, unknown>,
   gthConfig: GthConfig
 ): Promise<AgentMiddleware> {
-  switch (name) {
-    case 'anthropic-prompt-caching':
-      return createAnthropicPromptCachingMiddleware(
-        settings as AnthropicPromptCachingConfig,
-        gthConfig
-      );
-
-    case 'summarization':
-      return createSummarizationMiddleware(settings as SummarizationConfig, gthConfig);
-
-    default:
-      throw new Error(`Unknown predefined middleware: ${name}`);
+  if (!isPredefinedMiddlewareName(name)) {
+    throw new Error(`Unknown predefined middleware: ${name}`);
   }
+
+  const factory = predefinedMiddlewareFactories[name];
+  return factory(settings, gthConfig);
 }

@@ -37,6 +37,7 @@ vi.mock('node:path', () => pathMock);
 const systemUtilsMock = {
   getProjectDir: vi.fn(),
   exit: vi.fn(),
+  setExitCode: vi.fn(),
   stdout: {
     write: vi.fn(),
   },
@@ -78,6 +79,12 @@ const ProgressIndicatorInstanceMock = {
 vi.mock('#src/utils/ProgressIndicator.js', () => ({
   ProgressIndicator: ProgressIndicatorMock,
 }));
+
+const artifactStoreMock = {
+  getArtifact: vi.fn(),
+  deleteArtifact: vi.fn(),
+};
+vi.mock('#src/state/artifactStore.js', () => artifactStoreMock);
 
 // Mock llmUtils module
 const llmUtilsMock = {
@@ -139,6 +146,7 @@ vi.mock('#src/config.js', () => ({
 describe('reviewModule', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    artifactStoreMock.getArtifact.mockReturnValue(undefined);
 
     // Setup mock for our new generateStandardFileName function
     fileUtilsMock.generateStandardFileName.mockReturnValue('gth_2025-05-17_21-00-00_REVIEW.md');
@@ -189,6 +197,7 @@ describe('reviewModule', () => {
 
     // Verify that ProgressIndicator.stop() was called
     expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
+    expect(artifactStoreMock.deleteArtifact).toHaveBeenCalledWith('gsloth.review.rate');
   });
 
   it('should write review to a specified string path when writeOutputToFile is a string', async () => {
@@ -267,11 +276,13 @@ describe('reviewModule', () => {
         },
       };
 
-      const ratingResponse = JSON.stringify({
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
         rate: 8,
         comment: 'Good code quality, minor improvements needed',
+        passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
       });
-      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
 
       const { review } = await import('#src/modules/reviewModule.js');
       await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
@@ -283,7 +294,8 @@ describe('reviewModule', () => {
       expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
         expect.stringContaining('Good code quality')
       );
-      expect(systemUtilsMock.exit).not.toHaveBeenCalled();
+      expect(systemUtilsMock.setExitCode).not.toHaveBeenCalled();
+      expect(artifactStoreMock.deleteArtifact).toHaveBeenCalledWith('gsloth.review.rate');
     });
 
     it('should display FAIL rating and exit with code 1 when review fails and errorOnReviewFail is true', async () => {
@@ -300,17 +312,19 @@ describe('reviewModule', () => {
         },
       };
 
-      const ratingResponse = JSON.stringify({
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
         rate: 4,
         comment: 'Significant issues found',
+        passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
       });
-      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
 
       const { review } = await import('#src/modules/reviewModule.js');
       await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
 
       expect(consoleUtilsMock.displayError).toHaveBeenCalledWith('FAIL 4/10 (threshold: 6)');
-      expect(systemUtilsMock.exit).toHaveBeenCalledWith(1);
+      expect(systemUtilsMock.setExitCode).toHaveBeenCalledWith(1);
     });
 
     it('should display FAIL rating but not exit when errorOnReviewFail is false', async () => {
@@ -327,17 +341,19 @@ describe('reviewModule', () => {
         },
       };
 
-      const ratingResponse = JSON.stringify({
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
         rate: 3,
         comment: 'Major refactoring needed',
+        passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
       });
-      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
 
       const { review } = await import('#src/modules/reviewModule.js');
       await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
 
       expect(consoleUtilsMock.displayError).toHaveBeenCalledWith('FAIL 3/10 (threshold: 6)');
-      expect(systemUtilsMock.exit).not.toHaveBeenCalled();
+      expect(systemUtilsMock.setExitCode).not.toHaveBeenCalled();
     });
 
     it('should not display rating when rating config is not provided', async () => {
@@ -354,6 +370,8 @@ describe('reviewModule', () => {
       expect(consoleUtilsMock.displayInfo).not.toHaveBeenCalledWith(
         expect.stringContaining('REVIEW RATING')
       );
+      expect(artifactStoreMock.getArtifact).not.toHaveBeenCalled();
+      expect(artifactStoreMock.deleteArtifact).toHaveBeenCalledWith('gsloth.review.rate');
     });
 
     it('should use default values when rating config is empty object', async () => {
@@ -366,11 +384,13 @@ describe('reviewModule', () => {
         },
       };
 
-      const ratingResponse = JSON.stringify({
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
         rate: 7,
         comment: 'Meets standards',
+        passThreshold: 6,
+        minRating: 0,
+        maxRating: 10,
       });
-      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
 
       const { review } = await import('#src/modules/reviewModule.js');
       await review('test-source', 'test-preamble', 'test-diff', configWithEmptyRating, 'review');
@@ -393,17 +413,41 @@ describe('reviewModule', () => {
         },
       };
 
-      const ratingResponse = JSON.stringify({
+      artifactStoreMock.getArtifact.mockReturnValueOnce({
         rate: 9,
         comment: 'Excellent PR',
+        passThreshold: 7,
+        minRating: 0,
+        maxRating: 10,
       });
-      gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(ratingResponse);
 
       const { review } = await import('#src/modules/reviewModule.js');
       await review('PR-123', 'test-preamble', 'test-diff', configWithPrRating, 'pr');
 
       expect(consoleUtilsMock.displaySuccess).toHaveBeenCalledWith('PASS 9/10 (threshold: 7)');
-      expect(systemUtilsMock.exit).not.toHaveBeenCalled();
+      expect(systemUtilsMock.setExitCode).not.toHaveBeenCalled();
+    });
+
+    it('should warn when rating artifact is missing', async () => {
+      const configWithRating: GthConfig = {
+        ...mockConfig,
+        commands: {
+          review: {
+            rating: {
+              enabled: true,
+            },
+          },
+        },
+      };
+
+      artifactStoreMock.getArtifact.mockReturnValueOnce(undefined);
+
+      const { review } = await import('#src/modules/reviewModule.js');
+      await review('test-source', 'test-preamble', 'test-diff', configWithRating, 'review');
+
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        'Rating middleware did not return a score for review command.'
+      );
     });
   });
 });

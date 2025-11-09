@@ -9,15 +9,14 @@ import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.j
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
-import { AIMessage, BaseMessage } from '@langchain/core/messages';
+import { AIMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
-import { createAgent, toolStrategy } from 'langchain';
-import { isRatingEnabled, RateSchema } from '#src/core/ratingSchema.js';
+import { createAgent } from 'langchain';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
@@ -113,25 +112,12 @@ export class GthLangChainAgent implements GthAgentInterface {
 
     this.statusUpdate('info', `Loaded middleware: ${middleware.map((m) => m.name).join(', ')}`);
 
-    // Determine if rating should be enabled for this command
-    const ratingConfig =
-      command && (command === 'review' || command === 'pr')
-        ? this.config.commands?.[command]?.rating
-        : undefined;
-    const ratingEnabled = isRatingEnabled(command, ratingConfig);
-
-    if (ratingEnabled) {
-      this.statusUpdate('info', 'Review rating enabled');
-      debugLog('Rating enabled - using structured response format');
-    }
-
-    // Create agent with optional rating response format
+    // Create agent with configured middleware
     this.agent = createAgent({
       model: this.config.llm,
       tools,
       middleware,
       checkpointer,
-      ...(ratingEnabled && { responseFormat: toolStrategy(RateSchema) }),
     });
     debugLog('React agent created successfully');
   }
@@ -156,36 +142,7 @@ export class GthLangChainAgent implements GthAgentInterface {
       try {
         debugLog('Calling agent.invoke...');
         const response = await this.agent.invoke({ messages }, runConfig);
-
-        // Safety check for response structure
-        if (!response?.messages || response.messages.length === 0) {
-          debugLogError('invoke', 'No messages in response');
-          this.statusUpdate('warning', 'No messages in response');
-          return '';
-        }
-
-        const lastMessage: BaseMessage = response.messages[response.messages.length - 1];
-
-        // Check if this is a structured response (tool call result)
-        // This happens when using toolStrategy for rating responses
-        if (
-          lastMessage &&
-          AIMessage.isInstance(lastMessage) &&
-          'tool_calls' in lastMessage &&
-          lastMessage.tool_calls &&
-          Array.isArray(lastMessage.tool_calls) &&
-          lastMessage.tool_calls.length > 0
-        ) {
-          // Extract the structured data from the tool call
-          const toolCall = lastMessage.tool_calls[0];
-          const structuredData = JSON.stringify(toolCall.args);
-          debugLog(`Structured response extracted from tool_calls: ${structuredData}`);
-          // Don't display - let the consumer handle it
-          return structuredData;
-        }
-
-        // Regular response - use original extraction logic
-        const aiMessage = lastMessage?.content as string;
+        const aiMessage = response.messages[response.messages.length - 1].content as string;
         this.statusUpdate('display', aiMessage);
         return aiMessage;
       } catch (e) {
