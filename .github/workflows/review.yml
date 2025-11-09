@@ -22,7 +22,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm i gaunt-sloth-assistant@0.9.21 -g && gth --version
+        run: npm i gaunt-sloth-assistant@1.0.0-alpha.2 -g && gth --version
 
       - name: Extract issue number from PR title
         id: extract_issue
@@ -61,12 +61,13 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
+              per_page: 100,
             });
 
             // Find and hide older AI review comments
             const aiComments = comments.data.filter(comment =>
               comment.user.login === 'github-actions[bot]' &&
-              comment.body.startsWith(AI_REVIEW_IDENTIFIER)
+              comment.body.includes(AI_REVIEW_IDENTIFIER)
             );
 
             // Hide older comments by wrapping them in a collapsible section
