@@ -7,12 +7,13 @@
  */
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { RatingConfig } from '#src/config.js';
 import { AgentMiddleware } from 'langchain';
 
 /**
  * Predefined middleware types that can be configured via JSON config.
  */
-export type PredefinedMiddlewareName = 'anthropic-prompt-caching' | 'summarization';
+export type PredefinedMiddlewareName = 'anthropic-prompt-caching' | 'summarization' | 'review-rate';
 
 /**
  * Configuration for Anthropic prompt caching middleware.
@@ -55,7 +56,8 @@ export interface SummarizationConfig {
  */
 export type PredefinedMiddlewareConfig =
   | ({ name: 'anthropic-prompt-caching' } & AnthropicPromptCachingConfig)
-  | ({ name: 'summarization' } & SummarizationConfig);
+  | ({ name: 'summarization' } & SummarizationConfig)
+  | ({ name: 'review-rate' } & RatingConfig);
 
 /**
  * Middleware configuration that can be specified in JSON or JS config.

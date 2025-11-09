@@ -48,12 +48,6 @@ const predefinedMiddlewareFactories = {
     createReviewRateMiddleware(settings as ReviewRateMiddlewareSettings, gthConfig),
 } satisfies Record<string, PredefinedMiddlewareFactory>;
 
-type ExtendedPredefinedMiddlewareConfig =
-  | PredefinedMiddlewareConfig
-  | {
-      name: 'review-rate';
-    } & ReviewRateMiddlewareSettings;
-
 function isPredefinedMiddlewareName(
   name: string
 ): name is keyof typeof predefinedMiddlewareFactories {
@@ -62,7 +56,7 @@ function isPredefinedMiddlewareName(
 
 function isPredefinedMiddlewareObject(
   config: MiddlewareConfig
-): config is ExtendedPredefinedMiddlewareConfig {
+): config is PredefinedMiddlewareConfig {
   return (
     typeof config === 'object' &&
     config !== null &&
