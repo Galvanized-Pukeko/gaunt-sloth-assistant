@@ -613,6 +613,52 @@ Important! You are likely to be dealing with git diff below, please don't confus
 }
 
 /**
+ * Deep merge two objects, with source overriding target properties
+ * @param target - The target object with default values
+ * @param source - The source object with user overrides
+ * @param maxDepth - Maximum recursion depth to prevent stack overflow (default: 4)
+ */
+function deepMerge<T extends Record<string, unknown>>(
+  target: T | undefined,
+  source: Partial<T> | undefined,
+  maxDepth = 4
+): T {
+  if (!source) return target as T;
+  if (!target) return source as T;
+
+  const result = { ...target };
+
+  // Return result without merging if depth is exceeded
+  if (maxDepth === 0) return result;
+
+  for (const key in source) {
+    const sourceValue = source[key];
+    const targetValue = target[key];
+
+    if (
+      sourceValue &&
+      typeof sourceValue === 'object' &&
+      !Array.isArray(sourceValue) &&
+      targetValue &&
+      typeof targetValue === 'object' &&
+      !Array.isArray(targetValue)
+    ) {
+      // Recursively merge nested objects
+      result[key] = deepMerge(
+        targetValue as Record<string, unknown>,
+        sourceValue as Record<string, unknown>,
+        maxDepth - 1
+      ) as T[Extract<keyof T, string>];
+    } else if (sourceValue !== undefined) {
+      // Override with source value if it exists
+      result[key] = sourceValue as T[Extract<keyof T, string>];
+    }
+  }
+
+  return result;
+}
+
+/**
  * Merge config with default config
  */
 function mergeConfig(
@@ -620,10 +666,30 @@ function mergeConfig(
   commandLineConfigOverrides: CommandLineConfigOverrides
 ): GthConfig {
   const config = partialConfig as GthConfig;
+
+  // Deep merge command configs while preserving defaults
+  // Type complexity from DEFAULT_CONFIG.commands 'as const' requires any cast for deep merge result
+  const mergedCommands: GthConfig['commands'] = {
+    pr: deepMerge(
+      DEFAULT_CONFIG.commands.pr as Record<string, unknown>,
+      config?.commands?.pr as Record<string, unknown> | undefined
+    ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    review: deepMerge(
+      DEFAULT_CONFIG.commands.review as Record<string, unknown>,
+      config?.commands?.review as Record<string, unknown> | undefined
+    ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    code: deepMerge(
+      DEFAULT_CONFIG.commands.code as Record<string, unknown>,
+      config?.commands?.code as Record<string, unknown> | undefined
+    ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    ...(config?.commands?.ask && { ask: config.commands.ask }),
+    ...(config?.commands?.chat && { chat: config.commands.chat }),
+  };
+
   const mergedConfig = {
     ...DEFAULT_CONFIG,
     ...config,
-    commands: { ...DEFAULT_CONFIG.commands, ...(config?.commands ?? {}) },
+    commands: mergedCommands,
   };
 
   if (commandLineConfigOverrides.identityProfile !== undefined) {
