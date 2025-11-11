@@ -68,7 +68,14 @@ By default, Gaunt Sloth writes each response to `gth_<timestamp>_<COMMAND>.md` u
 Set `writeOutputToFile` in your config to:
 - `true` (default) for standard filenames,
 - `false` to skip writing files,
-- a relative path (e.g. `"reviews/last.md"`) to always use that location.
+- a string for a custom path (behavior depends on the format):
+  - **Bare filenames** (e.g. `"review.md"`) are placed in `.gsloth/` when it exists, otherwise project root
+  - **Paths with separators** (e.g. `"./review.md"` or `"reviews/last.md"`) are always relative to project root
+
+**Examples:**
+- `"review.md"` → `.gsloth/review.md` (when `.gsloth` exists) or `review.md` (otherwise)
+- `"./review.md"` → `review.md` (always project root)
+- `"reviews/last.md"` → `reviews/last.md` (always relative to project root)
 
 Override the setting per run with `-w/--write-output-to-file true|false|<filename>`. Shortcuts `-wn` or `-w0` map to `false`.
 
