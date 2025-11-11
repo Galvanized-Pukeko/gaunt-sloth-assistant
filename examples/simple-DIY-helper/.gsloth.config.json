@@ -1,0 +1,6 @@
+{
+  "llm": {
+    "type": "deepseek",
+    "model": "deepseek-reasoner"
+  }
+}
