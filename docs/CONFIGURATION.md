@@ -289,6 +289,16 @@ You can use the `XAI_API_KEY` environment variable instead of specifying `apiKey
 
 JavaScript configuration provides more flexibility than JSON configuration, allowing you to use dynamic imports and include custom tools.
 
+**For a complete working example** demonstrating custom middleware and custom tools, see:
+- [JavaScript Config Example README](../examples/js-config/README.md) - Full documentation and usage guide
+- [Example Config File](../examples/js-config/.gsloth.config.js) - Complete working example with custom logging middleware and custom logger tool
+
+The example demonstrates:
+- Custom middleware with all lifecycle hooks (`beforeAgent`, `beforeModel`, `afterModel`, `afterAgent`)
+- Custom tool creation using LangChain's `tool()` API
+- Combining built-in and custom middleware
+- Practical patterns for extending Gaunt Sloth functionality
+
 **Example with Custom Tools**
 ```javascript
 // .gsloth.config.mjs

@@ -234,6 +234,9 @@ Make sure you either define `XAI_API_KEY` environment variable or edit your conf
 Any other AI provider supported by Langchain.js can be configured with js [Config](./docs/CONFIGURATION.md).
 For example, Ollama can be set up with JS config (some of the models, see https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/discussions/107)
 
+### JavaScript Configuration with Custom Middleware and Tools
+JavaScript configs enable advanced customization including custom middleware and tools that aren't available in JSON configs. See the [JavaScript config example](./examples/js-config/README.md) for a complete demonstration of creating custom logging middleware and custom tools.
+
 ## Integration with GitHub Workflows / Actions
 
 Example GitHub workflows integration can be found in [.github/workflows/review.yml;](.github/workflows/review.yml)
