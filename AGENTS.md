@@ -4,6 +4,22 @@ This file provides guidance to any AI coding agent (Claude Code, Cursor, etc.) w
 
 **IMPORTANT: Always read and follow .gsloth.guidelines.md first for development principles, testing patterns, and workflow.**
 
+## Tool Use
+
+Precedence for your tool use:
+1. Your built-in tools (e.g. Read, Edit, Write, Glob, Grep, etc.)
+2. Bash commands that are documented in this file and in README.md
+3. Other bash commands
+
+**Examples of what to avoid:**
+- ❌ `cat file.txt` → ✅ Use Read tool
+- ❌ `grep pattern file.txt` → ✅ Use Grep tool
+- ❌ `echo content > file.txt` → ✅ Use Write tool
+- ❌ `find . -name "*.js"` → ✅ Use Glob tool
+
+Abstain from using bash commands when you already have a built-in tool,
+every time you use a bash command that is not in allow-list, it needs approval and slows down the process.
+
 ## Integration tests
 
 Running all integration tests (takes ~10 minutes):
@@ -35,37 +51,19 @@ npm run it vertexai prCommand reviewCommand
 npm run build
 
 # Run tests
-npm run test
+npm test
 
 # Run linting
 npm run lint
+
+# Auto-fix simple lint issues
+npm run lint-n-fix
 
 # Format code
 npm run format
 
 # Install globally for development
 npm install -g ./
-```
-
-### Release Process
-
-```bash
-# For patch release (e.g., 0.0.8 -> 0.0.9)
-npm version patch -m "Release notes"
-git push
-git push --tags
-
-# For minor release (e.g., 0.0.8 -> 0.1.0)
-npm version minor -m "Release notes"
-git push
-git push --tags
-
-# Create GitHub release
-gh release create --notes-from-tag
-
-# Publish to NPM
-npm login
-npm publish
 ```
 
 ## Codebase Architecture
