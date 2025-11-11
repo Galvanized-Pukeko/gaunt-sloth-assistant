@@ -85,12 +85,14 @@ export async function review(
 
 function handleRatingResult(rateConfig: RatingConfig | undefined, command: 'pr' | 'review'): void {
   if (!rateConfig || rateConfig.enabled === false) {
+    // No rating enabled - no need to handle the result
     return;
   }
 
   const rating = getArtifact<ReviewRatingArtifact>(REVIEW_RATE_ARTIFACT_KEY);
   if (!rating) {
     displayWarning(`Rating middleware did not return a score for ${command} command.`);
+    setExitCode(1); // Build should fail if rating is enabled, but no rating artifact is present
     return;
   }
 
