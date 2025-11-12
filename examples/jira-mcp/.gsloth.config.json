@@ -1,0 +1,25 @@
+{
+  "llm": {
+    "type": "vertexai",
+    "model": "gemini-2.5-pro"
+  },
+  "mcpServers": {
+    "jira": {
+      "url": "https://mcp.atlassian.com/v1/sse",
+      "authProvider": "OAuth",
+      "transport": "sse"
+    }
+  },
+  "requirementsProviderConfig": {
+    "jira": {
+      "cloudId": "YOURCLOUDID",
+      "displayUrl": "https://YOURDOMAIN.atlassian.net/browse/"
+    }
+  },
+  "commands": {
+    "pr": {
+      "contentProvider": "github",
+      "requirementsProvider": "jira"
+    }
+  }
+}

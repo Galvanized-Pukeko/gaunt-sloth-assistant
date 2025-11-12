@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { AddressInfo } from 'net';
 import { displayInfo } from '#src/utils/consoleUtils.js';
 import { StreamableHTTPConnection } from '@langchain/mcp-adapters';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { getOAuthStoragePath } from '#src/utils/globalConfigUtils.js';
 import http from 'http';
 
@@ -34,6 +34,7 @@ export class OAuthClientProviderImpl implements OAuthClientProvider {
   private config: OAuthClientProviderConfig;
   private innerState: string;
   private storagePath: string;
+  private storageCache?: OAuthStorageData;
 
   constructor(config: OAuthClientProviderConfig) {
     this.config = config as OAuthClientProviderConfig;
@@ -48,21 +49,49 @@ export class OAuthClientProviderImpl implements OAuthClientProvider {
   }
 
   private loadStorageData(): OAuthStorageData {
+    // Return cached data if available
+    if (this.storageCache !== undefined) {
+      return this.storageCache;
+    }
+
+    // Read from file if cache is empty
     if (existsSync(this.storagePath)) {
       try {
         const data = readFileSync(this.storagePath, 'utf-8');
-        return JSON.parse(data);
+        const parsedData: OAuthStorageData = JSON.parse(data);
+
+        // Wipe data if the in-memory cache is empty and file info is missing tokens
+        if (parsedData.clientInformation && !parsedData.tokens) {
+          try {
+            unlinkSync(this.storagePath);
+            displayInfo('Deleted OAuth storage file (missing tokens)');
+            this.storageCache = {};
+            return this.storageCache;
+          } catch (error) {
+            displayInfo('Failed to delete OAuth storage file: ' + error);
+          }
+        }
+
+        // Cache the loaded data
+        this.storageCache = parsedData;
+        return parsedData;
       } catch (error) {
-        displayInfo('Failed to load OAuth storage data:' + error);
-        return {};
+        displayInfo('Failed to load OAuth storage data: ' + error);
+        this.storageCache = {};
+        return this.storageCache;
       }
     }
-    return {};
+
+    // No file exists, cache empty object
+    this.storageCache = {};
+    return this.storageCache;
   }
 
   private saveStorageData(data: OAuthStorageData): void {
     try {
       writeFileSync(this.storagePath, JSON.stringify(data, null, 2), 'utf-8');
+      // Update the cache when saving
+      this.storageCache = data;
     } catch (error) {
       console.error('Failed to save OAuth storage data:', error);
     }
@@ -82,7 +111,7 @@ export class OAuthClientProviderImpl implements OAuthClientProvider {
     return {
       redirect_uris: [this.config.redirectUrl],
       client_name: 'Gaunt Sloth Assistant',
-      client_uri: 'https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant',
+      client_uri: 'https://gaunt-sloth-assistant.github.io/',
       software_id: '1dd38b83-946b-4631-8855-66ee467bfd68',
       scope: 'mcp:read mcp:write',
       token_endpoint_auth_method: 'none',
@@ -164,9 +193,9 @@ export class OAuthClientProviderImpl implements OAuthClientProvider {
 export async function createAuthProviderAndAuthenticate(
   mcpServer: StreamableHTTPConnection
 ): Promise<OAuthClientProviderImpl> {
-  const { port, server, codePromise } = await createOAuthRedirectServer('/oauth-callback');
+  const { port, server, codePromise } = await createOAuthRedirectServer('/oauth/callback');
   const authProvider = new OAuthClientProviderImpl({
-    redirectUrl: `http://127.0.0.1:${port}/oauth-callback`,
+    redirectUrl: `http://localhost:${port}/oauth/callback`,
     serverUrl: mcpServer.url,
   });
   const outcome = await auth(authProvider, { serverUrl: mcpServer.url });
