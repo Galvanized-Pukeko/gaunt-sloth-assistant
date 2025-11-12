@@ -12,11 +12,7 @@ Based on [LangChain.js](https://github.com/langchain-ai/langchainjs)
 
 ## Why?
 
-There are many Open Source command line AI assistants available, such as Aider and Goose;
-there are great non-open source options such as Claude Code.
-
-Gaunt Sloth does not intend to be your "Daily Driver" and is not aiming to replace your Cursor.
-What it promises is that it is small, extendable, cross-platform and can itself be a dependency in your project.
+Gaunt Sloth's promise is that it is small, extendable, cross-platform and can itself be a dependency in your project.
 
 The GSloth was initially built as a code review tool, fetching PR contents and Jira contents before feeding them to
 the LLM, but we ourselves found many more use cases which we initially did not anticipate; for example,
@@ -249,6 +245,10 @@ Gaunt Sloth supports connecting to MCP servers, including those requiring OAuth 
 
 This has been tested with the Atlassian Jira MCP server.  
 See the [MCP configuration section](./docs/CONFIGURATION.md#model-context-protocol-mcp) for detailed setup instructions.
+
+If you experience issues with the MCP auth try finding `.gsloth` dir in your home directory,
+and delete JSON file matching the server you are trying to connect to,
+for example for atlassian MCP the file would be `~/.gsloth/.gsloth-auth/mcp.atlassian.com_v1_sse.json`
 
 ## Uninstall
 Uninstall global NPM package:
