@@ -19,6 +19,11 @@ export interface JiraConfig extends ProviderConfig {
   token: string;
 }
 
+export interface A2AConfig {
+  agentId: string;
+  agentUrl: string;
+}
+
 export interface Provider {
   get: (config: ProviderConfig | null, id: string | undefined) => Promise<string | null>;
 }

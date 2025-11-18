@@ -16,7 +16,7 @@ import {
   USER_PROJECT_CONFIG_MJS,
 } from '#src/constants.js';
 import type { MiddlewareConfig } from '#src/middleware/types.js';
-import { JiraConfig } from '#src/providers/types.js';
+import { JiraConfig, A2AConfig } from '#src/providers/types.js';
 import {
   displayDebug,
   displayError,
@@ -208,6 +208,7 @@ export interface RawGthConfig extends Omit<GthConfig, 'llm'> {
 export type CustomToolsConfig = Record<string, object>;
 export type BuiltInToolsConfig = {
   jira: JiraConfig;
+  a2a?: A2AConfig;
 };
 
 /**
@@ -490,8 +491,8 @@ async function tryMjsConfig(
     // No config files found
     displayError(
       'No configuration file found. Please create one of: ' +
-        `${USER_PROJECT_CONFIG_JSON}, ${USER_PROJECT_CONFIG_JS}, or ${USER_PROJECT_CONFIG_MJS} ` +
-        'in your project directory.'
+      `${USER_PROJECT_CONFIG_JSON}, ${USER_PROJECT_CONFIG_JS}, or ${USER_PROJECT_CONFIG_MJS} ` +
+      'in your project directory.'
     );
     exit(1);
   }
