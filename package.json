@@ -40,30 +40,30 @@
     "gth": "cli.js"
   },
   "dependencies": {
-    "@langchain/anthropic": "^1.0.0",
-    "@langchain/core": "^1.0.4",
-    "@langchain/deepseek": "^1.0.0",
-    "@langchain/google-genai": "^1.0.0",
-    "@langchain/google-vertexai": "^1.0.0",
-    "@langchain/groq": "^1.0.0",
+    "@langchain/anthropic": "^1.1.0",
+    "@langchain/core": "^1.0.5",
+    "@langchain/deepseek": "^1.0.1",
+    "@langchain/google-genai": "^1.0.1",
+    "@langchain/google-vertexai": "^1.0.1",
+    "@langchain/groq": "^1.0.1",
     "@langchain/langgraph": "^1.0.2",
     "@langchain/mcp-adapters": "^1.0.0",
-    "@langchain/openai": "^1.1.0",
-    "@langchain/xai": "^1.0.0",
+    "@langchain/openai": "^1.1.2",
+    "@langchain/xai": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.22.0",
     "commander": "^14.0.2",
     "diff": "^8.0.2",
     "express": "^5.1.0",
-    "langchain": "^1.0.4",
-    "minimatch": "^10.1.1",
-    "@modelcontextprotocol/sdk": "1.20.0"
+    "langchain": "^1.0.5",
+    "minimatch": "^10.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
     "@types/express": "^5.0.5",
     "@types/node": "^24.10.1",
     "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.4",
-    "@typescript-eslint/parser": "^8.46.4",
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
@@ -72,6 +72,9 @@
     "typedoc": "^0.28.14",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "rimraf": "^6.1.0"
   },
   "imports": {
     "#src/*.js": "./dist/*.js"

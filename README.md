@@ -243,8 +243,8 @@ GitHub actions bot.
 
 Gaunt Sloth supports connecting to MCP servers, including those requiring OAuth authentication.
 
-This has been tested with the Atlassian Jira MCP server.  
-See the [MCP configuration section](./docs/CONFIGURATION.md#model-context-protocol-mcp) for detailed setup instructions.
+This has been tested with the Atlassian Jira MCP server.
+See the [MCP configuration section](./docs/CONFIGURATION.md#model-context-protocol-mcp) for detailed setup instructions, or the [Jira MCP example](./examples/jira-mcp) for a working configuration.
 
 If you experience issues with the MCP auth try finding `.gsloth` dir in your home directory,
 and delete JSON file matching the server you are trying to connect to,

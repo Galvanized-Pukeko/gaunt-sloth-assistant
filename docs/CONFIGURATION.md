@@ -485,6 +485,8 @@ To connect to the Atlassian Jira MCP server using OAuth, add the following to yo
 }
 ```
 
+For a complete working example, see [examples/jira-mcp](../examples/jira-mcp).
+
 **OAuth Authentication Flow:**
 1. When you first use a command that requires the MCP server, your browser will open automatically
 2. Complete the OAuth authentication in your browser
