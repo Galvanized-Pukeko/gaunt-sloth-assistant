@@ -35,6 +35,8 @@ Type `\` and then Enter to type new line in message.
 
 Note the release version from pervious step and do
 
+(if you have multiple accounts in gh, you may need to do `gh auth switch`)
+
 ```bash
 gh release create --notes-from-tag
 ```
