@@ -1,4 +1,6 @@
 import { Command, Option } from 'commander';
+import { displayError } from '#src/utils/consoleUtils.js';
+import { setExitCode } from '#src/utils/systemUtils.js';
 import {
   type ContentProviderType,
   getContentFromProvider,
@@ -92,7 +94,13 @@ export function prCommand(
       }
 
       // Get PR diff using the provider
-      content.push(await getContentFromProvider(contentProvider, prId, config));
+      try {
+        content.push(await getContentFromProvider(contentProvider, prId, config));
+      } catch (error) {
+        displayError(error instanceof Error ? error.message : String(error));
+        setExitCode(1);
+        return;
+      }
 
       if (options.message) {
         content.push(wrapContent(options.message, 'message', 'user message'));
