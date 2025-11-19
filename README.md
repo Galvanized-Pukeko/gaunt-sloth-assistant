@@ -171,6 +171,18 @@ gcloud auth login
 gcloud auth application-default login
 ```
 
+As of 18 Nov 2025 those willing to use Gemini 3 with Vertex AI should also set location to `global`,
+as other locations give 404. Example config:
+```json
+{
+  "llm": {
+    "type": "vertexai",
+    "model": "gemini-3-pro-preview",
+    "location": "global"
+  }
+}
+```
+
 ### Open Router
 
 ```bash
