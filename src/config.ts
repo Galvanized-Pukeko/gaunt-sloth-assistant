@@ -153,6 +153,7 @@ export interface GthConfig {
   requirementsProviderConfig?: Record<string, unknown>;
   contentProviderConfig?: Record<string, unknown>;
   mcpServers?: Record<string, Connection>;
+  a2aAgents?: Record<string, A2AConfig>;
   builtInToolsConfig?: BuiltInToolsConfig;
   commands?: {
     pr?: {
@@ -208,7 +209,6 @@ export interface RawGthConfig extends Omit<GthConfig, 'llm'> {
 export type CustomToolsConfig = Record<string, object>;
 export type BuiltInToolsConfig = {
   jira: JiraConfig;
-  a2a?: A2AConfig;
 };
 
 /**
@@ -491,8 +491,8 @@ async function tryMjsConfig(
     // No config files found
     displayError(
       'No configuration file found. Please create one of: ' +
-      `${USER_PROJECT_CONFIG_JSON}, ${USER_PROJECT_CONFIG_JS}, or ${USER_PROJECT_CONFIG_MJS} ` +
-      'in your project directory.'
+        `${USER_PROJECT_CONFIG_JSON}, ${USER_PROJECT_CONFIG_JS}, or ${USER_PROJECT_CONFIG_MJS} ` +
+        'in your project directory.'
     );
     exit(1);
   }

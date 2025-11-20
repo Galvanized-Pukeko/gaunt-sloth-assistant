@@ -33,11 +33,6 @@ export const AVAILABLE_BUILT_IN_TOOLS = {
    * Web fetch tool.
    */
   gth_web_fetch: '#src/tools/gthWebFetchTool.js',
-  /**
-   * A2A Agent tool.
-   * Needs a2a configuration in builtInToolsConfig.
-   */
-  gth_a2a_agent: '#src/tools/gthA2AAgentTool.js',
 } as const;
 
 /**
