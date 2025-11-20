@@ -1,4 +1,3 @@
-import { displayWarning } from '#src/utils/consoleUtils.js';
 import type { ProviderConfig } from './types.js';
 import { execAsync } from '#src/utils/systemUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
@@ -14,27 +13,23 @@ export async function get(
   prId: string | undefined
 ): Promise<string | null> {
   if (!prId) {
-    displayWarning('No GitHub PR number provided');
-    return null;
+    throw new Error('No GitHub PR number provided');
   }
 
+  // Use the GitHub CLI to fetch PR diff
+  const progress = new ProgressIndicator(`Fetching GitHub PR #${prId} diff`);
   try {
-    // Use the GitHub CLI to fetch PR diff
-    const progress = new ProgressIndicator(`Fetching GitHub PR #${prId} diff`);
     const prDiffContent = await execAsync(`gh pr diff ${prId}`);
     progress.stop();
 
     if (!prDiffContent) {
-      displayWarning(`No diff content found for GitHub PR #${prId}`);
-      return null;
+      throw new Error(`No diff content found for GitHub PR #${prId}`);
     }
 
     return `GitHub PR Diff: #${prId}\n\n${prDiffContent}`;
   } catch (error) {
-    displayWarning(`
-Failed to get GitHub PR diff #${prId}: ${error instanceof Error ? error.message : String(error)}
-Consider checking if gh cli (https://cli.github.com/) is installed and authenticated.
-    `);
-    return null;
+    progress.stop();
+    throw new Error(`Failed to get GitHub PR diff #${prId}: ${error instanceof Error ? error.message : String(error)}
+Consider checking if gh cli (https://cli.github.com/) is installed and authenticated.`);
   }
 }

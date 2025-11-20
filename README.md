@@ -171,6 +171,19 @@ gcloud auth login
 gcloud auth application-default login
 ```
 
+As of 19 Nov 2025, Gemini 3 on Vertex AI works with `global` and `us-central1` locations when using the default `aiplatform.googleapis.com` endpoint.
+However, regional endpoints (e.g., `us-central-aiplatform.googleapis.com`) currently return 404 for Gemini 3.
+Example config:
+```json
+{
+  "llm": {
+    "type": "vertexai",
+    "model": "gemini-3-pro-preview",
+    "location": "global"
+  }
+}
+```
+
 ### Open Router
 
 ```bash
