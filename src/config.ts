@@ -16,7 +16,7 @@ import {
   USER_PROJECT_CONFIG_MJS,
 } from '#src/constants.js';
 import type { MiddlewareConfig } from '#src/middleware/types.js';
-import { JiraConfig } from '#src/providers/types.js';
+import { JiraConfig, A2AConfig } from '#src/providers/types.js';
 import {
   displayDebug,
   displayError,
@@ -152,7 +152,20 @@ export interface GthConfig {
   customToolsConfig?: CustomToolsConfig;
   requirementsProviderConfig?: Record<string, unknown>;
   contentProviderConfig?: Record<string, unknown>;
+  /**
+   * MCP (Model Context Protocol) server connections.
+   * Allows connecting to external MCP servers including those requiring OAuth.
+   * @see {@link https://modelcontextprotocol.io/}
+   */
   mcpServers?: Record<string, Connection>;
+  /**
+   * A2A (Agent-to-Agent) protocol agents configuration.
+   * Enables delegation of tasks to external AI agents.
+   * Each agent becomes available as a tool named `a2a_agent_<agentId>`.
+   * @experimental This feature is experimental and may change.
+   * @see {@link https://a2a-protocol.org/}
+   */
+  a2aAgents?: Record<string, A2AConfig>;
   builtInToolsConfig?: BuiltInToolsConfig;
   commands?: {
     pr?: {

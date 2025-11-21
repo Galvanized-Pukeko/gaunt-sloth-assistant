@@ -1,6 +1,6 @@
 {
   "name": "gaunt-sloth-assistant",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "",
   "license": "MIT",
   "author": "Andrew Kondratev",
@@ -40,7 +40,8 @@
     "gth": "cli.js"
   },
   "dependencies": {
-    "@langchain/anthropic": "^1.1.0",
+    "@a2a-js/sdk": "^0.3.5",
+    "@langchain/anthropic": "^1.1.1",
     "@langchain/core": "^1.0.5",
     "@langchain/deepseek": "^1.0.1",
     "@langchain/google-genai": "^1.0.3",

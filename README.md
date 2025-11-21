@@ -263,6 +263,10 @@ If you experience issues with the MCP auth try finding `.gsloth` dir in your hom
 and delete JSON file matching the server you are trying to connect to,
 for example for atlassian MCP the file would be `~/.gsloth/.gsloth-auth/mcp.atlassian.com_v1_sse.json`
 
+## A2A (Agent-to-Agent) Protocol Support (Experimental)
+
+Gaunt Sloth supports the [A2A protocol](https://a2a-protocol.org/) for connecting to external AI agents. See [CONFIGURATION.md](./docs/CONFIGURATION.md#a2a-agent-to-agent-protocol-support-experimental) for setup instructions.
+
 ## Uninstall
 Uninstall global NPM package:
 ```bash

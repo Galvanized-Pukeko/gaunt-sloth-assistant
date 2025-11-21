@@ -2,6 +2,7 @@ import { getDefaultTools } from '#src/builtInToolsConfig.js';
 import { GthConfig, ServerTool } from '#src/config.js';
 import { GthAgentInterface, GthCommand, StatusLevel } from '#src/core/types.js';
 import { createAuthProviderAndAuthenticate } from '#src/mcp/OAuthClientProviderImpl.js';
+import { createA2AAgentTool } from '#src/tools/A2AAgentTool.js';
 import { resolveMiddleware } from '#src/middleware/registry.js';
 import type { Message } from '#src/modules/types.js';
 import { displayInfo } from '#src/utils/consoleUtils.js';
@@ -67,8 +68,12 @@ export class GthLangChainAgent implements GthAgentInterface {
     const mcpTools = (await this.mcpClient?.getTools()) ?? [];
     debugLog(`MCP tools loaded: ${mcpTools.length}`);
 
+    // Get A2A tools
+    const a2aTools = this.getA2ATools(this.config);
+    debugLog(`A2A tools loaded: ${a2aTools.length}`);
+
     // Combine all tools
-    const tools = [...defaultTools, ...flattenedConfigTools, ...mcpTools];
+    const tools = [...defaultTools, ...flattenedConfigTools, ...mcpTools, ...a2aTools];
 
     if (tools.length > 0) {
       const toolNames = tools
@@ -332,5 +337,18 @@ export class GthLangChainAgent implements GthAgentInterface {
       debugLog('No MCP servers configured');
       return null;
     }
+  }
+
+  protected getA2ATools(config: GthConfig): StructuredToolInterface[] {
+    debugLog('Setting up A2A tools...');
+    const a2aAgents = config.a2aAgents || {};
+    const tools: StructuredToolInterface[] = [];
+
+    for (const [agentId, agentConfig] of Object.entries(a2aAgents)) {
+      debugLog(`Adding A2A agent tool: ${agentId}`);
+      tools.push(createA2AAgentTool(agentConfig));
+    }
+
+    return tools;
   }
 }

@@ -1051,6 +1051,35 @@ Example usage in GitHub Actions:
   # This step will fail if rating is below threshold
 ```
 
+## A2A (Agent-to-Agent) Protocol Support (Experimental)
+
+> **Note:** A2A support is an experimental feature and may change in future releases.
+
+Gaunt Sloth supports the [A2A protocol](https://google.github.io/A2A/) for connecting to external AI agents. This allows delegating tasks to specialized agents.
+
+### Configuration
+
+Add `a2aAgents` to your configuration file:
+
+```json
+{
+  "llm": {
+    "type": "YOUR_PROVIDER",
+    "model": "MODEL_OF_YOUR_CHOICE"
+  },
+  "a2aAgents": {
+    "myAgent": {
+      "agentId": "my-agent-id",
+      "agentUrl": "http://localhost:8080/a2a"
+    }
+  }
+}
+```
+
+Each agent becomes available as a tool named `a2a_agent_<agentId>` in `chat` and `code` commands.
+
+See [examples/a2a](../examples/a2a) for a working example.
+
 ## Server Tools Configuration
 
 Some AI providers provide integrated server tools, such as web search.
