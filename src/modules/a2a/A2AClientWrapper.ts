@@ -1,12 +1,24 @@
+/**
+ * @module A2AClientWrapper
+ * Wrapper for A2A (Agent-to-Agent) protocol client.
+ * @experimental A2A support is experimental and may change.
+ */
 import { A2AClient } from '@a2a-js/sdk/client';
 import { debugLog, debugLogError } from '#src/utils/debugUtils.js';
 import { v4 as uuidv4 } from 'uuid';
 
+/** Configuration for A2A client */
 export interface A2AClientConfig {
+  /** Unique identifier for the agent */
   agentId: string;
+  /** URL endpoint for the A2A agent */
   agentUrl: string;
 }
 
+/**
+ * Wrapper around the A2A SDK client for communicating with external agents.
+ * @experimental
+ */
 export class A2AClientWrapper {
   private client: A2AClient;
   private config: A2AClientConfig;
@@ -17,6 +29,11 @@ export class A2AClientWrapper {
     this.client = new A2AClient(config.agentUrl);
   }
 
+  /**
+   * Sends a message to the A2A agent and returns the response.
+   * @param messageText - The message to send to the agent
+   * @returns The agent's response as a string
+   */
   async sendMessage(messageText: string): Promise<string> {
     debugLog(
       `Sending message to A2A agent ${this.config.agentId} at ${this.config.agentUrl}: ${messageText}`

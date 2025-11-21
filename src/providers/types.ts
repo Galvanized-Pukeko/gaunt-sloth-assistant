@@ -19,8 +19,15 @@ export interface JiraConfig extends ProviderConfig {
   token: string;
 }
 
+/**
+ * Configuration for an A2A (Agent-to-Agent) protocol agent.
+ * @experimental A2A support is experimental and may change.
+ * @see {@link https://a2a-protocol.org/}
+ */
 export interface A2AConfig {
+  /** Unique identifier for the agent, used in tool naming */
   agentId: string;
+  /** URL endpoint for the A2A agent */
   agentUrl: string;
 }
 
