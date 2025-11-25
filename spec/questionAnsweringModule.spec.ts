@@ -3,12 +3,16 @@ import { FakeStreamingChatModel } from '@langchain/core/utils/testing';
 import type { GthConfig } from '#src/config.js';
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
-const gthAgentRunnerMock = vi.fn();
-const gthAgentRunnerInstanceMock = {
+const gthAgentRunnerInstanceMock = vi.hoisted(() => ({
   init: vi.fn(),
   processMessages: vi.fn(),
   cleanup: vi.fn(),
-};
+}));
+const gthAgentRunnerMock = vi.hoisted(() =>
+  vi.fn(function GthAgentRunnerMock() {
+    return gthAgentRunnerInstanceMock;
+  })
+);
 vi.mock('#src/core/GthAgentRunner.js', () => ({
   GthAgentRunner: gthAgentRunnerMock,
 }));
@@ -45,11 +49,15 @@ const consoleUtilsMock = {
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 // Mock utils module
-const ProgressIndicatorMock = vi.fn();
-const ProgressIndicatorInstanceMock = {
+const ProgressIndicatorInstanceMock = vi.hoisted(() => ({
   stop: vi.fn(),
   indicate: vi.fn(),
-};
+}));
+const ProgressIndicatorMock = vi.hoisted(() =>
+  vi.fn(function ProgressIndicatorMock() {
+    return ProgressIndicatorInstanceMock;
+  })
+);
 vi.mock('#src/utils/ProgressIndicator.js', () => ({
   ProgressIndicator: ProgressIndicatorMock,
 }));
@@ -106,7 +114,11 @@ vi.mock('#src/utils/llmUtils.js', () => llmUtilsMock);
 
 describe('questionAnsweringModule', () => {
   beforeEach(async () => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
+    gthAgentRunnerMock.mockClear();
+    gthAgentRunnerInstanceMock.init.mockResolvedValue(undefined);
+    gthAgentRunnerInstanceMock.processMessages.mockResolvedValue(undefined);
+    gthAgentRunnerInstanceMock.cleanup.mockResolvedValue(undefined);
 
     // Setup mock for our new generateStandardFileName function
     fileUtilsMock.generateStandardFileName.mockReturnValue('gth_2025-05-17_21-00-00_ASK.md');
@@ -116,7 +128,9 @@ describe('questionAnsweringModule', () => {
       return '';
     });
 
-    ProgressIndicatorMock.mockImplementation(() => ProgressIndicatorInstanceMock);
+    ProgressIndicatorMock.mockClear();
+    ProgressIndicatorInstanceMock.stop.mockReset();
+    ProgressIndicatorInstanceMock.indicate.mockReset();
 
     // Setup pathUtils mocks
     fileUtilsMock.getGslothFilePath.mockReturnValue('test-file-path.md');
@@ -132,7 +146,9 @@ describe('questionAnsweringModule', () => {
     testConfig.llm.bindTools = vi.fn();
 
     // Prepare runner mocks
-    gthAgentRunnerMock.mockImplementation(() => gthAgentRunnerInstanceMock);
+    gthAgentRunnerMock.mockImplementation(function () {
+      return gthAgentRunnerInstanceMock;
+    });
     gthAgentRunnerInstanceMock.init.mockResolvedValue(undefined);
     gthAgentRunnerInstanceMock.processMessages.mockResolvedValue('LLM Response');
     gthAgentRunnerInstanceMock.cleanup.mockResolvedValue(undefined);
@@ -174,7 +190,9 @@ describe('questionAnsweringModule', () => {
     llmUtilsMock.invoke.mockResolvedValue('Different LLM Response');
 
     // Prepare runner mocks
-    gthAgentRunnerMock.mockImplementation(() => gthAgentRunnerInstanceMock);
+    gthAgentRunnerMock.mockImplementation(function () {
+      return gthAgentRunnerInstanceMock;
+    });
     gthAgentRunnerInstanceMock.init.mockResolvedValue(undefined);
     gthAgentRunnerInstanceMock.processMessages.mockResolvedValue('Different LLM Response');
     gthAgentRunnerInstanceMock.cleanup.mockResolvedValue(undefined);

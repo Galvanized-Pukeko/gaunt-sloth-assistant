@@ -60,9 +60,11 @@ vi.mock('#src/utils/fileUtils.js', () => ({
 }));
 
 vi.mock('#src/utils/utils.js', () => ({
-  ProgressIndicator: vi.fn().mockImplementation(() => ({
-    stop: vi.fn(),
-  })),
+  ProgressIndicator: vi.fn(function ProgressIndicatorMock() {
+    return {
+      stop: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock('node:fs', () => ({
@@ -81,7 +83,9 @@ vi.mock('#src/utils/llmUtils.js', () => ({
   readCodePrompt: vi.fn().mockReturnValue('Mock code prompt'),
 }));
 
-const gthAgentRunnerMock = vi.fn();
+const gthAgentRunnerMock = vi.fn(function GthAgentRunnerMock() {
+  return gthAgentRunnerInstanceMock;
+});
 const gthAgentRunnerInstanceMock = {
   init: vi.fn(),
   processMessages: vi.fn(),
@@ -106,7 +110,9 @@ describe('codeCommand', () => {
     vi.clearAllMocks();
 
     // Set up GthAgentRunner mock implementation
-    gthAgentRunnerMock.mockImplementation(() => gthAgentRunnerInstanceMock);
+    gthAgentRunnerMock.mockImplementation(function () {
+      return gthAgentRunnerInstanceMock;
+    });
     gthAgentRunnerInstanceMock.init.mockResolvedValue(undefined);
     gthAgentRunnerInstanceMock.processMessages.mockResolvedValue('Mock response');
     gthAgentRunnerInstanceMock.cleanup.mockResolvedValue(undefined);

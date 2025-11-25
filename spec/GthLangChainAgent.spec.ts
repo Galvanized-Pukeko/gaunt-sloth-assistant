@@ -21,7 +21,9 @@ vi.mock('#src/builtInToolsConfig.js', () => ({
   getDefaultTools: configMock.getDefaultTools,
 }));
 
-const ProgressIndicatorMock = vi.fn();
+const ProgressIndicatorMock = vi.fn(function ProgressIndicatorMock() {
+  return ProgressIndicatorInstanceMock;
+});
 const ProgressIndicatorInstanceMock = {
   stop: vi.fn(),
   indicate: vi.fn(),
@@ -30,7 +32,9 @@ vi.mock('#src/utils/ProgressIndicator.js', () => ({
   ProgressIndicator: ProgressIndicatorMock,
 }));
 
-const multiServerMCPClientMock = vi.fn();
+const multiServerMCPClientMock = vi.fn(function MultiServerMCPClientMock() {
+  return mcpClientInstanceMock;
+});
 const mcpClientInstanceMock = {
   getTools: vi.fn(),
   close: vi.fn(),
@@ -78,8 +82,14 @@ describe('GthLangChainAgent', () => {
     vi.resetAllMocks();
 
     systemUtilsMock.getProjectDir.mockReturnValue('/test/dir');
-    multiServerMCPClientMock.mockImplementation(() => mcpClientInstanceMock);
-    ProgressIndicatorMock.mockImplementation(() => ProgressIndicatorInstanceMock);
+    multiServerMCPClientMock.mockImplementation(function () {
+      return mcpClientInstanceMock;
+    });
+    mcpClientInstanceMock.getTools.mockReset();
+    mcpClientInstanceMock.close.mockReset();
+    ProgressIndicatorMock.mockClear();
+    ProgressIndicatorInstanceMock.stop.mockReset();
+    ProgressIndicatorInstanceMock.indicate.mockReset();
 
     // Setup middleware mock
     resolveMiddlewareMock.mockResolvedValue([]);

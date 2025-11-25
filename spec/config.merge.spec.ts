@@ -38,9 +38,21 @@ const fileUtilsMock = {
 };
 vi.mock('#src/utils/fileUtils.js', () => fileUtilsMock);
 
+const mockChatInstance = { instance: 'anthropic', verbose: false };
+const ChatAnthropicMock = vi.fn(function ChatAnthropicMock() {
+  return mockChatInstance;
+});
+
+function mockAnthropic() {
+  vi.doMock('@langchain/anthropic', () => ({
+    ChatAnthropic: ChatAnthropicMock,
+  }));
+}
+
 describe('Config merging', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    ChatAnthropicMock.mockClear();
     systemUtilsMock.getProjectDir.mockReturnValue('/mock/current/dir');
     systemUtilsMock.getInstallDir.mockReturnValue('/mock/install/dir');
     systemUtilsMock.isTTY.mockReturnValue(true);
@@ -48,11 +60,7 @@ describe('Config merging', () => {
 
   describe('pr command config merging', () => {
     it('should preserve rating config when user overrides contentProvider', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config only overrides contentProvider
       const userConfig: Partial<RawGthConfig> = {
@@ -91,11 +99,7 @@ describe('Config merging', () => {
     });
 
     it('should allow user to override rating config while preserving other defaults', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config overrides rating threshold
       const userConfig: Partial<RawGthConfig> = {
@@ -135,11 +139,7 @@ describe('Config merging', () => {
     });
 
     it('should handle complex nested override scenario', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config overrides multiple nested properties
       const userConfig: Partial<RawGthConfig> = {
@@ -184,11 +184,7 @@ describe('Config merging', () => {
 
   describe('review command config merging', () => {
     it('should preserve rating config when user overrides contentProvider', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config only overrides contentProvider
       const userConfig: Partial<RawGthConfig> = {
@@ -226,11 +222,7 @@ describe('Config merging', () => {
     });
 
     it('should allow disabling rating while preserving threshold defaults', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config disables rating
       const userConfig: Partial<RawGthConfig> = {
@@ -268,11 +260,7 @@ describe('Config merging', () => {
 
   describe('other command configs', () => {
     it('should merge code command config correctly', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config adds builtInTools while keeping filesystem default
       const userConfig: Partial<RawGthConfig> = {
@@ -303,11 +291,7 @@ describe('Config merging', () => {
     });
 
     it('should handle undefined command configs gracefully', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config does not define commands
       const userConfig: Partial<RawGthConfig> = {
@@ -336,11 +320,7 @@ describe('Config merging', () => {
 
   describe('maxDepth parameter', () => {
     it('should respect maxDepth and stop recursion at depth 4', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // Create a deeply nested config (5 levels deep)
       const userConfig: Partial<RawGthConfig> = {
@@ -378,11 +358,7 @@ describe('Config merging', () => {
 
   describe('edge cases', () => {
     it('should handle empty command config objects', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config defines empty command objects
       const userConfig: Partial<RawGthConfig> = {
@@ -412,11 +388,7 @@ describe('Config merging', () => {
     });
 
     it('should override array properties completely, not merge them', async () => {
-      // Mock the anthropic module
-      const mockChatInstance = { instance: 'anthropic', verbose: false };
-      vi.doMock('@langchain/anthropic', () => ({
-        ChatAnthropic: vi.fn().mockReturnValue(mockChatInstance),
-      }));
+      mockAnthropic();
 
       // User config sets builtInTools array
       const userConfig: Partial<RawGthConfig> = {

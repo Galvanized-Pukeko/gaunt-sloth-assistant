@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockSendMessage = vi.fn();
+const mockSendMessage = vi.hoisted(() => vi.fn());
+const A2AClientMock = vi.hoisted(() =>
+  vi.fn(function A2AClientMock() {
+    return {
+      sendMessage: mockSendMessage,
+    };
+  })
+);
 
 vi.mock('@a2a-js/sdk/client', () => ({
-  A2AClient: vi.fn().mockImplementation(() => ({
-    sendMessage: mockSendMessage,
-  })),
+  A2AClient: A2AClientMock,
 }));
 
 vi.mock('#src/utils/debugUtils.js', () => ({
@@ -20,6 +25,8 @@ vi.mock('uuid', () => ({
 describe('A2AClientWrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSendMessage.mockReset();
+    A2AClientMock.mockClear();
   });
 
   describe('constructor', () => {

@@ -7,7 +7,9 @@ import {
   BaseChatModelCallOptions,
 } from '@langchain/core/language_models/chat_models';
 
-const gthAgentRunnerMock = vi.fn();
+const gthAgentRunnerMock = vi.fn(function GthAgentRunnerMock() {
+  return gthAgentRunnerInstanceMock;
+});
 const gthAgentRunnerInstanceMock = {
   init: vi.fn(),
   processMessages: vi.fn(),
@@ -71,7 +73,9 @@ const fileUtilsMock = {
 };
 vi.mock('#src/utils/fileUtils.js', () => fileUtilsMock);
 
-const ProgressIndicatorMock = vi.fn();
+const ProgressIndicatorMock = vi.fn(function ProgressIndicatorMock() {
+  return ProgressIndicatorInstanceMock;
+});
 const ProgressIndicatorInstanceMock = {
   stop: vi.fn(),
   indicate: vi.fn(),
@@ -167,9 +171,13 @@ describe('reviewModule', () => {
       return String(config.writeOutputToFile);
     });
 
-    ProgressIndicatorMock.mockImplementation(() => ProgressIndicatorInstanceMock);
+    ProgressIndicatorMock.mockClear();
+    ProgressIndicatorInstanceMock.stop.mockReset();
+    ProgressIndicatorInstanceMock.indicate.mockReset();
 
-    gthAgentRunnerMock.mockImplementation(() => gthAgentRunnerInstanceMock);
+    gthAgentRunnerMock.mockImplementation(function () {
+      return gthAgentRunnerInstanceMock;
+    });
     gthAgentRunnerInstanceMock.init.mockResolvedValue(undefined);
     gthAgentRunnerInstanceMock.processMessages.mockResolvedValue('LLM Review Response');
     gthAgentRunnerInstanceMock.cleanup.mockResolvedValue(undefined);
