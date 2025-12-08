@@ -160,7 +160,7 @@ describe('Middleware Registry', () => {
 
       expect(result).toBe(mockMiddleware);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
-        model: mockConfig.llm
+        model: mockConfig.llm,
       });
     });
 
