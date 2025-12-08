@@ -109,9 +109,7 @@ export async function createSummarizationMiddleware(
   return Promise.resolve(
     summarizationMiddleware({
       model: config.model || gthConfig.llm,
-      maxTokensBeforeSummary: config.maxTokensBeforeSummary || 10000,
-      messagesToKeep: config.messagesToKeep,
-      summaryPrompt: config.summaryPrompt,
+      ...config,
     })
   );
 }

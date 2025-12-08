@@ -49,9 +49,6 @@ describe('Middleware Registry', () => {
       expect(result[0]).toBe(mockMiddleware);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
         model: mockConfig.llm,
-        maxTokensBeforeSummary: 10000, // Default value is now 10000
-        messagesToKeep: undefined,
-        summaryPrompt: undefined,
       });
     });
 
@@ -62,15 +59,15 @@ describe('Middleware Registry', () => {
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await resolveMiddleware(
-        [{ name: 'summarization', maxTokensBeforeSummary: 5000, messagesToKeep: 10 }],
+        [{ name: 'summarization', trigger: { tokens: 5000 }, keep: { messages: 10 } }],
         mockConfig
       );
 
       expect(result).toHaveLength(1);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
         model: mockConfig.llm,
-        maxTokensBeforeSummary: 5000,
-        messagesToKeep: 10,
+        trigger: { tokens: 5000 },
+        keep: { messages: 10 },
         summaryPrompt: undefined,
       });
     });
@@ -126,9 +123,8 @@ describe('Middleware Registry', () => {
 
   describe('createAnthropicPromptCachingMiddleware', () => {
     it('should create Anthropic caching middleware with default TTL', async () => {
-      const { createAnthropicPromptCachingMiddleware } = await import(
-        '#src/middleware/registry.js'
-      );
+      const { createAnthropicPromptCachingMiddleware } =
+        await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
       const mockMiddleware = { beforeModel: vi.fn() };
       anthropicPromptCachingMiddlewareMock.mockReturnValue(mockMiddleware);
@@ -140,9 +136,8 @@ describe('Middleware Registry', () => {
     });
 
     it('should create Anthropic caching middleware with custom TTL', async () => {
-      const { createAnthropicPromptCachingMiddleware } = await import(
-        '#src/middleware/registry.js'
-      );
+      const { createAnthropicPromptCachingMiddleware } =
+        await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
       const mockMiddleware = { beforeModel: vi.fn() };
       anthropicPromptCachingMiddlewareMock.mockReturnValue(mockMiddleware);
@@ -165,10 +160,7 @@ describe('Middleware Registry', () => {
 
       expect(result).toBe(mockMiddleware);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
-        model: mockConfig.llm,
-        maxTokensBeforeSummary: 10000,
-        messagesToKeep: undefined,
-        summaryPrompt: undefined,
+        model: mockConfig.llm
       });
     });
 
@@ -180,8 +172,8 @@ describe('Middleware Registry', () => {
 
       const result = await createSummarizationMiddleware(
         {
-          maxTokensBeforeSummary: 6000,
-          messagesToKeep: 5,
+          trigger: { tokens: 6000 },
+          keep: { messages: 5 },
           summaryPrompt: 'Custom prompt',
         },
         mockConfig
@@ -190,8 +182,8 @@ describe('Middleware Registry', () => {
       expect(result).toBe(mockMiddleware);
       expect(summarizationMiddlewareMock).toHaveBeenCalledWith({
         model: mockConfig.llm,
-        maxTokensBeforeSummary: 6000,
-        messagesToKeep: 5,
+        trigger: { tokens: 6000 },
+        keep: { messages: 5 },
         summaryPrompt: 'Custom prompt',
       });
     });

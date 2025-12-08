@@ -37,14 +37,22 @@ export interface SummarizationConfig {
   model?: BaseChatModel;
   /**
    * Maximum tokens before triggering summarization.
-   * This parameter is not required, but without it summarization will not happen.
-   * Gaunt Sloth default value is 10000.
+   * Set one of:
    */
-  maxTokensBeforeSummary?: number;
+  trigger?: {
+    fraction?: number;
+    tokens?: number;
+    messages?: number;
+  };
   /**
-   * Number of recent messages to keep after summarization.
+   * How many tokens, messages, or a fraction of context to keep.
+   * Set one of:
    */
-  messagesToKeep?: number;
+  keep?: {
+    fraction?: number;
+    tokens?: number;
+    messages?: number;
+  };
   /**
    * Custom prompt template for summarization.
    */

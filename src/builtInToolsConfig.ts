@@ -26,10 +26,6 @@ export const AVAILABLE_BUILT_IN_TOOLS = {
    */
   gth_jira_log_work: '#src/tools/gthJiraLogWorkTool.js',
   /**
-   * Sequential thinking. LLM can use this as a scratchpad for thinking.
-   */
-  gth_sequential_thinking: '#src/tools/gthSequentialThinkingTool.js',
-  /**
    * Web fetch tool.
    */
   gth_web_fetch: '#src/tools/gthWebFetchTool.js',
@@ -55,9 +51,8 @@ async function filterDevTools(
   if (command != 'code' || !devToolConfig) {
     return [];
   }
-  const thinking = await import(AVAILABLE_BUILT_IN_TOOLS.gth_sequential_thinking);
   const toolkit = new GthDevToolkit(devToolConfig);
-  return [thinking.get(), ...toolkit.getTools()];
+  return [...toolkit.getTools()];
 }
 
 /**
