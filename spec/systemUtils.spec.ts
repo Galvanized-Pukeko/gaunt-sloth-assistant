@@ -7,6 +7,9 @@ const processMock = {
     on: vi.fn(),
     off: vi.fn(),
   },
+  versions: {
+    node: '24.0.0',
+  },
 };
 
 // Mock console utilities
