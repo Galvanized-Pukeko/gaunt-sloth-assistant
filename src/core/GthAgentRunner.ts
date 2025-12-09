@@ -97,6 +97,7 @@ export class GthAgentRunner {
     } catch (error) {
       // Handle agent invocation errors
       debugLogError('Agent processing', error);
+      // TODO we should loop unexpected tool calls back to agent, so it can continue without this tool
       throw new Error(
         `Agent processing failed: ${error instanceof Error ? error.message : String(error)}`
       );
