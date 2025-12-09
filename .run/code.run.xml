@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="code" type="NodeJSConfigurationType" application-parameters="code" path-to-js-file="../../cli.js" working-dir="$PROJECT_DIR$/examples/checklist">
+    <EXTENSION ID="com.intellij.javascript.debugger.execution.StartBrowserRunConfigurationExtension">
+      <browser with-js-debugger="true" />
+    </EXTENSION>
+    <method v="2" />
+  </configuration>
+</component>

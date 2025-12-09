@@ -113,6 +113,8 @@ export interface GthConfig {
    * Available predefined middleware:
    * - `anthropic-prompt-caching`: Reduces API costs by caching prompts (Anthropic only)
    * - `summarization`: Condenses conversation history when approaching token limits
+   * - `checklist`: Adds checklist creation and tracking tools before and during execution
+   * - `review-rate`: Scores reviews and records the rating in the artifact store
    */
   middleware?: MiddlewareConfig[];
   /**

@@ -24,6 +24,10 @@ import {
   createReviewRateMiddleware,
   type ReviewRateMiddlewareSettings,
 } from '#src/middleware/reviewRateMiddleware.js';
+import {
+  createChecklistMiddleware,
+  type ChecklistMiddlewareSettings,
+} from '#src/middleware/checklistMiddleware.js';
 
 type PredefinedMiddlewareFactory = (
   settings: Record<string, unknown>,
@@ -58,6 +62,11 @@ const predefinedMiddlewareFactories = {
     gthConfig: GthConfig
   ): Promise<AgentMiddleware> =>
     createReviewRateMiddleware(settings as ReviewRateMiddlewareSettings, gthConfig),
+  /**
+   * Checklist middleware. Guides the agent to build and maintain a checklist through dedicated tools.
+   */
+  checklist: (settings: Record<string, unknown>, gthConfig: GthConfig): Promise<AgentMiddleware> =>
+    createChecklistMiddleware(settings as ChecklistMiddlewareSettings, gthConfig),
 } satisfies Record<string, PredefinedMiddlewareFactory>;
 
 function isPredefinedMiddlewareName(
