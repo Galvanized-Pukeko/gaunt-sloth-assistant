@@ -24,6 +24,7 @@ import {
   createReviewRateMiddleware,
   type ReviewRateMiddlewareSettings,
 } from '#src/middleware/reviewRateMiddleware.js';
+import { createChecklistMiddleware } from '#src/middleware/checklistMiddleware.js';
 
 type PredefinedMiddlewareFactory = (
   settings: Record<string, unknown>,
@@ -58,6 +59,8 @@ const predefinedMiddlewareFactories = {
     gthConfig: GthConfig
   ): Promise<AgentMiddleware> =>
     createReviewRateMiddleware(settings as ReviewRateMiddlewareSettings, gthConfig),
+  checklist: (settings: Record<string, unknown>, gthConfig: GthConfig): Promise<AgentMiddleware> =>
+    createChecklistMiddleware(settings, gthConfig),
 } satisfies Record<string, PredefinedMiddlewareFactory>;
 
 function isPredefinedMiddlewareName(

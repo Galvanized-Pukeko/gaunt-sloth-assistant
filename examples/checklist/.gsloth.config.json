@@ -1,0 +1,12 @@
+{
+  "llm": {
+    "type": "vertexai",
+    "model": "gemini-3-pro-preview",
+    "location": "global"
+  },
+  "middleware": [
+    {
+      "name": "checklist"
+    }
+  ]
+}
