@@ -5,7 +5,7 @@ This example demonstrates how to use JavaScript configuration files (`.gsloth.co
 ## Features Demonstrated
 
 ### 1. Custom Middleware
-The example includes a `loggingMiddleware` that logs at all lifecycle points:
+The example includes a `loggingMiddleware` built with LangChain's `createMiddleware` helper (required to brand middleware instances) that logs at all lifecycle points:
 - `beforeAgent` - Called before agent initialization
 - `beforeModel` - Called before each LLM invocation
 - `afterModel` - Called after each LLM response
@@ -39,7 +39,7 @@ The example includes a `custom_logger` tool similar to the built-in `gth_status_
 - Simpler but less flexible
 
 **JavaScript Config** (`.gsloth.config.js`):
-- Can define custom middleware objects
+- Can define custom middleware (use `createMiddleware` to brand them)
 - Can create custom tools using LangChain's `tool()` function
 - Full programmatic control over configuration
 - Requires Node.js/ES modules knowledge
@@ -47,7 +47,9 @@ The example includes a `custom_logger` tool similar to the built-in `gth_status_
 ### Custom Middleware Structure
 
 ```javascript
-const customMiddleware = {
+import { createMiddleware } from 'langchain';
+
+const customMiddleware = createMiddleware({
   name: 'my-middleware',
 
   beforeAgent(state) {
@@ -70,8 +72,10 @@ const customMiddleware = {
     // Called once after agent completes
     return state;
   },
-};
+});
 ```
+
+Always wrap custom middleware with `createMiddleware` so it includes the `MIDDLEWARE_BRAND` marker expected by LangChain/Gaunt Sloth.
 
 ### Custom Tool Structure
 

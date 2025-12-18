@@ -4,6 +4,7 @@
  * and custom tools that aren't available in JSON configs.
  */
 
+import { createMiddleware } from 'langchain';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { ChatVertexAI } from '@langchain/google-vertexai';
@@ -12,7 +13,7 @@ import { ChatVertexAI } from '@langchain/google-vertexai';
  * Custom middleware that logs all lifecycle events
  * Middleware provides hooks at key points in agent execution
  */
-const loggingMiddleware = {
+const loggingMiddleware = createMiddleware({
   name: 'custom-logging',
 
   beforeAgent(state) {
@@ -47,7 +48,7 @@ const loggingMiddleware = {
     console.log(`   Final message count: ${state.messages?.length || 0}`);
     return state;
   },
-};
+});
 
 /**
  * Custom tool similar to gthStatusUpdateTool

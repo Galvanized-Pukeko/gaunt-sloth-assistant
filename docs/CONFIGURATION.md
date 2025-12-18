@@ -877,10 +877,26 @@ You can combine multiple middleware:
 
 ### Custom Middleware (JavaScript Config Only)
 
-Custom middleware objects are only available in JavaScript configurations:
+Custom middleware objects are only available in JavaScript configurations. Always wrap them with LangChain's `createMiddleware` to include the required `MIDDLEWARE_BRAND` marker—plain objects/functions will be rejected by the registry.
 
 ```javascript
 // .gsloth.config.mjs
+import { createMiddleware } from 'langchain';
+
+const requestLogger = createMiddleware({
+  name: 'request-logger',
+  beforeModel: (state) => {
+    // Custom logic before model execution
+    console.log('Processing request...');
+    return state;
+  },
+  afterModel: (state) => {
+    // Custom logic after model execution
+    console.log('Model completed');
+    return state;
+  },
+});
+
 export async function configure() {
   const anthropic = await import('@langchain/anthropic');
   
@@ -890,18 +906,7 @@ export async function configure() {
     }),
     middleware: [
       "summarization",
-      {
-        beforeModel: (state) => {
-          // Custom logic before model execution
-          console.log('Processing request...');
-          return state;
-        },
-        afterModel: (state) => {
-          // Custom logic after model execution
-          console.log('Model completed');
-          return state;
-        }
-      }
+      requestLogger
     ]
   };
 }
