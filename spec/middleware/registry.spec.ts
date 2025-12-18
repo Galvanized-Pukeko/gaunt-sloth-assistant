@@ -1,6 +1,5 @@
 import type { GthConfig } from '#src/config.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 const displayDebugMock = vi.fn();
 const displayWarningMock = vi.fn();
 vi.mock('#src/utils/consoleUtils.js', () => ({
@@ -15,12 +14,19 @@ vi.mock('#src/utils/debugUtils.js', () => ({
   debugLogError: vi.fn(),
 }));
 
-const summarizationMiddlewareMock = vi.fn();
-const anthropicPromptCachingMiddlewareMock = vi.fn();
-vi.mock('langchain', () => ({
-  summarizationMiddleware: summarizationMiddlewareMock,
-  anthropicPromptCachingMiddleware: anthropicPromptCachingMiddlewareMock,
-}));
+const summarizationMiddlewareMock = vi.hoisted(() => vi.fn());
+const anthropicPromptCachingMiddlewareMock = vi.hoisted(() => vi.fn());
+vi.mock('langchain', async () => {
+  const actual = await vi.importActual<typeof import('langchain')>('langchain');
+
+  return {
+    ...actual,
+    summarizationMiddleware: summarizationMiddlewareMock,
+    anthropicPromptCachingMiddleware: anthropicPromptCachingMiddlewareMock,
+  };
+});
+
+import { createMiddleware } from 'langchain';
 
 describe('Middleware Registry', () => {
   beforeEach(() => {
@@ -40,7 +46,10 @@ describe('Middleware Registry', () => {
     it('should resolve string middleware name with defaults', async () => {
       const { resolveMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
-      const mockMiddleware = { beforeModel: vi.fn() };
+      const mockMiddleware = createMiddleware({
+        name: 'summarization-middleware',
+        beforeModel: () => undefined,
+      });
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await resolveMiddleware(['summarization'], mockConfig);
@@ -55,7 +64,10 @@ describe('Middleware Registry', () => {
     it('should resolve predefined middleware with custom settings', async () => {
       const { resolveMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
-      const mockMiddleware = { beforeModel: vi.fn() };
+      const mockMiddleware = createMiddleware({
+        name: 'summarization-middleware',
+        beforeModel: () => undefined,
+      });
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await resolveMiddleware(
@@ -75,11 +87,11 @@ describe('Middleware Registry', () => {
     it('should handle custom middleware objects', async () => {
       const { resolveMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
-      const customMiddleware = {
+      const customMiddleware = createMiddleware({
         name: 'custom-middleware',
-        beforeModel: vi.fn(),
-        afterModel: vi.fn(),
-      };
+        beforeModel: () => undefined,
+        afterModel: () => undefined,
+      });
 
       const result = await resolveMiddleware([customMiddleware], mockConfig);
 
@@ -90,9 +102,18 @@ describe('Middleware Registry', () => {
     it('should handle multiple middleware configurations', async () => {
       const { resolveMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
-      const mockSummarizationMiddleware = { beforeModel: vi.fn() };
-      const mockAnthropicPromptCachingMiddleware = { beforeModel: vi.fn() };
-      const customMiddleware = { name: 'custom', afterModel: vi.fn() };
+      const mockSummarizationMiddleware = createMiddleware({
+        name: 'summarization-middleware',
+        beforeModel: () => undefined,
+      });
+      const mockAnthropicPromptCachingMiddleware = createMiddleware({
+        name: 'anthropic-caching-middleware',
+        beforeModel: () => undefined,
+      });
+      const customMiddleware = createMiddleware({
+        name: 'custom',
+        afterModel: () => undefined,
+      });
 
       summarizationMiddlewareMock.mockReturnValue(mockSummarizationMiddleware);
       anthropicPromptCachingMiddlewareMock.mockReturnValue(mockAnthropicPromptCachingMiddleware);
@@ -126,7 +147,10 @@ describe('Middleware Registry', () => {
       const { createAnthropicPromptCachingMiddleware } =
         await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
-      const mockMiddleware = { beforeModel: vi.fn() };
+      const mockMiddleware = createMiddleware({
+        name: 'anthropic-caching-middleware',
+        beforeModel: () => undefined,
+      });
       anthropicPromptCachingMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await createAnthropicPromptCachingMiddleware({}, mockConfig);
@@ -139,7 +163,10 @@ describe('Middleware Registry', () => {
       const { createAnthropicPromptCachingMiddleware } =
         await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
-      const mockMiddleware = { beforeModel: vi.fn() };
+      const mockMiddleware = createMiddleware({
+        name: 'anthropic-caching-middleware',
+        beforeModel: () => undefined,
+      });
       anthropicPromptCachingMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await createAnthropicPromptCachingMiddleware({ ttl: '1h' }, mockConfig);
@@ -153,7 +180,10 @@ describe('Middleware Registry', () => {
     it('should create summarization middleware with config model', async () => {
       const { createSummarizationMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: { model: 'test-model' } } as unknown as GthConfig;
-      const mockMiddleware = { beforeModel: vi.fn() };
+      const mockMiddleware = createMiddleware({
+        name: 'summarization-middleware',
+        beforeModel: () => undefined,
+      });
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await createSummarizationMiddleware({}, mockConfig);
@@ -167,7 +197,10 @@ describe('Middleware Registry', () => {
     it('should create summarization middleware with custom settings', async () => {
       const { createSummarizationMiddleware } = await import('#src/middleware/registry.js');
       const mockConfig = { llm: { model: 'test-model' } } as unknown as GthConfig;
-      const mockMiddleware = { beforeModel: vi.fn() };
+      const mockMiddleware = createMiddleware({
+        name: 'summarization-middleware',
+        beforeModel: () => undefined,
+      });
       summarizationMiddlewareMock.mockReturnValue(mockMiddleware);
 
       const result = await createSummarizationMiddleware(

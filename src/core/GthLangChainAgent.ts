@@ -17,7 +17,7 @@ import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
-import { createAgent } from 'langchain';
+import { createAgent, createMiddleware } from 'langchain';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
@@ -92,7 +92,7 @@ export class GthLangChainAgent implements GthAgentInterface {
     const configuredMiddleware = await resolveMiddleware(this.config.middleware, this.config);
 
     // Add tool call status update middleware
-    const toolCallStatusMiddleware = {
+    const toolCallStatusMiddleware = createMiddleware({
       name: 'GthMiddlewareToolCallStatusUpdate',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       afterModel: (state: any) => {
@@ -110,7 +110,7 @@ export class GthLangChainAgent implements GthAgentInterface {
         }
         return state;
       },
-    };
+    });
 
     // Combine all middleware
     const middleware = [...configuredMiddleware, toolCallStatusMiddleware];
