@@ -60,12 +60,16 @@ const agentMock = {
   invoke: vi.fn(),
   stream: vi.fn(),
 };
-vi.mock('langchain', () => ({
-  createAgent: createAgentMock,
-  toolStrategy: toolStrategyMock,
-  summarizationMiddleware: vi.fn(),
-  anthropicPromptCachingMiddleware: vi.fn(),
-}));
+vi.mock('langchain', async () => {
+  const actual = await vi.importActual<typeof import('langchain')>('langchain');
+  return {
+    ...actual,
+    createAgent: createAgentMock,
+    toolStrategy: toolStrategyMock,
+    summarizationMiddleware: vi.fn(),
+    anthropicPromptCachingMiddleware: vi.fn(),
+  };
+});
 
 // Mock middleware registry
 const resolveMiddlewareMock = vi.fn();
