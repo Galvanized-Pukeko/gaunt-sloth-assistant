@@ -4,12 +4,12 @@ import { ToolSchemaBase } from '@langchain/core/tools';
 import { ChatVertexAI } from '@langchain/google-vertexai';
 import { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type McpTool = DynamicStructuredTool<ToolSchemaBase, any, any, any>;
-
 const status = {
   update: (_msg: string) => {},
 };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type McpTool = DynamicStructuredTool<ToolSchemaBase, any, any, any>;
 
 function isVertexLlm(config: GthConfig): boolean {
   return config.llm instanceof ChatVertexAI;
@@ -107,7 +107,7 @@ function replaceUnionSchemas(
     // The unassignment below pull is for purpose of taking rest of parameters except unions.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { anyOf, oneOf, discriminator, ...rest } = schema;
-    status.update(`converted schema union at ${context.path.join('.')}`);
+    status.update(`${context.toolName}: converted schema union at ${context.path.join('.')}`);
     return {
       ...rest,
       description,
@@ -162,10 +162,10 @@ function replaceUnionSchemas(
   return schema;
 }
 
-function updateToolSchema(tool: McpTool): { tool: McpTool; converted: boolean } {
+function updateToolSchema(tool: McpTool): McpTool {
   const schema = tool.schema as unknown;
   if (!schema || typeof schema !== 'object') {
-    return { tool, converted: false };
+    return tool;
   }
 
   const updatedSchema = replaceUnionSchemas(schema, {
@@ -173,11 +173,11 @@ function updateToolSchema(tool: McpTool): { tool: McpTool; converted: boolean } 
     path: ['schema'],
   });
   if (updatedSchema === tool.schema) {
-    return { tool, converted: false };
+    return tool;
   }
 
   tool.schema = updatedSchema as ToolSchemaBase;
-  return { tool, converted: true };
+  return tool;
 }
 
 export function prepareMcpTools(
@@ -194,12 +194,9 @@ export function prepareMcpTools(
   if (!isVertexLlm(config)) {
     return tools;
   }
-  statusUpdate('info', 'converting tools for Vertex AI LLM to avoid schema issues.');
+  status.update = (msg) => statusUpdate('info', msg);
+  status.update('converting tools for Vertex AI LLM to avoid schema issues.');
   return tools.map((tool) => {
-    status.update = (msg: string) => {
-      statusUpdate('info', `Migrating tool ${tool.name}: ${msg}`);
-    };
-    const result = updateToolSchema(tool);
-    return result.tool;
+    return updateToolSchema(tool);
   });
 }
