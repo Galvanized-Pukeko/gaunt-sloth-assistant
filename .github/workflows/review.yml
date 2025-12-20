@@ -1,4 +1,4 @@
-name: AI PR Review (Anthropic)
+name: AI PR Review (K2)
 
 # The pull_request_target is an important feature. It is running on files from `main`.
 on:
@@ -44,7 +44,7 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
 
       - name: Hide older AI review comments and post new one
         uses: actions/github-script@v8
