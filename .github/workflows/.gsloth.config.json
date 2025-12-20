@@ -1,7 +1,7 @@
 {
   "llm": {
-    "type": "anthropic",
-    "model": "claude-sonnet-4-20250514"
+    "type": "openrouter",
+    "model": "moonshotai/kimi-k2-thinking"
   },
   "filesystem": "none",
   "useColour": false,
