@@ -18,6 +18,7 @@ import { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
 import { createAgent, createMiddleware } from 'langchain';
+import { prepareMcpTools } from '#src/utils/mcpUtils.js';
 
 export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
@@ -65,7 +66,8 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLog(`User config tools loaded: ${flattenedConfigTools.length}`);
 
     // Get MCP tools
-    const mcpTools = (await this.mcpClient?.getTools()) ?? [];
+    const mcpTools =
+      prepareMcpTools(this.statusUpdate, this.config, await this.mcpClient?.getTools()) ?? [];
     debugLog(`MCP tools loaded: ${mcpTools.length}`);
 
     // Get A2A tools
