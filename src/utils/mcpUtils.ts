@@ -4,6 +4,7 @@ import { ToolSchemaBase } from '@langchain/core/tools';
 import { ChatVertexAI } from '@langchain/google-vertexai';
 import { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type McpTool = DynamicStructuredTool<ToolSchemaBase, any, any, any>;
 
 const status = {
@@ -182,7 +183,9 @@ function updateToolSchema(tool: McpTool): { tool: McpTool; converted: boolean } 
 export function prepareMcpTools(
   statusUpdate: StatusUpdateCallback,
   config: GthConfig,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools: DynamicStructuredTool<ToolSchemaBase, any, any, any>[] | undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): DynamicStructuredTool<ToolSchemaBase, any, any, any>[] | undefined {
   if (!tools || tools.length === 0) {
     return tools;
