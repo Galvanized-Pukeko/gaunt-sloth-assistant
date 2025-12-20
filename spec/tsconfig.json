@@ -7,6 +7,6 @@
     "rootDir": "..",
     "baseUrl": ".."
   },
-  "include": ["../src/**/*", "../spec/**/*", "../dist"],
-  "exclude": ["../src", "../integration-tests"]
+  "include": ["../spec/**/*", "../src/**/*"],
+  "exclude": ["../integration-tests"]
 }

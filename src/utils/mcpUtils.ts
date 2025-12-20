@@ -4,8 +4,19 @@ import { ToolSchemaBase } from '@langchain/core/tools';
 import { ChatVertexAI } from '@langchain/google-vertexai';
 import { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type McpTool = DynamicStructuredTool<ToolSchemaBase, any, any, any>;
+type JsonInputSchema = {
+  type?: string | string[];
+  description?: string;
+  properties?: Record<string, JsonInputSchema>;
+  items?: JsonInputSchema;
+  anyOf?: JsonInputSchema[];
+  oneOf?: JsonInputSchema[];
+  discriminator?: { propertyName?: string };
+  enum?: Array<string | number | boolean | null>;
+  const?: string | number | boolean | null;
+};
+
+type McpTool = DynamicStructuredTool<ToolSchemaBase, unknown, unknown, string>;
 
 function isVertexLlm(config: GthConfig): boolean {
   return config.llm instanceof ChatVertexAI;
@@ -20,23 +31,11 @@ function mergeDescription(existing: string | undefined, extra: string): string {
   return extra;
 }
 
-type JsonSchema = {
-  type?: string | string[];
-  description?: string;
-  properties?: Record<string, JsonSchema>;
-  items?: JsonSchema;
-  anyOf?: JsonSchema[];
-  oneOf?: JsonSchema[];
-  discriminator?: { propertyName?: string };
-  enum?: Array<string | number | boolean | null>;
-  const?: string | number | boolean | null;
-};
-
-function isJsonSchema(value: unknown): value is JsonSchema {
+function isJsonSchema(value: unknown): value is JsonInputSchema {
   return !!value && typeof value === 'object';
 }
 
-function describeJsonSchemaType(schema: JsonSchema | undefined): string {
+function describeJsonSchemaType(schema: JsonInputSchema | undefined): string {
   if (!schema) return 'value';
   if (schema.const !== undefined) return `literal(${JSON.stringify(schema.const)})`;
   if (schema.enum && schema.enum.length > 0) {
@@ -55,14 +54,14 @@ function describeJsonSchemaType(schema: JsonSchema | undefined): string {
   return 'value';
 }
 
-function buildUnionDescriptionFromSchema(options: JsonSchema[]): string {
+function buildUnionDescriptionFromSchema(options: JsonInputSchema[]): string {
   const optionDescriptions = options.map((option) => describeJsonSchemaType(option));
   return `Expected one of: ${optionDescriptions.join(' | ')}.`;
 }
 
 function buildDiscriminatedUnionDescriptionFromSchema(
-  schema: JsonSchema,
-  options: JsonSchema[]
+  schema: JsonInputSchema,
+  options: JsonInputSchema[]
 ): string {
   const discriminator = schema.discriminator?.propertyName;
   if (discriminator) {
@@ -113,13 +112,13 @@ function replaceUnionSchemas(
   if (schema.type === 'object' || schema.properties) {
     const properties = schema.properties ?? {};
     let hasChanges = false;
-    const updatedProperties: Record<string, JsonSchema> = {};
+    const updatedProperties: Record<string, JsonInputSchema> = {};
     Object.entries(properties).forEach(([key, value]) => {
       const updatedValue = replaceUnionSchemas(value, {
         toolName: context.toolName,
         path: [...context.path, key],
         log: context.log,
-      }) as JsonSchema;
+      }) as JsonInputSchema;
       updatedProperties[key] = updatedValue;
       if (updatedValue !== value) {
         hasChanges = true;
@@ -130,7 +129,7 @@ function replaceUnionSchemas(
         toolName: context.toolName,
         path: [...context.path, 'items'],
         log: context.log,
-      }) as JsonSchema;
+      }) as JsonInputSchema;
       hasChanges = hasChanges || updatedItems !== schema.items;
       return {
         ...schema,
@@ -154,7 +153,7 @@ function replaceUnionSchemas(
         toolName: context.toolName,
         path: [...context.path, 'items'],
         log: context.log,
-      }) as JsonSchema,
+      }) as JsonInputSchema,
     };
   }
 
@@ -183,7 +182,7 @@ function updateToolSchema(tool: McpTool, log: (message: string) => void): McpToo
 /**
  * Convert union types to flat types:
  * See https://github.com/langchain-ai/langchainjs/issues/9691
- * Since Langchain 1.2.1 Gemini explodes with the following error:
+ * Since LangChain 1.2.1 Gemini explodes with the following error:
  * Error processing message: Agent processing failed:
  * Failed to convert tool 'mcp_tool_name' schema for Gemini: zod_to_gemini_parameters:
  * Gemini cannot handle union types (discriminatedUnion, anyOf, oneOf).
@@ -192,10 +191,8 @@ function updateToolSchema(tool: McpTool, log: (message: string) => void): McpToo
 export function prepareMcpTools(
   statusUpdate: StatusUpdateCallback,
   config: GthConfig,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tools: DynamicStructuredTool<ToolSchemaBase, any, any, any>[] | undefined
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): DynamicStructuredTool<ToolSchemaBase, any, any, any>[] | undefined {
+  tools: DynamicStructuredTool<ToolSchemaBase, unknown, unknown, string>[] | undefined
+): DynamicStructuredTool<ToolSchemaBase, unknown, unknown, string>[] | undefined {
   if (!tools || tools.length === 0) {
     return tools;
   }
