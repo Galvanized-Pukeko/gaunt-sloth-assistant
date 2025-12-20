@@ -4,10 +4,6 @@ import { ToolSchemaBase } from '@langchain/core/tools';
 import { ChatVertexAI } from '@langchain/google-vertexai';
 import { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
 
-const status = {
-  update: (_msg: string) => {},
-};
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type McpTool = DynamicStructuredTool<ToolSchemaBase, any, any, any>;
 
@@ -90,7 +86,7 @@ function buildDiscriminatedUnionDescriptionFromSchema(
 
 function replaceUnionSchemas(
   schema: unknown,
-  context: { toolName: string; path: string[] }
+  context: { toolName: string; path: string[]; log: (message: string) => void }
 ): unknown {
   if (!isJsonSchema(schema)) {
     return schema;
@@ -107,7 +103,7 @@ function replaceUnionSchemas(
     // The unassignment below pull is for purpose of taking rest of parameters except unions.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { anyOf, oneOf, discriminator, ...rest } = schema;
-    status.update(`${context.toolName}: converted schema union at ${context.path.join('.')}`);
+    context.log(`${context.toolName}: converted schema union at ${context.path.join('.')}`);
     return {
       ...rest,
       description,
@@ -122,6 +118,7 @@ function replaceUnionSchemas(
       const updatedValue = replaceUnionSchemas(value, {
         toolName: context.toolName,
         path: [...context.path, key],
+        log: context.log,
       }) as JsonSchema;
       updatedProperties[key] = updatedValue;
       if (updatedValue !== value) {
@@ -132,6 +129,7 @@ function replaceUnionSchemas(
       const updatedItems = replaceUnionSchemas(schema.items, {
         toolName: context.toolName,
         path: [...context.path, 'items'],
+        log: context.log,
       }) as JsonSchema;
       hasChanges = hasChanges || updatedItems !== schema.items;
       return {
@@ -155,6 +153,7 @@ function replaceUnionSchemas(
       items: replaceUnionSchemas(schema.items, {
         toolName: context.toolName,
         path: [...context.path, 'items'],
+        log: context.log,
       }) as JsonSchema,
     };
   }
@@ -162,7 +161,7 @@ function replaceUnionSchemas(
   return schema;
 }
 
-function updateToolSchema(tool: McpTool): McpTool {
+function updateToolSchema(tool: McpTool, log: (message: string) => void): McpTool {
   const schema = tool.schema as unknown;
   if (!schema || typeof schema !== 'object') {
     return tool;
@@ -171,6 +170,7 @@ function updateToolSchema(tool: McpTool): McpTool {
   const updatedSchema = replaceUnionSchemas(schema, {
     toolName: tool.name ?? 'unknown',
     path: ['schema'],
+    log,
   });
   if (updatedSchema === tool.schema) {
     return tool;
@@ -203,9 +203,7 @@ export function prepareMcpTools(
   if (!isVertexLlm(config)) {
     return tools;
   }
-  status.update = (msg) => statusUpdate('info', msg);
-  status.update('converting tools for Vertex AI LLM to avoid schema issues.');
-  return tools.map((tool) => {
-    return updateToolSchema(tool);
-  });
+  const log: (message: string) => void = (msg) => statusUpdate('info', msg);
+  log('converting tools for Vertex AI LLM to avoid schema issues.');
+  return tools.map((tool) => updateToolSchema(tool, log));
 }
