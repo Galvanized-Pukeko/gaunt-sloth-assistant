@@ -180,6 +180,15 @@ function updateToolSchema(tool: McpTool): McpTool {
   return tool;
 }
 
+/**
+ * Convert union types to flat types:
+ * See https://github.com/langchain-ai/langchainjs/issues/9691
+ * Since Langchain 1.2.1 Gemini explodes with the following error:
+ * Error processing message: Agent processing failed:
+ * Failed to convert tool 'mcp_tool_name' schema for Gemini: zod_to_gemini_parameters:
+ * Gemini cannot handle union types (discriminatedUnion, anyOf, oneOf).
+ * Consider using a flat object structure with optional fields instead.
+ */
 export function prepareMcpTools(
   statusUpdate: StatusUpdateCallback,
   config: GthConfig,
