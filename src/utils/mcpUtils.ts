@@ -100,7 +100,7 @@ function replaceUnionSchemas(
         ? buildDiscriminatedUnionDescriptionFromSchema(schema, options)
         : buildUnionDescriptionFromSchema(options)
     );
-    // The unassignment below pull is for purpose of taking rest of parameters except unions.
+    // The unassignment below is for purpose of taking rest of parameters except unions.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { anyOf, oneOf, discriminator, ...rest } = schema;
     context.log(`${context.toolName}: converted schema union at ${context.path.join('.')}`);
