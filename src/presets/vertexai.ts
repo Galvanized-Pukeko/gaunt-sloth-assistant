@@ -1,3 +1,15 @@
+/**
+ * @packageDocumentation
+ * Google VertexAI preset.
+ * This preset requires `gcloud auth login` and `gcloud auth application-default login`.
+ * <p>
+ * Caveats:
+ * This preset does not support discriminatedUnion, anyOf, oneOf in tool signatures,
+ * Gaunt Sloth converts those tools to flat calls, and generally they work fine,
+ * but sometimes this may lead to some quirks.
+ * <p>
+ * Hopefully this issue will go away when LangChain switches to the new GenAI dependency.
+ */
 import { displayWarning } from '#src/utils/consoleUtils.js';
 import { ChatVertexAIInput } from '@langchain/google-vertexai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
