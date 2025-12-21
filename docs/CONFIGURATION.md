@@ -144,6 +144,39 @@ gsloth init openrouter
 
 Make sure you either define `OPEN_ROUTER_API_KEY` environment variable or edit your configuration file and set up your key.
 
+### LM Studio
+
+LM Studio provides a local OpenAI-compatible server for running models on your machine.
+
+```bash
+cd ./your-project
+gsloth init openai
+```
+
+Then edit your configuration file to point to your LM Studio server:
+```json
+{
+  "llm": {
+    "type": "openai",
+    "model": "openai/gpt-oss-20b",
+    "apiKey": "none",
+    "configuration": {
+      "baseURL": "http://127.0.0.1:1234/v1"
+    }
+  }
+}
+```
+
+**Configuration notes:**
+- LM Studio uses OpenAI format, so set `type` to `"openai"`
+- The `apiKey` can be any random string (e.g., `"none"`) - LM Studio doesn't validate it
+- The default `baseURL` is `http://127.0.0.1:1234/v1`, but adjust the port if you've configured LM Studio differently
+- The `model` should match the model identifier shown in LM Studio
+- **Important:** The model must support tool calling. Tested models include:
+  gpt-oss, granite, nemotron, seed, qwen3
+
+For a complete example, see [examples/lmstudio/.gsloth.config.json](../examples/lmstudio/.gsloth.config.json).
+
 ### Other OpenAI-compatible providers (Inception, etc.)
 For providers that use OpenAI-compatible APIs:
 ```bash
@@ -226,6 +259,22 @@ You can use the `DEEPSEEK_API_KEY` environment variable instead of specifying `a
 }
 ```
 You can use the `OPENAI_API_KEY` environment variable instead of specifying `apiKey` in the config.
+
+**Example of .gsloth.config.json for LM Studio (OpenAI-compatible)**
+```json
+{
+  "llm": {
+    "type": "openai",
+    "model": "openai/gpt-oss-20b",
+    "apiKey": "none",
+    "configuration": {
+      "baseURL": "http://127.0.0.1:1234/v1"
+    }
+  }
+}
+```
+LM Studio runs locally and doesn't require a real API key. Use any string for `apiKey`.
+**Note:** The model must support tool calling. Tested models include gpt-oss, granite, nemotron, seed, and qwen3.
 
 **Example of .gsloth.config.json for Inception (OpenAI-compatible)**
 ```json
@@ -384,6 +433,23 @@ export async function configure() {
     };
 }
 ```
+
+**Example of .gsloth.config.mjs for LM Studio (OpenAI-compatible)**
+```javascript
+export async function configure() {
+    const openai = await import('@langchain/openai');
+    return {
+        llm: new openai.ChatOpenAI({
+            model: 'openai/gpt-oss-20b',
+            apiKey: 'none', // LM Studio doesn't validate API keys
+            configuration: {
+                baseURL: 'http://127.0.0.1:1234/v1',
+            },
+        })
+    };
+}
+```
+**Note:** The model must support tool calling. Tested models include gpt-oss, granite, nemotron, seed, and qwen3.
 
 **Example of .gsloth.config.mjs for Inception (OpenAI-compatible)**
 ```javascript

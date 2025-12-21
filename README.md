@@ -50,6 +50,7 @@ The promise of Gaunt Sloth:
 - Google AI Studio and Google Vertex AI;
 - Anthropic;
 - OpenAI (and other providers using OpenAI format, such as Inception);
+- LM Studio (local models);
 - Ollama with JS config (some of the models, see https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/discussions/107)
 - xAI;
 
@@ -223,6 +224,19 @@ cd ./your-project
 gsloth init openai
 ```
 Make sure you either define `OPENAI_API_KEY` environment variable or edit your configuration file and set up your key.
+
+### LM Studio
+LM Studio provides a local OpenAI-compatible server for running models on your machine:
+```bash
+cd ./your-project
+gsloth init openai
+```
+Then edit your configuration file to point to LM Studio (default: `http://127.0.0.1:1234/v1`).
+Use any string for the API key (e.g., `"none"`) - LM Studio doesn't validate it.
+
+**Important:** The model must support tool calling. Tested models include gpt-oss, granite, nemotron, seed, and qwen3.
+
+See [CONFIGURATION.md](./docs/CONFIGURATION.md#lm-studio) for detailed setup.
 
 ### OpenAI-compatible providers (Inception, etc.)
 For providers using OpenAI-compatible APIs:
