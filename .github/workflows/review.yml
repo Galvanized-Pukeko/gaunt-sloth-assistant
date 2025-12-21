@@ -1,4 +1,4 @@
-name: AI PR Review (K2)
+name: AI PR Review (grok fast)
 
 # The pull_request_target is an important feature. It is running on files from `main`.
 on:

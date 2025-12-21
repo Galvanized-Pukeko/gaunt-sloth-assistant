@@ -1,9 +1,9 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "moonshotai/kimi-k2-thinking"
+    "model": "x-ai/grok-code-fast-1"
   },
-  "filesystem": "none",
+  "filesystem": "read",
   "useColour": false,
   "writeOutputToFile": "review.md",
   "includeCurrentDateAfterGuidelines": true,
