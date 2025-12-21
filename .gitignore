@@ -9,6 +9,6 @@
 .junie
 .idea
 gaunt-sloth-assistant.iml
-/.gsloth.config*
+.gsloth/.gsloth-settings/jira/
 /gaunt-sloth.log
 req
