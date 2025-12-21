@@ -10,5 +10,6 @@
 .idea
 gaunt-sloth-assistant.iml
 .gsloth/.gsloth-settings/jira/
+.gsloth/.gsloth-settings/gth_*
 /gaunt-sloth.log
 req
