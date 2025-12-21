@@ -170,4 +170,83 @@ describe('prepareMcpTools', () => {
     expect(filtersItemsSchema.description).toContain('string');
     expect(filtersItemsSchema.description).toContain('number');
   });
+
+  it('should convert tuple items union schemas to z.any for Vertex', async () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        range: {
+          type: 'array',
+          items: [
+            {
+              anyOf: [{ type: 'string' }, { type: 'number' }],
+              description: 'Range start',
+            },
+            { type: 'number' },
+          ],
+        },
+      },
+    } as const;
+    const tool = new DynamicStructuredTool({
+      name: 'mcp__jira__getConfluenceSpaces',
+      description: 'Test tool',
+      schema,
+      func: async () => 'ok',
+    });
+    const { ChatVertexAI } = await import('@langchain/google-vertexai');
+    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+
+    const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
+    const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);
+
+    const rangeItemsSchema = (result?.[0].schema as any).properties.range.items;
+    expect(rangeItemsSchema[0].anyOf).toBeUndefined();
+    expect(rangeItemsSchema[0].description).toContain('Range start');
+    expect(rangeItemsSchema[0].description).toContain('string');
+    expect(rangeItemsSchema[0].description).toContain('number');
+  });
+
+  it('should convert nested union schemas in conditional branches for Vertex', async () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        payload: {
+          type: 'object',
+          if: {
+            properties: {
+              kind: {
+                anyOf: [{ const: 'a' }, { const: 'b' }],
+                description: 'Payload kind',
+              },
+            },
+          },
+          then: {
+            properties: {
+              value: {
+                oneOf: [{ type: 'string' }, { type: 'number' }],
+                description: 'Payload value',
+              },
+            },
+          },
+        },
+      },
+    } as const;
+    const tool = new DynamicStructuredTool({
+      name: 'mcp__jira__getConfluenceSpaces',
+      description: 'Test tool',
+      schema,
+      func: async () => 'ok',
+    });
+    const { ChatVertexAI } = await import('@langchain/google-vertexai');
+    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+
+    const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
+    const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);
+
+    const payloadSchema = (result?.[0].schema as any).properties.payload;
+    expect(payloadSchema.if.properties.kind.anyOf).toBeUndefined();
+    expect(payloadSchema.if.properties.kind.description).toContain('Payload kind');
+    expect(payloadSchema.then.properties.value.oneOf).toBeUndefined();
+    expect(payloadSchema.then.properties.value.description).toContain('Payload value');
+  });
 });

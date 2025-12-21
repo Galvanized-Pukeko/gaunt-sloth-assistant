@@ -8,10 +8,17 @@ type JsonInputSchema = {
   type?: string | string[];
   description?: string;
   properties?: Record<string, JsonInputSchema>;
-  items?: JsonInputSchema;
+  items?: JsonInputSchema | JsonInputSchema[];
   anyOf?: JsonInputSchema[];
   oneOf?: JsonInputSchema[];
   discriminator?: { propertyName?: string };
+  additionalProperties?: boolean | JsonInputSchema;
+  patternProperties?: Record<string, JsonInputSchema>;
+  allOf?: JsonInputSchema[];
+  not?: JsonInputSchema;
+  if?: JsonInputSchema;
+  then?: JsonInputSchema;
+  else?: JsonInputSchema;
   enum?: Array<string | number | boolean | null>;
   const?: string | number | boolean | null;
 };
@@ -32,7 +39,7 @@ function mergeDescription(existing: string | undefined, extra: string): string {
 }
 
 function isJsonSchema(value: unknown): value is JsonInputSchema {
-  return !!value && typeof value === 'object';
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function describeJsonSchemaType(schema: JsonInputSchema | undefined): string {
@@ -46,6 +53,10 @@ function describeJsonSchemaType(schema: JsonInputSchema | undefined): string {
       return schema.type.join(' | ');
     }
     if (schema.type === 'array') {
+      if (Array.isArray(schema.items)) {
+        const itemTypes = schema.items.map((item) => describeJsonSchemaType(item)).join(', ');
+        return `tuple<${itemTypes}>`;
+      }
       return `array<${describeJsonSchemaType(schema.items)}>`;
     }
     return schema.type;
@@ -83,6 +94,9 @@ function buildDiscriminatedUnionDescriptionFromSchema(
   return buildUnionDescriptionFromSchema(options);
 }
 
+/**
+ * Replace union schemas in JSON schema
+ */
 function replaceUnionSchemas(
   schema: unknown,
   context: { toolName: string; path: string[]; log: (message: string) => void }
@@ -109,11 +123,24 @@ function replaceUnionSchemas(
     };
   }
 
-  if (schema.type === 'object' || schema.properties) {
-    const properties = schema.properties ?? {};
-    let hasChanges = false;
+  let hasChanges = false;
+  let updatedSchema = schema;
+  const updateField = <Key extends keyof JsonInputSchema>(
+    key: Key,
+    value: JsonInputSchema[Key]
+  ) => {
+    if (schema[key] === value) return;
+    if (!hasChanges) {
+      updatedSchema = { ...schema };
+    }
+    updatedSchema[key] = value;
+    hasChanges = true;
+  };
+
+  if (schema.properties) {
     const updatedProperties: Record<string, JsonInputSchema> = {};
-    Object.entries(properties).forEach(([key, value]) => {
+    let propertiesChanged = false;
+    Object.entries(schema.properties).forEach(([key, value]) => {
       const updatedValue = replaceUnionSchemas(value, {
         toolName: context.toolName,
         path: [...context.path, key],
@@ -121,43 +148,131 @@ function replaceUnionSchemas(
       }) as JsonInputSchema;
       updatedProperties[key] = updatedValue;
       if (updatedValue !== value) {
-        hasChanges = true;
+        propertiesChanged = true;
       }
     });
-    if (schema.items) {
+    if (propertiesChanged) {
+      updateField('properties', updatedProperties);
+    }
+  }
+
+  if (schema.patternProperties) {
+    const updatedPatternProperties: Record<string, JsonInputSchema> = {};
+    let patternChanged = false;
+    Object.entries(schema.patternProperties).forEach(([key, value]) => {
+      const updatedValue = replaceUnionSchemas(value, {
+        toolName: context.toolName,
+        path: [...context.path, `patternProperties.${key}`],
+        log: context.log,
+      }) as JsonInputSchema;
+      updatedPatternProperties[key] = updatedValue;
+      if (updatedValue !== value) {
+        patternChanged = true;
+      }
+    });
+    if (patternChanged) {
+      updateField('patternProperties', updatedPatternProperties);
+    }
+  }
+
+  if (isJsonSchema(schema.additionalProperties)) {
+    const updatedAdditionalProperties = replaceUnionSchemas(schema.additionalProperties, {
+      toolName: context.toolName,
+      path: [...context.path, 'additionalProperties'],
+      log: context.log,
+    }) as JsonInputSchema;
+    if (updatedAdditionalProperties !== schema.additionalProperties) {
+      updateField('additionalProperties', updatedAdditionalProperties);
+    }
+  }
+
+  if (schema.items) {
+    if (Array.isArray(schema.items)) {
+      const itemsArray = schema.items;
+      const updatedItems = itemsArray.map(
+        (item, index) =>
+          replaceUnionSchemas(item, {
+            toolName: context.toolName,
+            path: [...context.path, `items[${index}]`],
+            log: context.log,
+          }) as JsonInputSchema
+      );
+      const itemsChanged = updatedItems.some((item, index) => item !== itemsArray[index]);
+      if (itemsChanged) {
+        updateField('items', updatedItems);
+      }
+    } else {
       const updatedItems = replaceUnionSchemas(schema.items, {
         toolName: context.toolName,
         path: [...context.path, 'items'],
         log: context.log,
       }) as JsonInputSchema;
-      hasChanges = hasChanges || updatedItems !== schema.items;
-      return {
-        ...schema,
-        properties: hasChanges ? updatedProperties : schema.properties,
-        items: updatedItems,
-      };
+      if (updatedItems !== schema.items) {
+        updateField('items', updatedItems);
+      }
     }
-    if (!hasChanges) {
-      return schema;
-    }
-    return {
-      ...schema,
-      properties: updatedProperties,
-    };
   }
 
-  if (schema.type === 'array' && schema.items) {
-    return {
-      ...schema,
-      items: replaceUnionSchemas(schema.items, {
-        toolName: context.toolName,
-        path: [...context.path, 'items'],
-        log: context.log,
-      }) as JsonInputSchema,
-    };
+  if (schema.allOf) {
+    const updatedAllOf = schema.allOf.map(
+      (item, index) =>
+        replaceUnionSchemas(item, {
+          toolName: context.toolName,
+          path: [...context.path, `allOf[${index}]`],
+          log: context.log,
+        }) as JsonInputSchema
+    );
+    const allOfChanged = updatedAllOf.some((item, index) => item !== schema.allOf?.[index]);
+    if (allOfChanged) {
+      updateField('allOf', updatedAllOf);
+    }
   }
 
-  return schema;
+  if (schema.not) {
+    const updatedNot = replaceUnionSchemas(schema.not, {
+      toolName: context.toolName,
+      path: [...context.path, 'not'],
+      log: context.log,
+    }) as JsonInputSchema;
+    if (updatedNot !== schema.not) {
+      updateField('not', updatedNot);
+    }
+  }
+
+  if (schema.if) {
+    const updatedIf = replaceUnionSchemas(schema.if, {
+      toolName: context.toolName,
+      path: [...context.path, 'if'],
+      log: context.log,
+    }) as JsonInputSchema;
+    if (updatedIf !== schema.if) {
+      updateField('if', updatedIf);
+    }
+  }
+
+  if (schema.then) {
+    const updatedThen = replaceUnionSchemas(schema.then, {
+      toolName: context.toolName,
+      path: [...context.path, 'then'],
+      log: context.log,
+    }) as JsonInputSchema;
+    if (updatedThen !== schema.then) {
+      updateField('then', updatedThen);
+    }
+  }
+
+  if (schema.else) {
+    const updatedElse = replaceUnionSchemas(schema.else, {
+      toolName: context.toolName,
+      path: [...context.path, 'else'],
+      log: context.log,
+    }) as JsonInputSchema;
+    if (updatedElse !== schema.else) {
+      updateField('else', updatedElse);
+    }
+  }
+
+  return updatedSchema;
 }
 
 function updateToolSchema(tool: McpTool, log: (message: string) => void): McpTool {
