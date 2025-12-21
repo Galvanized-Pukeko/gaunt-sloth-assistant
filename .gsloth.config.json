@@ -1,0 +1,17 @@
+{
+  "llm": {
+    "type": "openrouter",
+    "model": "anthropic/claude-opus-4.5"
+  },
+  "commands": {
+    "code": {
+      "filesystem": "all",
+      "devTools": {
+        "run_build": "npm build",
+        "run_tests": "npm test",
+        "run_lint": "npm run lint-n-fix",
+        "run_single_test": "npm test"
+      }
+    }
+  }
+}

@@ -1,8 +1,8 @@
 import { GthConfig } from '#src/config.js';
-import { DynamicStructuredTool } from '@langchain/core/tools';
-import { ToolSchemaBase } from '@langchain/core/tools';
+import { DynamicStructuredTool, ToolSchemaBase } from '@langchain/core/tools';
 import { ChatVertexAI } from '@langchain/google-vertexai';
-import { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
+
+type StatusUpdateCallback = (level: 'info', message: string) => void;
 
 type JsonInputSchema = {
   type?: string | string[];
@@ -94,13 +94,18 @@ function buildDiscriminatedUnionDescriptionFromSchema(
   return buildUnionDescriptionFromSchema(options);
 }
 
+interface ReplaceUnionSchemasContext {
+  toolName: string;
+  path: string[];
+  log: (message: string) => void;
+}
+
 /**
- * Replace union schemas in JSON schema
+ * Replace union schemas in JSON schema.
+ * Gemini/Vertex AI cannot handle anyOf, oneOf, or discriminatedUnion schemas,
+ * so this function converts them to a flat structure with descriptive text.
  */
-function replaceUnionSchemas(
-  schema: unknown,
-  context: { toolName: string; path: string[]; log: (message: string) => void }
-): unknown {
+function replaceUnionSchemas(schema: unknown, context: ReplaceUnionSchemasContext): unknown {
   if (!isJsonSchema(schema)) {
     return schema;
   }
@@ -137,41 +142,30 @@ function replaceUnionSchemas(
     hasChanges = true;
   };
 
-  if (schema.properties) {
-    const updatedProperties: Record<string, JsonInputSchema> = {};
-    let propertiesChanged = false;
-    Object.entries(schema.properties).forEach(([key, value]) => {
-      const updatedValue = replaceUnionSchemas(value, {
-        toolName: context.toolName,
-        path: [...context.path, key],
-        log: context.log,
-      }) as JsonInputSchema;
-      updatedProperties[key] = updatedValue;
-      if (updatedValue !== value) {
-        propertiesChanged = true;
+  // Process properties and patternProperties (Record<string, JsonInputSchema>)
+  const recordFields = [
+    { key: 'properties', pathPrefix: '' },
+    { key: 'patternProperties', pathPrefix: 'patternProperties.' },
+  ] as const;
+  for (const { key, pathPrefix } of recordFields) {
+    const record = schema[key];
+    if (record) {
+      const updatedRecord: Record<string, JsonInputSchema> = {};
+      let recordChanged = false;
+      for (const [propKey, propValue] of Object.entries(record)) {
+        const updatedValue = replaceUnionSchemas(propValue, {
+          toolName: context.toolName,
+          path: [...context.path, `${pathPrefix}${propKey}`],
+          log: context.log,
+        }) as JsonInputSchema;
+        updatedRecord[propKey] = updatedValue;
+        if (updatedValue !== propValue) {
+          recordChanged = true;
+        }
       }
-    });
-    if (propertiesChanged) {
-      updateField('properties', updatedProperties);
-    }
-  }
-
-  if (schema.patternProperties) {
-    const updatedPatternProperties: Record<string, JsonInputSchema> = {};
-    let patternChanged = false;
-    Object.entries(schema.patternProperties).forEach(([key, value]) => {
-      const updatedValue = replaceUnionSchemas(value, {
-        toolName: context.toolName,
-        path: [...context.path, `patternProperties.${key}`],
-        log: context.log,
-      }) as JsonInputSchema;
-      updatedPatternProperties[key] = updatedValue;
-      if (updatedValue !== value) {
-        patternChanged = true;
+      if (recordChanged) {
+        updateField(key, updatedRecord);
       }
-    });
-    if (patternChanged) {
-      updateField('patternProperties', updatedPatternProperties);
     }
   }
 
@@ -228,47 +222,18 @@ function replaceUnionSchemas(
     }
   }
 
-  if (schema.not) {
-    const updatedNot = replaceUnionSchemas(schema.not, {
-      toolName: context.toolName,
-      path: [...context.path, 'not'],
-      log: context.log,
-    }) as JsonInputSchema;
-    if (updatedNot !== schema.not) {
-      updateField('not', updatedNot);
-    }
-  }
-
-  if (schema.if) {
-    const updatedIf = replaceUnionSchemas(schema.if, {
-      toolName: context.toolName,
-      path: [...context.path, 'if'],
-      log: context.log,
-    }) as JsonInputSchema;
-    if (updatedIf !== schema.if) {
-      updateField('if', updatedIf);
-    }
-  }
-
-  if (schema.then) {
-    const updatedThen = replaceUnionSchemas(schema.then, {
-      toolName: context.toolName,
-      path: [...context.path, 'then'],
-      log: context.log,
-    }) as JsonInputSchema;
-    if (updatedThen !== schema.then) {
-      updateField('then', updatedThen);
-    }
-  }
-
-  if (schema.else) {
-    const updatedElse = replaceUnionSchemas(schema.else, {
-      toolName: context.toolName,
-      path: [...context.path, 'else'],
-      log: context.log,
-    }) as JsonInputSchema;
-    if (updatedElse !== schema.else) {
-      updateField('else', updatedElse);
+  // Process simple nested schema fields: not, if, then, else
+  const nestedFields = ['not', 'if', 'then', 'else'] as const;
+  for (const field of nestedFields) {
+    if (schema[field]) {
+      const updatedField = replaceUnionSchemas(schema[field], {
+        toolName: context.toolName,
+        path: [...context.path, field],
+        log: context.log,
+      }) as JsonInputSchema;
+      if (updatedField !== schema[field]) {
+        updateField(field, updatedField);
+      }
     }
   }
 
@@ -315,7 +280,7 @@ export function prepareMcpTools(
   if (!isVertexLlm(config)) {
     return tools;
   }
-  const log: (message: string) => void = (msg) => statusUpdate('info', msg);
+  const log = (msg: string): void => statusUpdate('info', msg);
   log('converting tools for Vertex AI LLM to avoid schema issues.');
   return tools.map((tool) => updateToolSchema(tool, log));
 }
