@@ -1,7 +1,7 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "x-ai/grok-code-fast-1"
+    "model": "anthropic/claude-sonnet-4.5"
   },
   "filesystem": "read",
   "useColour": false,

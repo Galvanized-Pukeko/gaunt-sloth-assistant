@@ -1,4 +1,4 @@
-name: AI PR Review (grok fast)
+name: AI PR Review
 
 # The pull_request_target is an important feature. It is running on files from `main`.
 on:
@@ -38,9 +38,9 @@ jobs:
           if [ -z "${{ steps.extract_issue.outputs.issue_number }}" ]; then
             echo "ℹ️ **Tip:** To link this PR to an issue, start your PR title with the issue number followed by a space (e.g., '123 Fix authentication bug')" | tee review.md
             echo "" >> review.md
-            gth --nopipe -c ".github/workflows/.gsloth.config.json" pr ${{ github.event.pull_request.number }}
+            gth --nopipe -i review pr ${{ github.event.pull_request.number }}
           else
-            gth --nopipe -c ".github/workflows/.gsloth.config.json" pr ${{ github.event.pull_request.number }} ${{ steps.extract_issue.outputs.issue_number }}
+            gth --nopipe -i review pr ${{ github.event.pull_request.number }} ${{ steps.extract_issue.outputs.issue_number }}
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
