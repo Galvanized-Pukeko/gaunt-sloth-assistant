@@ -138,4 +138,36 @@ describe('prepareMcpTools', () => {
     expect(payloadSchema.description).toContain('kind');
     expect(payloadSchema.description).toContain('"a"');
   });
+
+  it('should convert nested union schemas to z.any for Vertex', async () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        filters: {
+          type: 'array',
+          items: {
+            anyOf: [{ type: 'string' }, { type: 'number' }],
+            description: 'Filter item',
+          },
+        },
+      },
+    } as const;
+    const tool = new DynamicStructuredTool({
+      name: 'mcp__jira__getConfluenceSpaces',
+      description: 'Test tool',
+      schema,
+      func: async () => 'ok',
+    });
+    const { ChatVertexAI } = await import('@langchain/google-vertexai');
+    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+
+    const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
+    const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);
+
+    const filtersItemsSchema = (result?.[0].schema as any).properties.filters.items;
+    expect(filtersItemsSchema.anyOf).toBeUndefined();
+    expect(filtersItemsSchema.description).toContain('Filter item');
+    expect(filtersItemsSchema.description).toContain('string');
+    expect(filtersItemsSchema.description).toContain('number');
+  });
 });
