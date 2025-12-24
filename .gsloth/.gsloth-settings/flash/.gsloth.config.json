@@ -1,0 +1,7 @@
+{
+  "llm": {
+    "type": "vertexai",
+    "model": "gemini-3-flash-preview",
+    "location": "global"
+  }
+}
