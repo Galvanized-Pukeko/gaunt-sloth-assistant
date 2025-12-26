@@ -50,7 +50,7 @@ The promise of Gaunt Sloth:
 - Google AI Studio and Google Vertex AI;
 - Anthropic;
 - OpenAI (and other providers using OpenAI format, such as Inception);
-- LM Studio (local models);
+- Local AI: LM Studio, Ollama, llama.cpp (Via OpenAI compatibitlity)
 - Ollama with JS config (some of the models, see https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/discussions/107)
 - xAI;
 
