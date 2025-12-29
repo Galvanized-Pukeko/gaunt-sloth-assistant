@@ -339,6 +339,8 @@ export default class GthDevToolkit extends BaseToolkit {
       );
     }
 
+    // TODO custom tools should not really be a part of dev tools, they should be either available globally or on every command
+    // TODO extract custom tools into separate configuration note, there's customToolsConfig potentially conflicting `customToolsConfig` with jira
     // Create tools for custom commands
     if (this.commands.custom_commands) {
       for (const [name, config] of Object.entries(this.commands.custom_commands)) {
