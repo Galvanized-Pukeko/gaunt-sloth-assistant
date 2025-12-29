@@ -1,7 +1,7 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "anthropic/claude-opus-4.5"
+    "model": "anthropic/claude-opus-4.5:online"
   },
   "commands": {
     "code": {
