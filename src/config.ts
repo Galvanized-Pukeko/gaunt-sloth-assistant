@@ -257,6 +257,40 @@ export interface RatingConfig {
 }
 
 /**
+ * Configuration for a custom command parameter.
+ * Parameters allow the model to provide dynamic values to commands.
+ */
+export interface CustomCommandParameter {
+  /**
+   * Description of the parameter shown to the model.
+   */
+  description: string;
+}
+
+/**
+ * Configuration for a custom command.
+ * Custom commands can be executed with or without parameters.
+ */
+export interface CustomCommandConfig {
+  /**
+   * The shell command to execute.
+   * Can include placeholders like ${paramName} that will be replaced with parameter values.
+   * If no placeholder is present and parameters are provided, they are appended to the command.
+   */
+  command: string;
+  /**
+   * Description of what this command does, shown to the model.
+   */
+  description: string;
+  /**
+   * Optional parameters that the model can provide when calling this command.
+   * Each parameter has a name (the key) and a description.
+   * Parameters are validated for security (no shell injection, directory traversal, etc.).
+   */
+  parameters?: Record<string, CustomCommandParameter>;
+}
+
+/**
  * Config for {@link GthDevToolkit}.
  * Tools are not applied when config is not provided.
  * Only available in `code` mode.
@@ -285,6 +319,40 @@ export interface GthDevToolsConfig {
    * Not applied when config is not provided.
    */
   run_single_test?: string;
+  /**
+   * Custom commands that can be executed by the model.
+   * Each key is the tool name, and the value defines the command configuration.
+   *
+   * Example without parameters:
+   * ```json
+   * {
+   *   "custom_commands": {
+   *     "deploy_staging": {
+   *       "command": "npm run deploy:staging",
+   *       "description": "Deploy the application to staging environment"
+   *     }
+   *   }
+   * }
+   * ```
+   *
+   * Example with parameters:
+   * ```json
+   * {
+   *   "custom_commands": {
+   *     "run_migration": {
+   *       "command": "npm run migrate -- ${migrationName}",
+   *       "description": "Run a specific database migration",
+   *       "parameters": {
+   *         "migrationName": {
+   *           "description": "Name of the migration to run"
+   *         }
+   *       }
+   *     }
+   *   }
+   * }
+   * ```
+   */
+  custom_commands?: Record<string, CustomCommandConfig>;
 }
 
 export interface LLMConfig extends Record<string, unknown> {

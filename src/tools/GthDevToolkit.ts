@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { spawn } from 'child_process';
 import path from 'node:path';
 import { displayInfo, displayError } from '#src/utils/consoleUtils.js';
-import { GthDevToolsConfig } from '#src/config.js';
+import { GthDevToolsConfig, CustomCommandConfig } from '#src/config.js';
 import { stdout } from '#src/utils/systemUtils.js';
 
 // Helper function to create a tool with dev type
@@ -25,7 +25,7 @@ function createGthTool<T extends z.ZodSchema>(
   return toolInstance;
 }
 
-// Schema definitions
+// Schema definitions for built-in tools
 const RunTestsArgsSchema = z.object({});
 const RunLintArgsSchema = z.object({});
 const RunBuildArgsSchema = z.object({});
@@ -34,6 +34,7 @@ const RunSingleTestArgsSchema = z.object({
 });
 
 const TEST_PATH_PLACEHOLDER = '${testPath}';
+
 export default class GthDevToolkit extends BaseToolkit {
   tools: StructuredToolInterface[];
   private commands: GthDevToolsConfig;
@@ -56,43 +57,47 @@ export default class GthDevToolkit extends BaseToolkit {
   }
 
   /**
-   * Validate test path to prevent security issues
+   * Validate parameter value to prevent security issues
    */
-  private validateTestPath(testPath: string): string {
+  validateParameterValue(paramValue: string, paramName: string): string {
     // Check for absolute paths
-    if (path.isAbsolute(testPath)) {
-      throw new Error('Absolute paths are not allowed for test files');
+    if (path.isAbsolute(paramValue)) {
+      throw new Error(`Absolute paths are not allowed for parameter '${paramName}'`);
     }
 
     // Check for directory traversal attempts
-    if (testPath.includes('..') || testPath.includes('\\..\\') || testPath.includes('/../')) {
-      throw new Error('Directory traversal attempts are not allowed');
+    if (paramValue.includes('..') || paramValue.includes('\\..\\') || paramValue.includes('/../')) {
+      throw new Error(`Directory traversal attempts are not allowed in parameter '${paramName}'`);
     }
 
     // Check for pipe attempts and other shell injection
     if (
-      testPath.includes('|') ||
-      testPath.includes('&') ||
-      testPath.includes(';') ||
-      testPath.includes('`')
+      paramValue.includes('|') ||
+      paramValue.includes('&') ||
+      paramValue.includes(';') ||
+      paramValue.includes('`') ||
+      paramValue.includes('$') ||
+      paramValue.includes('$(') ||
+      paramValue.includes('\n') ||
+      paramValue.includes('\r')
     ) {
-      throw new Error('Shell injection attempts are not allowed');
+      throw new Error(`Shell injection attempts are not allowed in parameter '${paramName}'`);
     }
 
     // Check for null bytes
-    if (testPath.includes('\0')) {
-      throw new Error('Null bytes are not allowed in test path');
+    if (paramValue.includes('\0')) {
+      throw new Error(`Null bytes are not allowed in parameter '${paramName}'`);
     }
 
     // Normalize the path to remove any redundant separators
-    const normalizedPath = path.normalize(testPath);
+    const normalizedValue = path.normalize(paramValue);
 
     // Double-check after normalization
-    if (normalizedPath.includes('..')) {
-      throw new Error('Directory traversal attempts are not allowed');
+    if (normalizedValue.includes('..')) {
+      throw new Error(`Directory traversal attempts are not allowed in parameter '${paramName}'`);
     }
 
-    return normalizedPath;
+    return normalizedValue;
   }
 
   /**
@@ -110,6 +115,48 @@ export default class GthDevToolkit extends BaseToolkit {
     } else {
       throw new Error('No test command configured');
     }
+  }
+
+  /**
+   * Build a custom command with parameter interpolation
+   */
+  buildCustomCommand(
+    commandTemplate: string,
+    parameters: Record<string, string>,
+    parameterConfig?: Record<string, { description: string }>
+  ): string {
+    let command = commandTemplate;
+    const paramNames = Object.keys(parameters);
+
+    // Check if all provided parameters have placeholders or should be appended
+    const hasPlaceholders = paramNames.some((name) => command.includes(`\${${name}}`));
+
+    if (hasPlaceholders) {
+      // Replace all placeholders with validated parameter values
+      for (const [name, value] of Object.entries(parameters)) {
+        const validatedValue = this.validateParameterValue(value, name);
+        const placeholder = `\${${name}}`;
+        command = command.replace(
+          new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          validatedValue
+        );
+      }
+    } else if (paramNames.length > 0 && parameterConfig) {
+      // Append parameters in the order defined in the config
+      const orderedParams = Object.keys(parameterConfig);
+      const appendValues: string[] = [];
+      for (const name of orderedParams) {
+        if (parameters[name] !== undefined) {
+          const validatedValue = this.validateParameterValue(parameters[name], name);
+          appendValues.push(validatedValue);
+        }
+      }
+      if (appendValues.length > 0) {
+        command = `${command} ${appendValues.join(' ')}`;
+      }
+    }
+
+    return command;
   }
 
   private async executeCommand(command: string, toolName: string): Promise<string> {
@@ -167,6 +214,53 @@ export default class GthDevToolkit extends BaseToolkit {
     });
   }
 
+  /**
+   * Create a Zod schema for a custom command's parameters
+   */
+  private createCustomCommandSchema(
+    config: CustomCommandConfig
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): z.ZodObject<any> {
+    if (!config.parameters || Object.keys(config.parameters).length === 0) {
+      return z.object({});
+    }
+
+    const shape: Record<string, z.ZodString> = {};
+    for (const [paramName, paramConfig] of Object.entries(config.parameters)) {
+      shape[paramName] = z.string().describe(paramConfig.description);
+    }
+
+    return z.object(shape);
+  }
+
+  /**
+   * Create a tool for a custom command
+   */
+  private createCustomCommandTool(
+    name: string,
+    config: CustomCommandConfig
+  ): StructuredToolInterface {
+    const schema = this.createCustomCommandSchema(config);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toolFn = async (args: any): Promise<string> => {
+      // All parameters are strings, safe to cast
+      const stringArgs = args as Record<string, string>;
+      const command = this.buildCustomCommand(config.command, stringArgs, config.parameters);
+      return await this.executeCommand(command, name);
+    };
+
+    return createGthTool(
+      toolFn,
+      {
+        name,
+        description: config.description + `\nThe configured command is [${config.command}].`,
+        schema,
+      },
+      'execute'
+    );
+  }
+
   private createTools(): StructuredToolInterface[] {
     const tools: StructuredToolInterface[] = [];
 
@@ -192,7 +286,7 @@ export default class GthDevToolkit extends BaseToolkit {
       tools.push(
         createGthTool(
           async (args: z.infer<typeof RunSingleTestArgsSchema>): Promise<string> => {
-            const validatedPath = this.validateTestPath(args.testPath);
+            const validatedPath = this.validateParameterValue(args.testPath, 'testPath');
             const command = this.buildSingleTestCommand(validatedPath);
             return await this.executeCommand(command, 'run_single_test');
           },
@@ -243,6 +337,13 @@ export default class GthDevToolkit extends BaseToolkit {
           'execute'
         )
       );
+    }
+
+    // Create tools for custom commands
+    if (this.commands.custom_commands) {
+      for (const [name, config] of Object.entries(this.commands.custom_commands)) {
+        tools.push(this.createCustomCommandTool(name, config));
+      }
     }
 
     return tools;
