@@ -850,6 +850,226 @@ Example configuration including dev tools (from .gsloth.config.json):
 Note: For `run_single_test`, the command can include a placeholder like `${testPath}` for the test file path.
 Security validations are in place to prevent path traversal or injection.
 
+## Custom Tools Configuration
+
+Custom tools allow you to define custom shell commands that the AI can execute across all commands or specific commands. Unlike development tools (which are predefined and code-specific), custom tools are fully user-defined and can be used for any purpose: deployment, migration, testing, automation, or any other shell command you need.
+
+### Key Features
+
+- **Available Globally**: Custom tools work in ALL commands (`pr`, `review`, `code`, `ask`, `chat`) by default
+- **Per-Command Control**: Each command can override or disable custom tools
+- **Parameter Support**: Commands can accept dynamic parameters with security validation
+- **Security**: Built-in validation prevents shell injection, directory traversal, and other attacks
+
+### Basic Configuration
+
+Define custom tools at the root level to make them available across all commands:
+
+```json
+{
+  "llm": {
+    "type": "vertexai",
+    "model": "gemini-2.5-pro"
+  },
+  "customTools": {
+    "deploy_staging": {
+      "command": "npm run deploy:staging",
+      "description": "Deploy the application to staging environment"
+    },
+    "run_e2e_tests": {
+      "command": "npm run test:e2e",
+      "description": "Run end-to-end tests"
+    }
+  }
+}
+```
+
+### Custom Tools with Parameters
+
+Custom tools can accept parameters that are validated for security:
+
+```json
+{
+  "customTools": {
+    "run_migration": {
+      "command": "npm run migrate -- ${migrationName}",
+      "description": "Run a specific database migration",
+      "parameters": {
+        "migrationName": {
+          "description": "Name of the migration to run"
+        }
+      }
+    },
+    "docker_build": {
+      "command": "docker build -t ${imageName}:${tag} .",
+      "description": "Build Docker image with specified name and tag",
+      "parameters": {
+        "imageName": {
+          "description": "Name of the Docker image"
+        },
+        "tag": {
+          "description": "Tag for the Docker image"
+        }
+      }
+    }
+  }
+}
+```
+
+**Parameter Interpolation:**
+- Use `${parameterName}` placeholders in commands
+- If no placeholders exist, parameters are appended in definition order
+- All parameters are validated to prevent security issues
+
+### Per-Command Configuration
+
+You can override or disable custom tools for specific commands:
+
+**Override for specific command:**
+```json
+{
+  "customTools": {
+    "deploy": {
+      "command": "npm run deploy:prod",
+      "description": "Deploy to production"
+    }
+  },
+  "commands": {
+    "pr": {
+      "customTools": {
+        "deploy": {
+          "command": "npm run deploy:staging",
+          "description": "Deploy to staging for PR review"
+        }
+      }
+    }
+  }
+}
+```
+
+**Disable for specific command:**
+```json
+{
+  "customTools": {
+    "deploy": {
+      "command": "npm run deploy",
+      "description": "Deploy application"
+    }
+  },
+  "commands": {
+    "review": {
+      "customTools": false
+    }
+  }
+}
+```
+
+**Note:** When a command defines its own `customTools`, it completely replaces the root-level tools for that command (no merging).
+
+### Custom Tools vs Development Tools
+
+| Feature | Custom Tools | Dev Tools |
+|---------|-------------|-----------|
+| **Location** | Root-level `customTools` | `commands.code.devTools` |
+| **Availability** | All commands | Code command only |
+| **Purpose** | User-defined shell commands | Predefined build/test/lint tools |
+| **Per-Command** | Yes | No (code only) |
+| **Parameters** | Yes | Limited (run_single_test only) |
+
+Both can be used together:
+
+```json
+{
+  "customTools": {
+    "deploy": {
+      "command": "npm run deploy",
+      "description": "Deploy application"
+    }
+  },
+  "commands": {
+    "code": {
+      "filesystem": "all",
+      "devTools": {
+        "run_tests": "npm test",
+        "run_lint": "npm run lint-n-fix"
+      }
+    }
+  }
+}
+```
+
+### Security Validation
+
+All custom tool parameters are automatically validated to prevent:
+- **Shell injection**: Blocks `|`, `&`, `;`, `` ` ``, `$`, `$(`, newlines
+- **Directory traversal**: Blocks `..`, `/../`, `\..\\`
+- **Absolute paths**: Only relative paths allowed
+- **Null bytes**: Blocks `\0` characters
+
+Example of a secure custom tool that accepts a file path:
+
+```json
+{
+  "customTools": {
+    "process_file": {
+      "command": "node scripts/process.js ${filePath}",
+      "description": "Process a file in the project",
+      "parameters": {
+        "filePath": {
+          "description": "Relative path to the file to process"
+        }
+      }
+    }
+  }
+}
+```
+
+### Complete Example
+
+```json
+{
+  "llm": {
+    "type": "anthropic",
+    "model": "claude-sonnet-4-5"
+  },
+  "customTools": {
+    "deploy_staging": {
+      "command": "npm run deploy:staging",
+      "description": "Deploy to staging environment"
+    },
+    "run_migration": {
+      "command": "npm run migrate -- ${name}",
+      "description": "Run a database migration",
+      "parameters": {
+        "name": {
+          "description": "Migration name"
+        }
+      }
+    }
+  },
+  "commands": {
+    "pr": {
+      "customTools": {
+        "validate_pr": {
+          "command": "npm run validate:pr",
+          "description": "Run PR validation checks"
+        }
+      }
+    },
+    "review": {
+      "customTools": false
+    },
+    "code": {
+      "filesystem": "all",
+      "devTools": {
+        "run_tests": "npm test",
+        "run_lint": "npm run lint-n-fix"
+      }
+    }
+  }
+}
+```
+
 ## Middleware Configuration
 
 Gaunt Sloth supports middleware to intercept and control agent execution at critical points. Middleware provides hooks for cost optimization, conversation management, and custom logic.
