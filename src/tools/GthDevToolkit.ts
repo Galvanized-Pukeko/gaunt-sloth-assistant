@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { spawn } from 'child_process';
 import path from 'node:path';
 import { displayInfo, displayError } from '#src/utils/consoleUtils.js';
-import { GthDevToolsConfig, CustomCommandConfig } from '#src/config.js';
+import { GthDevToolsConfig } from '#src/config.js';
 import { stdout } from '#src/utils/systemUtils.js';
 
 // Helper function to create a tool with dev type
@@ -117,48 +117,6 @@ export default class GthDevToolkit extends BaseToolkit {
     }
   }
 
-  /**
-   * Build a custom command with parameter interpolation
-   */
-  buildCustomCommand(
-    commandTemplate: string,
-    parameters: Record<string, string>,
-    parameterConfig?: Record<string, { description: string }>
-  ): string {
-    let command = commandTemplate;
-    const paramNames = Object.keys(parameters);
-
-    // Check if all provided parameters have placeholders or should be appended
-    const hasPlaceholders = paramNames.some((name) => command.includes(`\${${name}}`));
-
-    if (hasPlaceholders) {
-      // Replace all placeholders with validated parameter values
-      for (const [name, value] of Object.entries(parameters)) {
-        const validatedValue = this.validateParameterValue(value, name);
-        const placeholder = `\${${name}}`;
-        command = command.replace(
-          new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-          validatedValue
-        );
-      }
-    } else if (paramNames.length > 0 && parameterConfig) {
-      // Append parameters in the order defined in the config
-      const orderedParams = Object.keys(parameterConfig);
-      const appendValues: string[] = [];
-      for (const name of orderedParams) {
-        if (parameters[name] !== undefined) {
-          const validatedValue = this.validateParameterValue(parameters[name], name);
-          appendValues.push(validatedValue);
-        }
-      }
-      if (appendValues.length > 0) {
-        command = `${command} ${appendValues.join(' ')}`;
-      }
-    }
-
-    return command;
-  }
-
   private async executeCommand(command: string, toolName: string): Promise<string> {
     displayInfo(`\n🔧 Executing ${toolName}: ${command}`);
 
@@ -212,53 +170,6 @@ export default class GthDevToolkit extends BaseToolkit {
         reject(new Error(errorMsg));
       });
     });
-  }
-
-  /**
-   * Create a Zod schema for a custom command's parameters
-   */
-  private createCustomCommandSchema(
-    config: CustomCommandConfig
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): z.ZodObject<any> {
-    if (!config.parameters || Object.keys(config.parameters).length === 0) {
-      return z.object({});
-    }
-
-    const shape: Record<string, z.ZodString> = {};
-    for (const [paramName, paramConfig] of Object.entries(config.parameters)) {
-      shape[paramName] = z.string().describe(paramConfig.description);
-    }
-
-    return z.object(shape);
-  }
-
-  /**
-   * Create a tool for a custom command
-   */
-  private createCustomCommandTool(
-    name: string,
-    config: CustomCommandConfig
-  ): StructuredToolInterface {
-    const schema = this.createCustomCommandSchema(config);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toolFn = async (args: any): Promise<string> => {
-      // All parameters are strings, safe to cast
-      const stringArgs = args as Record<string, string>;
-      const command = this.buildCustomCommand(config.command, stringArgs, config.parameters);
-      return await this.executeCommand(command, name);
-    };
-
-    return createGthTool(
-      toolFn,
-      {
-        name,
-        description: config.description + `\nThe configured command is [${config.command}].`,
-        schema,
-      },
-      'execute'
-    );
   }
 
   private createTools(): StructuredToolInterface[] {
@@ -337,15 +248,6 @@ export default class GthDevToolkit extends BaseToolkit {
           'execute'
         )
       );
-    }
-
-    // TODO custom tools should not really be a part of dev tools, they should be either available globally or on every command
-    // TODO extract custom tools into separate configuration note, there's customToolsConfig potentially conflicting `customToolsConfig` with jira
-    // Create tools for custom commands
-    if (this.commands.custom_commands) {
-      for (const [name, config] of Object.entries(this.commands.custom_commands)) {
-        tools.push(this.createCustomCommandTool(name, config));
-      }
     }
 
     return tools;

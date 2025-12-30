@@ -149,7 +149,7 @@ export interface GthConfig {
    * use llm.verbose or `gth --verbose` as more intrusive option, setting verbose to LangChain / LangGraph
    */
   debugLog?: boolean;
-  customToolsConfig?: CustomToolsConfig;
+  customTools?: CustomToolsConfig;
   requirementsProviderConfig?: Record<string, unknown>;
   contentProviderConfig?: Record<string, unknown>;
   /**
@@ -173,6 +173,7 @@ export interface GthConfig {
       requirementsProvider?: string;
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
       logWorkForReviewInSeconds?: number;
       rating?: RatingConfig;
     };
@@ -181,19 +182,23 @@ export interface GthConfig {
       contentProvider?: string;
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
       rating?: RatingConfig;
     };
     ask?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
     };
     chat?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
     };
     code?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
       devTools?: GthDevToolsConfig;
     };
   };
@@ -218,7 +223,7 @@ export interface RawGthConfig extends Omit<GthConfig, 'llm'> {
   llm: LLMConfig;
 }
 
-export type CustomToolsConfig = Record<string, object>;
+export type CustomToolsConfig = Record<string, CustomCommandConfig>;
 export type BuiltInToolsConfig = {
   jira: JiraConfig;
 };
@@ -319,40 +324,6 @@ export interface GthDevToolsConfig {
    * Not applied when config is not provided.
    */
   run_single_test?: string;
-  /**
-   * Custom commands that can be executed by the model.
-   * Each key is the tool name, and the value defines the command configuration.
-   *
-   * Example without parameters:
-   * ```json
-   * {
-   *   "custom_commands": {
-   *     "deploy_staging": {
-   *       "command": "npm run deploy:staging",
-   *       "description": "Deploy the application to staging environment"
-   *     }
-   *   }
-   * }
-   * ```
-   *
-   * Example with parameters:
-   * ```json
-   * {
-   *   "custom_commands": {
-   *     "run_migration": {
-   *       "command": "npm run migrate -- ${migrationName}",
-   *       "description": "Run a specific database migration",
-   *       "parameters": {
-   *         "migrationName": {
-   *           "description": "Name of the migration to run"
-   *         }
-   *       }
-   *     }
-   *   }
-   * }
-   * ```
-   */
-  custom_commands?: Record<string, CustomCommandConfig>;
 }
 
 export interface LLMConfig extends Record<string, unknown> {
