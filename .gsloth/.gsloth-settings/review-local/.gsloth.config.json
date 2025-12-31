@@ -3,9 +3,7 @@
     "type": "openrouter",
     "model": "anthropic/claude-sonnet-4.5"
   },
-  "filesystem": "none",
-  "useColour": false,
-  "writeOutputToFile": "./review.md",
+  "filesystem": "read",
   "includeCurrentDateAfterGuidelines": true,
   "organization": {
     "name": "Galvanized Pukeko",
