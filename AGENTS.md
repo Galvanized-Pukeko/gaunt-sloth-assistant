@@ -66,6 +66,51 @@ npm run format
 npm install -g ./
 ```
 
+## Release Notes
+
+Release notes are stored in `assets/release-notes/` and follow a consistent format.
+
+### Writing Release Notes
+
+When creating release notes for a new version:
+
+1. **File naming**: Use the pattern `v{major}_{minor}_{patch}.md` (e.g., `v1_1_0.md`)
+2. **Title format**: `# v{major}.{minor}.{patch} {Brief Description}`
+3. **Style**: Keep language dry and factual, not excited or marketing-oriented
+
+### Structure
+
+Release notes should include relevant sections:
+
+- **New Features**: Major functionality additions
+- **Potentially Breaking Changes**: Changes that might require user action
+- **Bug Fixes**: Resolved issues
+- **Improvements**: Refactoring, performance, architecture improvements
+- **Maintenance**: Dependency updates, minor fixes
+
+### Guidelines
+
+- Focus on user-facing changes and impacts
+- Omit internal implementation details like specific test counts or documentation updates unless relevant
+- Use concrete examples where helpful
+- For breaking changes, explain what users need to do
+- Reference examples: `v1_0_0.md`, `v1_0_2.md`, `v1_0_4.md`, `v1_0_5.md`
+
+### Example Structure
+
+```markdown
+# v1.1.0 Custom Tools
+
+## New Features
+- **Custom Tools Configuration:** Description of the feature...
+
+## Potentially Breaking Changes
+- Removed unused configuration property...
+
+## Improvements
+- Architectural changes that benefit users...
+```
+
 ## Codebase Architecture
 
 Gaunt Sloth Assistant is a command line AI assistant for software developers, primarily focused on code reviews and question answering.
