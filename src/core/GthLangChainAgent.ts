@@ -1,6 +1,11 @@
 import { getDefaultTools } from '#src/builtInToolsConfig.js';
 import { GthConfig, ServerTool } from '#src/config.js';
-import { GthAgentInterface, GthCommand, StatusLevel, StatusUpdateCallback } from '#src/core/types.js';
+import {
+  GthAgentInterface,
+  GthCommand,
+  StatusLevel,
+  StatusUpdateCallback,
+} from '#src/core/types.js';
 import { createAuthProviderAndAuthenticate } from '#src/mcp/OAuthClientProviderImpl.js';
 import { createA2AAgentTool } from '#src/tools/A2AAgentTool.js';
 import { resolveMiddleware } from '#src/middleware/registry.js';

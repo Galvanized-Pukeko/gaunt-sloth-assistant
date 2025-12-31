@@ -278,7 +278,9 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call, ignoring other info/warning messages
-      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === StatusLevel.DISPLAY);
+      const displayCalls = statusUpdateCallback.mock.calls.filter(
+        (call) => call[0] === StatusLevel.DISPLAY
+      );
       expect(displayCalls.length).toBeGreaterThan(0);
       expect(displayCalls[0]).toEqual([StatusLevel.DISPLAY, 'test response']);
       expect(result).toBe('test response');
@@ -376,7 +378,9 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call, ignoring other info/warning messages
-      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === StatusLevel.DISPLAY);
+      const displayCalls = statusUpdateCallback.mock.calls.filter(
+        (call) => call[0] === StatusLevel.DISPLAY
+      );
       expect(displayCalls.length).toBeGreaterThan(0);
       expect(displayCalls[0]).toEqual([StatusLevel.DISPLAY, 'test response']);
       expect(result).toBe('test response');
@@ -529,7 +533,9 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call to verify result
-      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === StatusLevel.DISPLAY);
+      const displayCalls = statusUpdateCallback.mock.calls.filter(
+        (call) => call[0] === StatusLevel.DISPLAY
+      );
       if (displayCalls.length > 0) {
         expect(displayCalls[0]).toEqual([StatusLevel.DISPLAY, 'test response']);
       }
