@@ -608,7 +608,17 @@ export default class GthFileSystemToolkit extends BaseToolkit {
           displayInfo(`\n📁 Listing directory: ${args.path}\n`);
           const validPath = await this.validatePath(args.path);
           const entries = await fs.readdir(validPath, { withFileTypes: true });
-          return entries
+          const aiignoreConfig = this.aiignoreConfig;
+          const filteredEntries = entries.filter((entry) => {
+            const fullPath = path.join(validPath, entry.name);
+            return !shouldIgnoreFile(
+              fullPath,
+              getProjectDir(),
+              aiignoreConfig?.patterns,
+              aiignoreConfig?.enabled
+            );
+          });
+          return filteredEntries
             .map((entry) => `${entry.isDirectory() ? '[DIR]' : '[FILE]'} ${entry.name}`)
             .join('\n');
         },
@@ -629,9 +639,19 @@ export default class GthFileSystemToolkit extends BaseToolkit {
           displayInfo(`\n📁 Listing directory with sizes: ${args.path}\n`);
           const validPath = await this.validatePath(args.path);
           const entries = await fs.readdir(validPath, { withFileTypes: true });
+          const aiignoreConfig = this.aiignoreConfig;
+          const filteredEntries = entries.filter((entry) => {
+            const fullPath = path.join(validPath, entry.name);
+            return !shouldIgnoreFile(
+              fullPath,
+              getProjectDir(),
+              aiignoreConfig?.patterns,
+              aiignoreConfig?.enabled
+            );
+          });
 
           const detailedEntries = await Promise.all(
-            entries.map(async (entry) => {
+            filteredEntries.map(async (entry) => {
               const entryPath = path.join(validPath, entry.name);
               try {
                 const stats = await fs.stat(entryPath);

@@ -231,17 +231,19 @@ export interface ServerTool extends Record<string, unknown> {
 /**
  * Raw, unprocessed Gaunt Sloth config.
  */
-export interface RawGthConfig extends Omit<GthConfig, 'llm'> {
+export type ConsoleLevelInput =
+  | StatusLevel
+  | keyof typeof StatusLevel
+  | Lowercase<keyof typeof StatusLevel>;
+
+export interface RawGthConfig extends Omit<GthConfig, 'llm' | 'consoleLevel'> {
   llm: LLMConfig;
+  consoleLevel?: ConsoleLevelInput;
 }
 
 export type CustomToolsConfig = Record<string, CustomCommandConfig>;
 export type BuiltInToolsConfig = {
   jira: JiraConfig;
-  aiignore?: {
-    enabled?: boolean;
-    patterns?: string[];
-  };
 };
 
 /**
@@ -739,7 +741,7 @@ function deepMerge<T extends Record<string, unknown>>(
  * Merge config with default config
  */
 async function mergeConfig(
-  partialConfig: Partial<GthConfig>,
+  partialConfig: Omit<Partial<GthConfig>, 'consoleLevel'> & { consoleLevel?: ConsoleLevelInput },
   commandLineConfigOverrides: CommandLineConfigOverrides
 ): Promise<GthConfig> {
   const config = partialConfig as GthConfig;
@@ -786,13 +788,52 @@ async function mergeConfig(
   setUseColour(mergedConfig.useColour);
 
   // Set console logging level
-  if (mergedConfig.consoleLevel) {
-    setConsoleLevel(mergedConfig.consoleLevel);
+  if (mergedConfig.consoleLevel !== undefined) {
+    const resolvedConsoleLevel = resolveConsoleLevel(mergedConfig.consoleLevel);
+    if (resolvedConsoleLevel !== undefined) {
+      mergedConfig.consoleLevel = resolvedConsoleLevel;
+      setConsoleLevel(resolvedConsoleLevel);
+    } else {
+      displayWarning(
+        `Invalid consoleLevel "${String(mergedConfig.consoleLevel)}", using default ${StatusLevel.INFO}.`
+      );
+      mergedConfig.consoleLevel = StatusLevel.INFO;
+      setConsoleLevel(StatusLevel.INFO);
+    }
   }
 
   mergedConfig.canInterruptInferenceWithEsc = mergedConfig.canInterruptInferenceWithEsc && isTTY();
 
   return mergedConfig;
+}
+
+const CONSOLE_LEVELS_BY_NAME: Record<string, StatusLevel> = {
+  debug: StatusLevel.DEBUG,
+  info: StatusLevel.INFO,
+  display: StatusLevel.DISPLAY,
+  success: StatusLevel.SUCCESS,
+  warning: StatusLevel.WARNING,
+  error: StatusLevel.ERROR,
+  stream: StatusLevel.STREAM,
+};
+
+function resolveConsoleLevel(level: ConsoleLevelInput | StatusLevel): StatusLevel | undefined {
+  if (typeof level === 'number') {
+    return StatusLevel[level] !== undefined ? level : undefined;
+  }
+
+  if (typeof level === 'string') {
+    const normalized = level.trim().toLowerCase();
+    if (normalized in CONSOLE_LEVELS_BY_NAME) {
+      return CONSOLE_LEVELS_BY_NAME[normalized];
+    }
+    const enumValue = StatusLevel[level as keyof typeof StatusLevel];
+    if (typeof enumValue === 'number') {
+      return enumValue;
+    }
+  }
+
+  return undefined;
 }
 
 /**
