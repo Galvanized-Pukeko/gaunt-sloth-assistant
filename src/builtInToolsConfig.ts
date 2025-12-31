@@ -61,10 +61,7 @@ async function filterDevTools(
  * Get custom tools based on configuration.
  * Supports global customTools and per-command overrides.
  */
-function getCustomTools(
-  config: GthConfig,
-  command?: GthCommand
-): StructuredToolInterface[] {
+function getCustomTools(config: GthConfig, command?: GthCommand): StructuredToolInterface[] {
   // Determine which custom tools to use
   let toolsConfig: CustomToolsConfig | false | undefined;
 

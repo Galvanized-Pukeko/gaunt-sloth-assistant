@@ -227,5 +227,4 @@ describe('GthDevToolkit - Basic Tests', () => {
       );
     });
   });
-
 });

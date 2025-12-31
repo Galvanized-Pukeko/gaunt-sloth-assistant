@@ -113,7 +113,9 @@ describe('Custom Tools Configuration', () => {
       });
 
       const tools = await getDefaultTools(config, 'pr');
-      const customToolNames = tools.map((t) => t.name).filter((n) => n.startsWith('deploy') || n === 'run_e2e');
+      const customToolNames = tools
+        .map((t) => t.name)
+        .filter((n) => n.startsWith('deploy') || n === 'run_e2e');
       expect(customToolNames).toContain('deploy_staging');
       expect(customToolNames).toContain('deploy_prod');
       expect(customToolNames).toContain('run_e2e');
@@ -151,7 +153,9 @@ describe('Custom Tools Configuration', () => {
       const config = createMockConfig();
 
       const tools = await getDefaultTools(config, 'code');
-      const customTools = tools.filter((t) => !t.name?.startsWith('gth_') && !t.name?.startsWith('run_'));
+      const customTools = tools.filter(
+        (t) => !t.name?.startsWith('gth_') && !t.name?.startsWith('run_')
+      );
       expect(customTools.length).toBe(0);
     });
   });

@@ -213,14 +213,11 @@ export default class GthCustomToolkit extends BaseToolkit {
       return await this.executeCommand(command, name);
     };
 
-    return createCustomTool(
-      toolFn,
-      {
-        name,
-        description: config.description + `\nThe configured command is [${config.command}].`,
-        schema,
-      }
-    );
+    return createCustomTool(toolFn, {
+      name,
+      description: config.description + `\nThe configured command is [${config.command}].`,
+      schema,
+    });
   }
 
   private createTools(): StructuredToolInterface[] {
