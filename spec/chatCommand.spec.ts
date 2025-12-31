@@ -38,7 +38,7 @@ vi.mock('node:fs', () => fsMock);
 const llmUtilsMock = {
   invoke: vi.fn(),
   getNewRunnableConfig: vi.fn().mockReturnValue({
-    recursionLimit: 250,
+    recursionLimit: 1000,
     configurable: { thread_id: 'test-thread-id' },
   }),
   readBackstory: vi.fn().mockReturnValue('Mock backstory'),

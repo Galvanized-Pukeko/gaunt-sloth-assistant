@@ -74,7 +74,7 @@ vi.mock('node:fs', () => ({
 vi.mock('#src/utils/llmUtils.js', () => ({
   invoke: vi.fn().mockResolvedValue('Mock response'),
   getNewRunnableConfig: vi.fn().mockReturnValue({
-    recursionLimit: 250,
+    recursionLimit: 1000,
     configurable: { thread_id: 'test-thread-id' },
   }),
   readBackstory: vi.fn().mockReturnValue('Mock backstory'),

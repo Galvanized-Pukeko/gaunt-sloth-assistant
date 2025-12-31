@@ -117,7 +117,7 @@ describe('GthAgentRunner', () => {
       expect(mockAgent.invoke).toHaveBeenCalledWith(
         messages,
         expect.objectContaining({
-          recursionLimit: 250,
+          recursionLimit: 1000,
           configurable: { thread_id: expect.any(String) },
         })
       );
@@ -143,7 +143,7 @@ describe('GthAgentRunner', () => {
       expect(mockAgent.stream).toHaveBeenCalledWith(
         messages,
         expect.objectContaining({
-          recursionLimit: 250,
+          recursionLimit: 1000,
           configurable: { thread_id: expect.any(String) },
         })
       );
@@ -163,7 +163,7 @@ describe('GthAgentRunner', () => {
       expect(mockAgent.invoke).toHaveBeenCalledWith(
         messages,
         expect.objectContaining({
-          recursionLimit: 250,
+          recursionLimit: 1000,
           configurable: { thread_id: expect.any(String) },
         })
       );

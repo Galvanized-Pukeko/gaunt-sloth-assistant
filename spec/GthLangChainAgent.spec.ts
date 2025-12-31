@@ -239,7 +239,7 @@ describe('GthLangChainAgent', () => {
     it('should throw error if not initialized', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
 
@@ -272,7 +272,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, config);
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
@@ -312,7 +312,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, config);
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       await agent.invoke([new HumanMessage('test message')], runConfig);
@@ -342,7 +342,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, config);
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
@@ -370,7 +370,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, config);
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
@@ -408,7 +408,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, config);
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       await agent.invoke([new HumanMessage('test message')], runConfig);
@@ -463,7 +463,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, config);
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       await agent.invoke([new HumanMessage('test message')], runConfig);
@@ -498,7 +498,7 @@ describe('GthLangChainAgent', () => {
       }
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
@@ -523,7 +523,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, config);
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
@@ -541,7 +541,7 @@ describe('GthLangChainAgent', () => {
     it('should throw error if not initialized', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
 
@@ -583,7 +583,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, streamConfig);
 
       const runConfig: RunnableConfig = {
-        recursionLimit: 250,
+        recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
       const stream = await agent.stream([new HumanMessage('test message')], runConfig);

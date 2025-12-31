@@ -106,7 +106,7 @@ vi.mock('#src/config.js', () => ({
 const llmUtilsMock = {
   invoke: vi.fn().mockResolvedValue('LLM Response'),
   getNewRunnableConfig: vi.fn().mockReturnValue({
-    recursionLimit: 250,
+    recursionLimit: 1000,
     configurable: { thread_id: 'test-thread-id' },
   }),
 };
