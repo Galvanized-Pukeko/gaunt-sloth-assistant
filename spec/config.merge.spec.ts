@@ -9,6 +9,7 @@ const consoleUtilsMock = {
   displayWarning: vi.fn(),
   displaySuccess: vi.fn(),
   displayDebug: vi.fn(),
+  setConsoleLevel: vi.fn(),
 };
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 

@@ -20,7 +20,7 @@ import { GthConfig } from '#src/config.js';
  */
 export function getNewRunnableConfig(): RunnableConfig {
   return {
-    recursionLimit: 250,
+    recursionLimit: 1000,
     configurable: { thread_id: randomUUID() },
   };
 }

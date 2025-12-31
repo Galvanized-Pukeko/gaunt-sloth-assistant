@@ -17,11 +17,13 @@ import {
 } from '#src/constants.js';
 import type { MiddlewareConfig } from '#src/middleware/types.js';
 import { JiraConfig, A2AConfig } from '#src/providers/types.js';
+import { StatusLevel } from '#src/core/types.js';
 import {
   displayDebug,
   displayError,
   displayInfo,
   displayWarning,
+  setConsoleLevel,
 } from '#src/utils/consoleUtils.js';
 import {
   getGslothConfigReadPath,
@@ -149,6 +151,12 @@ export interface GthConfig {
    * use llm.verbose or `gth --verbose` as more intrusive option, setting verbose to LangChain / LangGraph
    */
   debugLog?: boolean;
+  /**
+   * Console logging level. Only messages at or above this level will be displayed.
+   * Valid values: 'debug', 'info', 'display', 'success', 'warning', 'error', 'stream'
+   * Default: 'info' (not debug)
+   */
+  consoleLevel?: StatusLevel;
   customTools?: CustomToolsConfig;
   requirementsProviderConfig?: Record<string, unknown>;
   contentProviderConfig?: Record<string, unknown>;
@@ -406,6 +414,7 @@ export const DEFAULT_CONFIG = {
   projectReviewInstructions: PROJECT_REVIEW_INSTRUCTIONS,
   filesystem: 'read',
   debugLog: false,
+  consoleLevel: StatusLevel.INFO, // Default to INFO level, not debug
   /**
    * Default provider for both requirements and content is GitHub.
    * It needs GitHub CLI (gh).
@@ -500,7 +509,7 @@ export async function initConfig(
         `Failed to read config from ${USER_PROJECT_CONFIG_JSON}, will try other formats.`
       );
       // Continue to try other formats
-      return tryJsConfig(commandLineConfigOverrides);
+      return await tryJsConfig(commandLineConfigOverrides);
     }
   } else {
     // JSON config not found, try JS
@@ -519,16 +528,16 @@ async function tryJsConfig(
     try {
       const i = await importExternalFile(jsConfigPath);
       const customConfig = await i.configure();
-      return mergeConfig(customConfig, commandLineConfigOverrides) as GthConfig;
+      return await mergeConfig(customConfig, commandLineConfigOverrides);
     } catch (e) {
       displayDebug(e instanceof Error ? e : String(e));
       displayError(`Failed to read config from ${USER_PROJECT_CONFIG_JS}, will try other formats.`);
       // Continue to try other formats
-      return tryMjsConfig(commandLineConfigOverrides);
+      return await tryMjsConfig(commandLineConfigOverrides);
     }
   } else {
     // JS config not found, try MJS
-    return tryMjsConfig(commandLineConfigOverrides);
+    return await tryMjsConfig(commandLineConfigOverrides);
   }
 }
 
@@ -543,7 +552,7 @@ async function tryMjsConfig(
     try {
       const i = await importExternalFile(mjsConfigPath);
       const customConfig = await i.configure();
-      return mergeConfig(customConfig, commandLineConfigOverrides) as GthConfig;
+      return await mergeConfig(customConfig, commandLineConfigOverrides);
     } catch (e) {
       displayDebug(e instanceof Error ? e : String(e));
       displayError(`Failed to read config from ${USER_PROJECT_CONFIG_MJS}.`);
@@ -594,9 +603,9 @@ export async function tryJsonConfig(
         const llm = (await configModule.processJsonConfig(llmConfig)) as BaseChatModel;
         const mergedConfig = mergeRawConfig(jsonConfig, llm, commandLineConfigOverrides);
         if (configModule.postProcessJsonConfig) {
-          return configModule.postProcessJsonConfig(mergedConfig);
+          return await configModule.postProcessJsonConfig(mergedConfig);
         } else {
-          return mergedConfig;
+          return await mergedConfig;
         }
       } else {
         displayWarning(`Config module for ${llmType} does not have processJsonConfig function.`);
@@ -729,10 +738,10 @@ function deepMerge<T extends Record<string, unknown>>(
 /**
  * Merge config with default config
  */
-function mergeConfig(
+async function mergeConfig(
   partialConfig: Partial<GthConfig>,
   commandLineConfigOverrides: CommandLineConfigOverrides
-): GthConfig {
+): Promise<GthConfig> {
   const config = partialConfig as GthConfig;
 
   // Deep merge command configs while preserving defaults
@@ -776,6 +785,11 @@ function mergeConfig(
   // Set the useColour value in systemUtils
   setUseColour(mergedConfig.useColour);
 
+  // Set console logging level
+  if (mergedConfig.consoleLevel) {
+    setConsoleLevel(mergedConfig.consoleLevel);
+  }
+
   mergedConfig.canInterruptInferenceWithEsc = mergedConfig.canInterruptInferenceWithEsc && isTTY();
 
   return mergedConfig;
@@ -784,11 +798,11 @@ function mergeConfig(
 /**
  * Merge raw with default config
  */
-function mergeRawConfig(
+async function mergeRawConfig(
   config: RawGthConfig,
   llm: BaseChatModel,
   commandLineConfigOverrides: CommandLineConfigOverrides
-): GthConfig {
+): Promise<GthConfig> {
   const modelDisplayName: string | undefined = config.llm?.model;
-  return mergeConfig({ ...config, llm, modelDisplayName }, commandLineConfigOverrides);
+  return await mergeConfig({ ...config, llm, modelDisplayName }, commandLineConfigOverrides);
 }

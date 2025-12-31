@@ -1,7 +1,7 @@
-import { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
-import { StatusLevel } from '#src/core/types.js';
+import { StatusLevel, StatusUpdateCallback } from '#src/core/types.js';
 import * as su from '#src/utils/systemUtils.js';
 import { closeLogStream, initLogStream, stream, writeToLogStream } from '#src/utils/systemUtils.js';
+import { debugLog } from '#src/utils/debugUtils.js';
 
 // Internal state for session logging
 interface LoggingState {
@@ -9,9 +9,18 @@ interface LoggingState {
   enableSessionLogging: boolean;
 }
 
+// Internal state for console level control
+interface ConsoleLevelState {
+  currentLevel: StatusLevel;
+}
+
 const loggingState: LoggingState = {
   sessionLogFile: undefined,
   enableSessionLogging: false,
+};
+
+const consoleLevelState: ConsoleLevelState = {
+  currentLevel: StatusLevel.INFO, // Default to INFO level, not debug
 };
 
 // ANSI color codes
@@ -51,6 +60,40 @@ export const initSessionLogging = (logFileName: string, enableLogging: boolean):
   }
 };
 
+/**
+ * Set the console logging level.
+ * Only messages at or above this level will be displayed.
+ * @param level - The minimum level to display
+ */
+export const setConsoleLevel = (level: StatusLevel): void => {
+  consoleLevelState.currentLevel = level;
+};
+
+/**
+ * Get the current console logging level.
+ * @returns The current console level
+ */
+export const getConsoleLevel = (): StatusLevel => {
+  return consoleLevelState.currentLevel;
+};
+
+/**
+ * Reset console level to default (INFO) for testing purposes
+ */
+export const resetConsoleLevel = (): void => {
+  consoleLevelState.currentLevel = StatusLevel.INFO;
+};
+
+/**
+ * Check if a given status level should be displayed based on current console level.
+ * @param level - The status level to check
+ * @returns true if the level should be displayed
+ */
+function shouldDisplayLevel(level: StatusLevel): boolean {
+  // Use enum values for comparison (higher values = more verbose)
+  return level >= consoleLevelState.currentLevel;
+}
+
 export const flushSessionLog = (): void => {
   // Streams auto-flush, so this is now a no-op for API compatibility
   // Could potentially force flush if needed in the future
@@ -63,30 +106,35 @@ export const stopSessionLogging = (): void => {
 };
 
 export function displayError(message: string): void {
+  if (!shouldDisplayLevel(StatusLevel.ERROR)) return;
   const coloredMessage = colorText(message, 'red');
   writeToSessionLog(message + '\n');
   su.log(coloredMessage);
 }
 
 export function displayWarning(message: string): void {
+  if (!shouldDisplayLevel(StatusLevel.WARNING)) return;
   const coloredMessage = colorText(message, 'yellow');
   writeToSessionLog(message + '\n');
   su.warn(coloredMessage);
 }
 
 export function displaySuccess(message: string): void {
+  if (!shouldDisplayLevel(StatusLevel.SUCCESS)) return;
   const coloredMessage = colorText(message, 'green');
   writeToSessionLog(message + '\n');
   su.log(coloredMessage);
 }
 
 export function displayInfo(message: string): void {
+  if (!shouldDisplayLevel(StatusLevel.INFO)) return;
   const coloredMessage = colorText(message, 'dim');
   writeToSessionLog(message + '\n');
   su.info(coloredMessage);
 }
 
 export function display(message: string): void {
+  if (!shouldDisplayLevel(StatusLevel.DISPLAY)) return;
   writeToSessionLog(message + '\n');
   su.log(message);
 }
@@ -95,15 +143,25 @@ export function formatInputPrompt(message: string): string {
   return colorText(message, 'magenta');
 }
 
+/**
+ * Display a debug message to the console and log it.
+ * This function also integrates with debugUtils to output logs when at debug level.
+ * Note: There is also a dedicated debug() function in debugUtils for more detailed logging.
+ * @param message - The message to display (string, Error, or undefined)
+ */
 export function displayDebug(message: string | Error | undefined): void {
-  // TODO make it controlled by config
+  if (!shouldDisplayLevel(StatusLevel.DEBUG)) return;
   if (message instanceof Error) {
     const stackTrace = message.stack || '';
     writeToSessionLog(stackTrace + '\n');
     su.debug(stackTrace);
+    // Also log to debugUtils when at debug level
+    debugLog(stackTrace);
   } else if (message !== undefined) {
     writeToSessionLog(message + '\n');
     su.debug(message);
+    // Also log to debugUtils when at debug level
+    debugLog(message);
   }
 }
 
@@ -113,27 +171,29 @@ export const defaultStatusCallback: StatusUpdateCallback = (
   message: string
 ) => {
   switch (level) {
-    case 'info':
+    case StatusLevel.INFO:
       displayInfo(message);
       break;
-    case 'warning':
+    case StatusLevel.WARNING:
       displayWarning(message);
       break;
-    case 'error':
+    case StatusLevel.ERROR:
       displayError(message);
       break;
-    case 'success':
+    case StatusLevel.SUCCESS:
       displaySuccess(message);
       break;
-    case 'debug':
+    case StatusLevel.DEBUG:
       displayDebug(message);
       break;
-    case 'display':
+    case StatusLevel.DISPLAY:
       display(message);
       break;
-    case 'stream':
-      writeToSessionLog(message);
-      stream(message);
+    case StatusLevel.STREAM:
+      if (shouldDisplayLevel(StatusLevel.STREAM)) {
+        writeToSessionLog(message);
+        stream(message);
+      }
       break;
   }
 };

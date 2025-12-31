@@ -1,8 +1,7 @@
 import { GthConfig } from '#src/config.js';
+import { StatusLevel, StatusUpdateCallback } from '#src/core/types.js';
 import { DynamicStructuredTool, ToolSchemaBase } from '@langchain/core/tools';
 import { ChatVertexAI } from '@langchain/google-vertexai';
-
-type StatusUpdateCallback = (level: 'info', message: string) => void;
 
 type JsonInputSchema = {
   type?: string | string[];
@@ -280,7 +279,7 @@ export function prepareMcpTools(
   if (!isVertexLlm(config)) {
     return tools;
   }
-  const log = (msg: string): void => statusUpdate('info', msg);
+  const log = (msg: string): void => statusUpdate(StatusLevel.INFO, msg);
   log('converting tools for Vertex AI LLM to avoid schema issues.');
   return tools.map((tool) => updateToolSchema(tool, log));
 }

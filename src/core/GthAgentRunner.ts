@@ -1,8 +1,8 @@
 import type { Message } from '#src/modules/types.js';
 import { GthConfig } from '#src/config.js';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
-import { GthAgentInterface, GthCommand } from '#src/core/types.js';
-import { GthLangChainAgent, StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
+import { GthAgentInterface, GthCommand, StatusUpdateCallback } from '#src/core/types.js';
+import { GthLangChainAgent } from '#src/core/GthLangChainAgent.js';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { getNewRunnableConfig } from '#src/utils/llmUtils.js';
 import {

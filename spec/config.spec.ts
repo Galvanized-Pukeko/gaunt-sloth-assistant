@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RawGthConfig } from '#src/config.js';
+import { StatusLevel } from '#src/core/types.js';
 import { platform } from 'node:os';
 
 const fsMock = {
@@ -21,6 +22,7 @@ const consoleUtilsMock = {
   displayWarning: vi.fn(),
   displaySuccess: vi.fn(),
   displayDebug: vi.fn(),
+  setConsoleLevel: vi.fn(),
 };
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
@@ -109,6 +111,7 @@ describe('config', async () => {
       expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'vertexai' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -192,6 +195,7 @@ describe('config', async () => {
       expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'anthropic' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -274,6 +278,7 @@ describe('config', async () => {
       expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'groq' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -734,6 +739,7 @@ describe('config', async () => {
       expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: mockLlm,
         modelDisplayName: 'test-model',
         contentProvider: 'file',

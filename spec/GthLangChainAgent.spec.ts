@@ -5,7 +5,7 @@ import type { GthConfig } from '#src/config.js';
 import type { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { FakeListChatModel, FakeStreamingChatModel } from '@langchain/core/utils/testing';
 import type { RunnableConfig } from '@langchain/core/runnables';
-import type { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
+import { StatusLevel, type StatusUpdateCallback } from '#src/core/types.js';
 
 const systemUtilsMock = {
   getProjectDir: vi.fn(),
@@ -183,7 +183,7 @@ describe('GthLangChainAgent', () => {
       await agent.init(undefined, configWithTools);
 
       expect(statusUpdateCallback).toHaveBeenCalledWith(
-        'info',
+        StatusLevel.INFO,
         'Loaded tools: custom_tool_1, custom_tool_2, custom_tool_3'
       );
     });
@@ -278,9 +278,9 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call, ignoring other info/warning messages
-      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === 'display');
+      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === StatusLevel.DISPLAY);
       expect(displayCalls.length).toBeGreaterThan(0);
-      expect(displayCalls[0]).toEqual(['display', 'test response']);
+      expect(displayCalls[0]).toEqual([StatusLevel.DISPLAY, 'test response']);
       expect(result).toBe('test response');
     });
 
@@ -348,7 +348,7 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       expect(statusUpdateCallback).toHaveBeenCalledWith(
-        'warning',
+        StatusLevel.WARNING,
         expect.stringContaining('Something went wrong')
       );
       expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
@@ -376,9 +376,9 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call, ignoring other info/warning messages
-      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === 'display');
+      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === StatusLevel.DISPLAY);
       expect(displayCalls.length).toBeGreaterThan(0);
-      expect(displayCalls[0]).toEqual(['display', 'test response']);
+      expect(displayCalls[0]).toEqual([StatusLevel.DISPLAY, 'test response']);
       expect(result).toBe('test response');
     });
 
@@ -504,7 +504,7 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
       expect(result).toBe('Tool execution failed: Tool failed');
       expect(statusUpdateCallback).toHaveBeenCalledWith(
-        'error',
+        StatusLevel.ERROR,
         'Tool execution failed: Tool failed'
       );
     });
@@ -529,9 +529,9 @@ describe('GthLangChainAgent', () => {
       const result = await agent.invoke([new HumanMessage('test message')], runConfig);
 
       // Check for the display call to verify result
-      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === 'display');
+      const displayCalls = statusUpdateCallback.mock.calls.filter((call) => call[0] === StatusLevel.DISPLAY);
       if (displayCalls.length > 0) {
-        expect(displayCalls[0]).toEqual(['display', 'test response']);
+        expect(displayCalls[0]).toEqual([StatusLevel.DISPLAY, 'test response']);
       }
       expect(result).toBe('test response');
     });
@@ -748,7 +748,7 @@ describe('GthLangChainAgent', () => {
       agent.getEffectiveConfig(config, undefined);
 
       expect(statusUpdateCallback).toHaveBeenCalledWith(
-        'warning',
+        StatusLevel.WARNING,
         'Model does not seem to support tools.'
       );
     });
