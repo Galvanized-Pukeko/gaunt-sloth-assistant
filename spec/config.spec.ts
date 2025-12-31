@@ -885,7 +885,7 @@ describe('config', async () => {
       expect(systemUtilsMock.exit).toHaveBeenCalledWith(1);
     });
 
-    it('Should handle mcpServers and customToolsConfig', async () => {
+    it('Should handle mcpServers and customTools', async () => {
       const jsonConfig = {
         llm: {
           type: 'vertexai',
@@ -898,10 +898,10 @@ describe('config', async () => {
             args: ['hello'],
           },
         },
-        customToolsConfig: {
-          jira: {
-            baseUrl: 'https://example.atlassian.net',
-            username: 'user@example.com',
+        customTools: {
+          deploy: {
+            command: 'npm run deploy',
+            description: 'Deploy application',
           },
         },
         builtInTools: ['jira', 'github'],
@@ -920,7 +920,7 @@ describe('config', async () => {
         command: 'echo',
         args: ['hello'],
       });
-      expect(config.customToolsConfig).toBeDefined();
+      expect(config.customTools).toBeDefined();
       expect(config.builtInTools).toEqual(['jira', 'github']);
     });
 

@@ -39,6 +39,7 @@ The promise of Gaunt Sloth:
 - Answers questions about provided code;
 - Writes code;
 - Connects to MCP server (including remote MCP with OAuth);
+- Executes custom shell commands (deployments, migrations, tests, etc.) with security validation;
 - Saves all responses in timestamped `.md` files (override with `-w/--write-output-to-file`);
 - Anything else you need, when combined with other command line tools.
 
@@ -153,6 +154,36 @@ Currently, openrouter, anthropic, groq, deepseek, openai, google-genai, vertexai
 For OpenAI-compatible providers like Inception, use `gsloth init openai` and modify the configuration.
 
 More detailed information on configuration can be found in [CONFIGURATION.md](./docs/CONFIGURATION.md)
+
+### Custom Tools
+
+Gaunt Sloth supports defining custom shell commands that the AI can execute. These custom tools:
+- Work across all commands (`pr`, `review`, `code`, `ask`, `chat`)
+- Can be configured globally or per-command
+- Support parameters with security validation
+- Are useful for deployments, migrations, automation, and more
+
+**Example configuration:**
+```json
+{
+  "llm": {"type": "vertexai", "model": "gemini-2.5-pro"},
+  "customTools": {
+    "deploy": {
+      "command": "npm run deploy",
+      "description": "Deploy the application"
+    },
+    "run_migration": {
+      "command": "npm run migrate -- ${name}",
+      "description": "Run a database migration",
+      "parameters": {
+        "name": {"description": "Migration name"}
+      }
+    }
+  }
+}
+```
+
+See [Custom Tools Configuration](./docs/CONFIGURATION.md#custom-tools-configuration) for complete documentation.
 
 ### Google GenAI (AI Studio)
 

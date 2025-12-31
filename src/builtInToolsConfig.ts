@@ -4,11 +4,12 @@
  */
 import GthFileSystemToolkit from '#src/tools/GthFileSystemToolkit.js';
 import { StructuredToolInterface } from '@langchain/core/tools';
-import { GthDevToolsConfig, GthConfig } from '#src/config.js';
+import { GthDevToolsConfig, GthConfig, CustomToolsConfig } from '#src/config.js';
 import { displayWarning } from '#src/utils/consoleUtils.js';
 import { getProjectDir } from '#src/utils/systemUtils.js';
 import { GthCommand } from '#src/core/types.js';
 import GthDevToolkit from '#src/tools/GthDevToolkit.js';
+import GthCustomToolkit from '#src/tools/GthCustomToolkit.js';
 
 /**
  * Available built-in tools may be configured in JSON config, see `builtInTools` of {@link GthConfig}.
@@ -41,7 +42,8 @@ export async function getDefaultTools(
   const filesystemTools = filterFilesystemTools(config.filesystem);
   const builtInTools = await getBuiltInTools(config);
   const devTools = await filterDevTools(command, config.commands?.code?.devTools);
-  return [...filesystemTools, ...devTools, ...builtInTools];
+  const customTools = getCustomTools(config, command);
+  return [...filesystemTools, ...devTools, ...customTools, ...builtInTools];
 }
 
 async function filterDevTools(
@@ -53,6 +55,38 @@ async function filterDevTools(
   }
   const toolkit = new GthDevToolkit(devToolConfig);
   return [...toolkit.getTools()];
+}
+
+/**
+ * Get custom tools based on configuration.
+ * Supports global customTools and per-command overrides.
+ */
+function getCustomTools(config: GthConfig, command?: GthCommand): StructuredToolInterface[] {
+  // Determine which custom tools to use
+  let toolsConfig: CustomToolsConfig | false | undefined;
+
+  if (command && config.commands?.[command]) {
+    const cmdConfig = config.commands[command];
+    // Check if command has customTools override
+    if ('customTools' in cmdConfig) {
+      toolsConfig = cmdConfig.customTools;
+    } else {
+      // No override, use root-level
+      toolsConfig = config.customTools;
+    }
+  } else {
+    // No command specified or no command config, use root-level
+    toolsConfig = config.customTools;
+  }
+
+  // If explicitly disabled or empty, return no tools
+  if (toolsConfig === false || !toolsConfig || Object.keys(toolsConfig).length === 0) {
+    return [];
+  }
+
+  // Create toolkit with the determined config
+  const toolkit = new GthCustomToolkit(toolsConfig);
+  return toolkit.getTools();
 }
 
 /**

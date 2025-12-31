@@ -108,46 +108,6 @@ describe('GthDevToolkit - Basic Tests', () => {
     });
   });
 
-  describe('validateTestPath', () => {
-    beforeEach(() => {
-      toolkit = new GthDevToolkit({});
-    });
-
-    it('should allow valid relative paths', () => {
-      expect(toolkit['validateTestPath']('spec/test.spec.ts')).toBe(
-        path.normalize('spec/test.spec.ts')
-      );
-    });
-
-    it('should throw on absolute paths', () => {
-      expect(() => toolkit['validateTestPath']('/absolute/path')).toThrow(
-        'Absolute paths are not allowed'
-      );
-    });
-
-    it('should throw on directory traversal', () => {
-      expect(() => toolkit['validateTestPath']('../secret')).toThrow(
-        'Directory traversal attempts are not allowed'
-      );
-      expect(() => toolkit['validateTestPath']('dir/../../secret')).toThrow(
-        'Directory traversal attempts are not allowed'
-      );
-    });
-
-    it('should throw on shell injection attempts', () => {
-      expect(() => toolkit['validateTestPath']('test|rm -rf')).toThrow(
-        'Shell injection attempts are not allowed'
-      );
-      expect(() => toolkit['validateTestPath']('test; evil')).toThrow(
-        'Shell injection attempts are not allowed'
-      );
-    });
-
-    it('should normalize paths', () => {
-      expect(toolkit['validateTestPath']('dir//subdir')).toBe(path.normalize('dir//subdir'));
-    });
-  });
-
   describe('buildSingleTestCommand', () => {
     it('should build command with placeholder', () => {
       toolkit = new GthDevToolkit({ run_single_test: 'npm test -- ${testPath}' });
@@ -237,10 +197,33 @@ describe('GthDevToolkit - Basic Tests', () => {
       expect(result).toContain(`Command 'npm test -- ${normalizedPath}' completed successfully`);
     });
 
-    it('should reject invalid path in run_single_test', async () => {
+    it('should reject directory traversal in run_single_test', async () => {
       const tool = toolkit.tools.find((t) => t.name === 'run_single_test')!;
       await expect(tool.invoke({ testPath: '../invalid' })).rejects.toThrow(
-        'Directory traversal attempts are not allowed'
+        "Directory traversal attempts are not allowed in parameter 'testPath'"
+      );
+      await expect(tool.invoke({ testPath: 'dir/../../secret' })).rejects.toThrow(
+        "Directory traversal attempts are not allowed in parameter 'testPath'"
+      );
+    });
+
+    it('should reject absolute paths in run_single_test', async () => {
+      const tool = toolkit.tools.find((t) => t.name === 'run_single_test')!;
+      await expect(tool.invoke({ testPath: '/absolute/path/test.ts' })).rejects.toThrow(
+        "Absolute paths are not allowed for parameter 'testPath'"
+      );
+    });
+
+    it('should reject shell injection in run_single_test', async () => {
+      const tool = toolkit.tools.find((t) => t.name === 'run_single_test')!;
+      await expect(tool.invoke({ testPath: 'test|rm -rf' })).rejects.toThrow(
+        "Shell injection attempts are not allowed in parameter 'testPath'"
+      );
+      await expect(tool.invoke({ testPath: 'test; evil' })).rejects.toThrow(
+        "Shell injection attempts are not allowed in parameter 'testPath'"
+      );
+      await expect(tool.invoke({ testPath: 'test`evil`' })).rejects.toThrow(
+        "Shell injection attempts are not allowed in parameter 'testPath'"
       );
     });
   });

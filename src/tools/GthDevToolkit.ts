@@ -25,7 +25,7 @@ function createGthTool<T extends z.ZodSchema>(
   return toolInstance;
 }
 
-// Schema definitions
+// Schema definitions for built-in tools
 const RunTestsArgsSchema = z.object({});
 const RunLintArgsSchema = z.object({});
 const RunBuildArgsSchema = z.object({});
@@ -34,6 +34,7 @@ const RunSingleTestArgsSchema = z.object({
 });
 
 const TEST_PATH_PLACEHOLDER = '${testPath}';
+
 export default class GthDevToolkit extends BaseToolkit {
   tools: StructuredToolInterface[];
   private commands: GthDevToolsConfig;
@@ -56,43 +57,47 @@ export default class GthDevToolkit extends BaseToolkit {
   }
 
   /**
-   * Validate test path to prevent security issues
+   * Validate parameter value to prevent security issues
    */
-  private validateTestPath(testPath: string): string {
+  validateParameterValue(paramValue: string, paramName: string): string {
     // Check for absolute paths
-    if (path.isAbsolute(testPath)) {
-      throw new Error('Absolute paths are not allowed for test files');
+    if (path.isAbsolute(paramValue)) {
+      throw new Error(`Absolute paths are not allowed for parameter '${paramName}'`);
     }
 
     // Check for directory traversal attempts
-    if (testPath.includes('..') || testPath.includes('\\..\\') || testPath.includes('/../')) {
-      throw new Error('Directory traversal attempts are not allowed');
+    if (paramValue.includes('..') || paramValue.includes('\\..\\') || paramValue.includes('/../')) {
+      throw new Error(`Directory traversal attempts are not allowed in parameter '${paramName}'`);
     }
 
     // Check for pipe attempts and other shell injection
     if (
-      testPath.includes('|') ||
-      testPath.includes('&') ||
-      testPath.includes(';') ||
-      testPath.includes('`')
+      paramValue.includes('|') ||
+      paramValue.includes('&') ||
+      paramValue.includes(';') ||
+      paramValue.includes('`') ||
+      paramValue.includes('$') ||
+      paramValue.includes('$(') ||
+      paramValue.includes('\n') ||
+      paramValue.includes('\r')
     ) {
-      throw new Error('Shell injection attempts are not allowed');
+      throw new Error(`Shell injection attempts are not allowed in parameter '${paramName}'`);
     }
 
     // Check for null bytes
-    if (testPath.includes('\0')) {
-      throw new Error('Null bytes are not allowed in test path');
+    if (paramValue.includes('\0')) {
+      throw new Error(`Null bytes are not allowed in parameter '${paramName}'`);
     }
 
     // Normalize the path to remove any redundant separators
-    const normalizedPath = path.normalize(testPath);
+    const normalizedValue = path.normalize(paramValue);
 
     // Double-check after normalization
-    if (normalizedPath.includes('..')) {
-      throw new Error('Directory traversal attempts are not allowed');
+    if (normalizedValue.includes('..')) {
+      throw new Error(`Directory traversal attempts are not allowed in parameter '${paramName}'`);
     }
 
-    return normalizedPath;
+    return normalizedValue;
   }
 
   /**
@@ -192,7 +197,7 @@ export default class GthDevToolkit extends BaseToolkit {
       tools.push(
         createGthTool(
           async (args: z.infer<typeof RunSingleTestArgsSchema>): Promise<string> => {
-            const validatedPath = this.validateTestPath(args.testPath);
+            const validatedPath = this.validateParameterValue(args.testPath, 'testPath');
             const command = this.buildSingleTestCommand(validatedPath);
             return await this.executeCommand(command, 'run_single_test');
           },

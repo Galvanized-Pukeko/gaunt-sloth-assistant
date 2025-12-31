@@ -149,7 +149,7 @@ export interface GthConfig {
    * use llm.verbose or `gth --verbose` as more intrusive option, setting verbose to LangChain / LangGraph
    */
   debugLog?: boolean;
-  customToolsConfig?: CustomToolsConfig;
+  customTools?: CustomToolsConfig;
   requirementsProviderConfig?: Record<string, unknown>;
   contentProviderConfig?: Record<string, unknown>;
   /**
@@ -173,6 +173,7 @@ export interface GthConfig {
       requirementsProvider?: string;
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
       logWorkForReviewInSeconds?: number;
       rating?: RatingConfig;
     };
@@ -181,19 +182,23 @@ export interface GthConfig {
       contentProvider?: string;
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
       rating?: RatingConfig;
     };
     ask?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
     };
     chat?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
     };
     code?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
+      customTools?: CustomToolsConfig | false;
       devTools?: GthDevToolsConfig;
     };
   };
@@ -218,7 +223,7 @@ export interface RawGthConfig extends Omit<GthConfig, 'llm'> {
   llm: LLMConfig;
 }
 
-export type CustomToolsConfig = Record<string, object>;
+export type CustomToolsConfig = Record<string, CustomCommandConfig>;
 export type BuiltInToolsConfig = {
   jira: JiraConfig;
 };
@@ -254,6 +259,40 @@ export interface RatingConfig {
    * @default true
    */
   errorOnReviewFail?: boolean;
+}
+
+/**
+ * Configuration for a custom command parameter.
+ * Parameters allow the model to provide dynamic values to commands.
+ */
+export interface CustomCommandParameter {
+  /**
+   * Description of the parameter shown to the model.
+   */
+  description: string;
+}
+
+/**
+ * Configuration for a custom command.
+ * Custom commands can be executed with or without parameters.
+ */
+export interface CustomCommandConfig {
+  /**
+   * The shell command to execute.
+   * Can include placeholders like ${paramName} that will be replaced with parameter values.
+   * If no placeholder is present and parameters are provided, they are appended to the command.
+   */
+  command: string;
+  /**
+   * Description of what this command does, shown to the model.
+   */
+  description: string;
+  /**
+   * Optional parameters that the model can provide when calling this command.
+   * Each parameter has a name (the key) and a description.
+   * Parameters are validated for security (no shell injection, directory traversal, etc.).
+   */
+  parameters?: Record<string, CustomCommandParameter>;
 }
 
 /**
