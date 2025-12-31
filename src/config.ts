@@ -167,6 +167,10 @@ export interface GthConfig {
    */
   a2aAgents?: Record<string, A2AConfig>;
   builtInToolsConfig?: BuiltInToolsConfig;
+  aiignore?: {
+    enabled?: boolean;
+    patterns?: string[];
+  };
   commands?: {
     pr?: {
       contentProvider?: string;
@@ -226,6 +230,10 @@ export interface RawGthConfig extends Omit<GthConfig, 'llm'> {
 export type CustomToolsConfig = Record<string, CustomCommandConfig>;
 export type BuiltInToolsConfig = {
   jira: JiraConfig;
+  aiignore?: {
+    enabled?: boolean;
+    patterns?: string[];
+  };
 };
 
 /**
@@ -437,6 +445,10 @@ export const DEFAULT_CONFIG = {
   useColour: true,
   streamSessionInferenceLog: true,
   canInterruptInferenceWithEsc: true,
+  aiignore: {
+    enabled: true,
+    patterns: undefined,
+  },
 } as const;
 
 /**

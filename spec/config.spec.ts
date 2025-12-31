@@ -118,6 +118,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
@@ -197,6 +201,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
@@ -275,6 +283,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
@@ -734,6 +746,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         commands: {
           pr: {
@@ -1055,6 +1071,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {
@@ -1118,6 +1138,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {
@@ -1181,6 +1205,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {
