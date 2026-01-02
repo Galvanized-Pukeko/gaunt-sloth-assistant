@@ -15,8 +15,8 @@ jobs:
       matrix:
         # only test macOS and Windows, linux is tested in all other variations
         os: [macos-latest, windows-latest]
-        node-version: [24.x]
-        provider: [groq]
+        node-version: [24.x, latest]
+        provider: [openrouter]
       max-parallel: 2
 
     steps:
