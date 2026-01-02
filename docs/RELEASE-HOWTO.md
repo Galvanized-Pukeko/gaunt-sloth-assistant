@@ -17,8 +17,7 @@ For patch, e.g., from 0.0.8 to 0.0.9
 
 ```bash
 npm version patch -m "Release notes"
-git push
-git push --tags
+git push --follow-tags
 ```
 
 For minor, e.g., from 0.0.8 to 0.1.0
