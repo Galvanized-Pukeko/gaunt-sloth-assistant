@@ -14,8 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [24.x, latest]
-        provider: [groq, inception, openrouter]
-      max-parallel: 2
+        provider: [groq, inception, openrouter, xai]
+      max-parallel: 3
 
     steps:
     - uses: actions/checkout@v4
