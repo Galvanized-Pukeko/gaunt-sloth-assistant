@@ -1,6 +1,11 @@
 import { getDefaultTools } from '#src/builtInToolsConfig.js';
 import { GthConfig, ServerTool } from '#src/config.js';
-import { GthAgentInterface, GthCommand, StatusLevel } from '#src/core/types.js';
+import {
+  GthAgentInterface,
+  GthCommand,
+  StatusLevel,
+  StatusUpdateCallback,
+} from '#src/core/types.js';
 import { createAuthProviderAndAuthenticate } from '#src/mcp/OAuthClientProviderImpl.js';
 import { createA2AAgentTool } from '#src/tools/A2AAgentTool.js';
 import { resolveMiddleware } from '#src/middleware/registry.js';
@@ -19,8 +24,6 @@ import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
 import { createAgent, createMiddleware } from 'langchain';
 import { prepareMcpTools } from '#src/utils/mcpUtils.js';
-
-export type StatusUpdateCallback = (level: StatusLevel, message: string) => void;
 
 export class GthLangChainAgent implements GthAgentInterface {
   private statusUpdate: StatusUpdateCallback;
@@ -51,7 +54,7 @@ export class GthLangChainAgent implements GthAgentInterface {
     });
 
     if (this.config.modelDisplayName) {
-      this.statusUpdate('info', `Model: ${this.config.modelDisplayName}`);
+      this.statusUpdate(StatusLevel.INFO, `Model: ${this.config.modelDisplayName}`);
     }
 
     this.mcpClient = await this.getMcpClient(this.config);
@@ -82,7 +85,7 @@ export class GthLangChainAgent implements GthAgentInterface {
         .map((tool) => tool.name)
         .filter((name) => name)
         .join(', ');
-      this.statusUpdate('info', `Loaded tools: ${toolNames}`);
+      this.statusUpdate(StatusLevel.INFO, `Loaded tools: ${toolNames}`);
       debugLog(`Total tools available: ${tools.length}`);
       debugLogObject('All Tools', toolNames.split(', '));
     }
@@ -106,7 +109,7 @@ export class GthLangChainAgent implements GthAgentInterface {
           lastMessage.tool_calls?.length > 0
         ) {
           this.statusUpdate(
-            'info',
+            StatusLevel.INFO,
             `\nRequested tools: ${formatToolCalls(lastMessage.tool_calls)}\n`
           );
         }
@@ -117,7 +120,10 @@ export class GthLangChainAgent implements GthAgentInterface {
     // Combine all middleware
     const middleware = [...configuredMiddleware, toolCallStatusMiddleware];
 
-    this.statusUpdate('info', `Loaded middleware: ${middleware.map((m) => m.name).join(', ')}`);
+    this.statusUpdate(
+      StatusLevel.INFO,
+      `Loaded middleware: ${middleware.map((m) => m.name).join(', ')}`
+    );
 
     // Create agent with configured middleware
     this.agent = createAgent({
@@ -150,14 +156,14 @@ export class GthLangChainAgent implements GthAgentInterface {
         debugLog('Calling agent.invoke...');
         const response = await this.agent.invoke({ messages }, runConfig);
         const aiMessage = response.messages[response.messages.length - 1].content as string;
-        this.statusUpdate('display', aiMessage);
+        this.statusUpdate(StatusLevel.DISPLAY, aiMessage);
         return aiMessage;
       } catch (e) {
         debugLogError('invoke inner', e);
         if (e instanceof Error && e?.name === 'ToolException') {
           throw e; // Re-throw ToolException to be handled by outer catch
         }
-        this.statusUpdate('warning', `Something went wrong ${(e as Error).message}`);
+        this.statusUpdate(StatusLevel.WARNING, `Something went wrong ${(e as Error).message}`);
         return '';
       } finally {
         progress.stop();
@@ -166,7 +172,7 @@ export class GthLangChainAgent implements GthAgentInterface {
       debugLogError('invoke outer', error);
       if (error instanceof Error) {
         if (error?.name === 'ToolException') {
-          this.statusUpdate('error', `Tool execution failed: ${error?.message}`);
+          this.statusUpdate(StatusLevel.ERROR, `Tool execution failed: ${error?.message}`);
           return `Tool execution failed: ${error?.message}`;
         }
       }
@@ -190,7 +196,7 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLogObject('LLM Input Messages', messages);
     debugLogObject('Stream RunConfig', runConfig);
 
-    this.statusUpdate('info', '\nThinking...\n');
+    this.statusUpdate(StatusLevel.INFO, '\nThinking...\n');
     const stream = await this.agent.stream({ messages }, { ...runConfig, streamMode: 'messages' });
 
     const statusUpdate = this.statusUpdate;
@@ -209,11 +215,11 @@ export class GthLangChainAgent implements GthAgentInterface {
               const text = chunk.text as string;
               totalChunks++;
 
-              statusUpdate('stream', text);
+              statusUpdate(StatusLevel.STREAM, text);
               controller.enqueue(text);
             }
             if (interruptState.escape) {
-              statusUpdate('warning', '\n\nInterrupted by user, exiting\n\n');
+              statusUpdate(StatusLevel.WARNING, '\n\nInterrupted by user, exiting\n\n');
               break;
             }
           }
@@ -225,7 +231,7 @@ export class GthLangChainAgent implements GthAgentInterface {
           debugLogError('stream processing', error);
           if (error instanceof Error) {
             if (error?.name === 'ToolException') {
-              statusUpdate('error', `Tool execution failed: ${error?.message}`);
+              statusUpdate(StatusLevel.ERROR, `Tool execution failed: ${error?.message}`);
             }
           }
           controller.error(error);
@@ -262,7 +268,7 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLog(`Getting effective config for command: ${command || 'default'}`);
     const supportsTools = !!config.llm.bindTools;
     if (!supportsTools) {
-      this.statusUpdate('warning', 'Model does not seem to support tools.');
+      this.statusUpdate(StatusLevel.WARNING, 'Model does not seem to support tools.');
       debugLog('Warning: Model does not support tools');
     }
     return {

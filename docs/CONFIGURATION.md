@@ -79,6 +79,47 @@ Set `writeOutputToFile` in your config to:
 
 Override the setting per run with `-w/--write-output-to-file true|false|<filename>`. Shortcuts `-wn` or `-w0` map to `false`.
 
+## AI Ignore (.aiignore)
+
+Gaunt Sloth can hide files and directories from filesystem tools using a `.aiignore` file in your project root.
+Patterns use minimatch rules (similar to `.gitignore`), and lines starting with `#` are treated as comments.
+
+**Example `.aiignore`:**
+```
+node_modules/
+dist/
+*.log
+```
+
+You can control this behavior in config:
+- `aiignore.enabled` (boolean, default `true`) to enable/disable `.aiignore` support.
+- `aiignore.patterns` (array of strings) to supply patterns directly instead of reading `.aiignore`.
+
+**Example config:**
+```json
+{
+  "aiignore": {
+    "enabled": true,
+    "patterns": ["node_modules/", "dist/", "*.log"]
+  }
+}
+```
+
+When `.aiignore` is missing, Gaunt Sloth logs the message at debug level only.
+
+## Console Logging Level
+
+Console output can be filtered using `consoleLevel`. The default is `info`, which hides debug-level output.
+Lower levels are more verbose. Valid values for JSON configs:
+`debug`, `info`, `display`, `success`, `warning`, `error`, `stream`.
+
+**Example config:**
+```json
+{
+  "consoleLevel": "warning"
+}
+```
+
 ## Configuration Object
 
 Refer to documentation site for [Configuration Interface](https://gaunt-sloth-assistant.github.io/docs/interfaces/config.GthConfig.html)

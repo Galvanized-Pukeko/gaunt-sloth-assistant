@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StatusLevel } from '#src/core/types.js';
 
 // Mock the systemUtils module
 const systemUtilsMock = {
@@ -13,12 +14,132 @@ const systemUtilsMock = {
   stream: vi.fn(),
 };
 
+// Mock the debugUtils module
+const debugUtilsMock = {
+  debugLog: vi.fn(),
+};
+
 vi.mock('#src/utils/systemUtils.js', () => systemUtilsMock);
+vi.mock('#src/utils/debugUtils.js', () => debugUtilsMock);
 
 describe('consoleUtils', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     systemUtilsMock.getUseColour.mockReturnValue(false); // Default to no colors for easier testing
+  });
+
+  describe('console level control', () => {
+    afterEach(async () => {
+      // Reset console level after each test
+      const { resetConsoleLevel } = await import('#src/utils/consoleUtils.js');
+      resetConsoleLevel();
+    });
+
+    it('should set and get console level', async () => {
+      const { setConsoleLevel, getConsoleLevel } = await import('#src/utils/consoleUtils.js');
+
+      // Default should be INFO
+      expect(getConsoleLevel()).toBe(StatusLevel.INFO);
+
+      // Set to DEBUG
+      setConsoleLevel(StatusLevel.DEBUG);
+      expect(getConsoleLevel()).toBe(StatusLevel.DEBUG);
+
+      // Set to ERROR
+      setConsoleLevel(StatusLevel.ERROR);
+      expect(getConsoleLevel()).toBe(StatusLevel.ERROR);
+    });
+
+    it('should display messages at or above current level', async () => {
+      const {
+        setConsoleLevel,
+        displayInfo,
+        displayWarning,
+        displayError,
+        displaySuccess,
+        display,
+        displayDebug,
+      } = await import('#src/utils/consoleUtils.js');
+
+      // Set level to WARNING
+      setConsoleLevel(StatusLevel.WARNING);
+
+      // Should display WARNING and ERROR
+      displayWarning('Warning message');
+      displayError('Error message');
+      expect(systemUtilsMock.warn).toHaveBeenCalledWith('Warning message');
+      expect(systemUtilsMock.log).toHaveBeenCalledWith('Error message');
+
+      // Should NOT display INFO, SUCCESS, DISPLAY, or DEBUG
+      displayInfo('Info message');
+      displaySuccess('Success message');
+      display('Display message');
+      displayDebug('Debug message');
+      expect(systemUtilsMock.info).not.toHaveBeenCalled();
+      // Note: displaySuccess and display both call log(), so we need to be more specific
+      expect(systemUtilsMock.log).toHaveBeenCalledTimes(1); // Only error message
+      expect(systemUtilsMock.warn).toHaveBeenCalledTimes(1); // Only warning message
+      expect(systemUtilsMock.debug).not.toHaveBeenCalled();
+    });
+
+    it('should display all messages when level is DEBUG', async () => {
+      const {
+        setConsoleLevel,
+        displayInfo,
+        displayWarning,
+        displayError,
+        displaySuccess,
+        display,
+        displayDebug,
+      } = await import('#src/utils/consoleUtils.js');
+
+      // Set level to DEBUG (lowest level)
+      setConsoleLevel(StatusLevel.DEBUG);
+
+      // Should display all levels
+      displayDebug('Debug message');
+      displayInfo('Info message');
+      display('Display message');
+      displaySuccess('Success message');
+      displayWarning('Warning message');
+      displayError('Error message');
+
+      expect(systemUtilsMock.debug).toHaveBeenCalledWith('Debug message');
+      expect(systemUtilsMock.info).toHaveBeenCalledWith('Info message');
+      expect(systemUtilsMock.log).toHaveBeenCalledWith('Success message');
+      expect(systemUtilsMock.warn).toHaveBeenCalledWith('Warning message');
+      expect(systemUtilsMock.log).toHaveBeenCalledWith('Error message');
+    });
+
+    it('should display no messages when level is higher than available', async () => {
+      const {
+        setConsoleLevel,
+        displayInfo,
+        displayWarning,
+        displayError,
+        displaySuccess,
+        display,
+        displayDebug,
+      } = await import('#src/utils/consoleUtils.js');
+
+      // Set level to STREAM (highest level)
+      setConsoleLevel(StatusLevel.STREAM);
+
+      // Should NOT display any regular messages
+      displayDebug('Debug message');
+      displayInfo('Info message');
+      display('Display message');
+      displaySuccess('Success message');
+      displayWarning('Warning message');
+      displayError('Error message');
+
+      // None of the display functions should be called since STREAM is highest level
+      expect(systemUtilsMock.debug).not.toHaveBeenCalled();
+      expect(systemUtilsMock.info).not.toHaveBeenCalled();
+      expect(systemUtilsMock.log).not.toHaveBeenCalled();
+      expect(systemUtilsMock.warn).not.toHaveBeenCalled();
+      expect(systemUtilsMock.stream).not.toHaveBeenCalled();
+    });
   });
 
   describe('initSessionLogging', () => {
@@ -68,8 +189,16 @@ describe('consoleUtils', () => {
   describe('display functions', () => {
     beforeEach(async () => {
       // Import and initialize session logging for each test
-      const { initSessionLogging } = await import('#src/utils/consoleUtils.js');
+      const { initSessionLogging, setConsoleLevel } = await import('#src/utils/consoleUtils.js');
       initSessionLogging('test.log', true);
+      // Set console level to always show all messages during tests
+      setConsoleLevel(StatusLevel.DEBUG);
+    });
+
+    afterEach(async () => {
+      // Reset console level after each test
+      const { resetConsoleLevel } = await import('#src/utils/consoleUtils.js');
+      resetConsoleLevel();
     });
 
     describe('displayError', () => {
@@ -181,6 +310,7 @@ describe('consoleUtils', () => {
         // Assert
         expect(systemUtilsMock.debug).toHaveBeenCalledWith(message);
         expect(systemUtilsMock.writeToLogStream).toHaveBeenCalledWith(message + '\n');
+        expect(debugUtilsMock.debugLog).toHaveBeenCalledWith(message);
       });
 
       it('should handle Error objects', async () => {
@@ -196,6 +326,7 @@ describe('consoleUtils', () => {
         // Assert
         expect(systemUtilsMock.debug).toHaveBeenCalledWith(error.stack);
         expect(systemUtilsMock.writeToLogStream).toHaveBeenCalledWith(error.stack + '\n');
+        expect(debugUtilsMock.debugLog).toHaveBeenCalledWith(error.stack);
       });
 
       it('should handle undefined values', async () => {
@@ -208,6 +339,43 @@ describe('consoleUtils', () => {
         // Assert
         expect(systemUtilsMock.debug).not.toHaveBeenCalled();
         expect(systemUtilsMock.writeToLogStream).not.toHaveBeenCalled();
+        expect(debugUtilsMock.debugLog).not.toHaveBeenCalled();
+      });
+
+      it('should not display debug messages when console level is above DEBUG', async () => {
+        // Import the functions after mocks are set up
+        const { setConsoleLevel, displayDebug } = await import('#src/utils/consoleUtils.js');
+
+        // Set console level to INFO (above DEBUG)
+        setConsoleLevel(StatusLevel.INFO);
+
+        const message = 'Test debug message';
+
+        // Act
+        displayDebug(message);
+
+        // Assert
+        expect(systemUtilsMock.debug).not.toHaveBeenCalled();
+        expect(systemUtilsMock.writeToLogStream).not.toHaveBeenCalled();
+        expect(debugUtilsMock.debugLog).not.toHaveBeenCalled();
+      });
+
+      it('should display debug messages when console level is DEBUG', async () => {
+        // Import the functions after mocks are set up
+        const { setConsoleLevel, displayDebug } = await import('#src/utils/consoleUtils.js');
+
+        // Set console level to DEBUG
+        setConsoleLevel(StatusLevel.DEBUG);
+
+        const message = 'Test debug message';
+
+        // Act
+        displayDebug(message);
+
+        // Assert
+        expect(systemUtilsMock.debug).toHaveBeenCalledWith(message);
+        expect(systemUtilsMock.writeToLogStream).toHaveBeenCalledWith(message + '\n');
+        expect(debugUtilsMock.debugLog).toHaveBeenCalledWith(message);
       });
     });
   });
@@ -215,8 +383,16 @@ describe('consoleUtils', () => {
   describe('defaultStatusCallback', () => {
     beforeEach(async () => {
       // Import and initialize session logging for each test
-      const { initSessionLogging } = await import('#src/utils/consoleUtils.js');
+      const { initSessionLogging, setConsoleLevel } = await import('#src/utils/consoleUtils.js');
       initSessionLogging('test.log', true);
+      // Set console level to show all messages
+      setConsoleLevel(StatusLevel.DEBUG);
+    });
+
+    afterEach(async () => {
+      // Reset console level after each test
+      const { resetConsoleLevel } = await import('#src/utils/consoleUtils.js');
+      resetConsoleLevel();
     });
 
     it('should handle all status levels correctly', async () => {
@@ -224,33 +400,57 @@ describe('consoleUtils', () => {
       const { defaultStatusCallback } = await import('#src/utils/consoleUtils.js');
 
       // Test info level
-      defaultStatusCallback('info', 'Info message');
+      defaultStatusCallback(StatusLevel.INFO, 'Info message');
       expect(systemUtilsMock.info).toHaveBeenCalledWith('Info message');
 
       // Test warning level
-      defaultStatusCallback('warning', 'Warning message');
+      defaultStatusCallback(StatusLevel.WARNING, 'Warning message');
       expect(systemUtilsMock.warn).toHaveBeenCalledWith('Warning message');
 
       // Test error level
-      defaultStatusCallback('error', 'Error message');
+      defaultStatusCallback(StatusLevel.ERROR, 'Error message');
       expect(systemUtilsMock.log).toHaveBeenCalledWith('Error message');
 
       // Test success level
-      defaultStatusCallback('success', 'Success message');
+      defaultStatusCallback(StatusLevel.SUCCESS, 'Success message');
       expect(systemUtilsMock.log).toHaveBeenCalledWith('Success message');
 
       // Test debug level
-      defaultStatusCallback('debug', 'Debug message');
+      defaultStatusCallback(StatusLevel.DEBUG, 'Debug message');
       expect(systemUtilsMock.debug).toHaveBeenCalledWith('Debug message');
 
       // Test display level
-      defaultStatusCallback('display', 'Display message');
+      defaultStatusCallback(StatusLevel.DISPLAY, 'Display message');
       expect(systemUtilsMock.log).toHaveBeenCalledWith('Display message');
 
       // Test stream level
-      defaultStatusCallback('stream', 'Stream message');
+      defaultStatusCallback(StatusLevel.STREAM, 'Stream message');
       expect(systemUtilsMock.stream).toHaveBeenCalledWith('Stream message');
       expect(systemUtilsMock.writeToLogStream).toHaveBeenCalledWith('Stream message');
+    });
+
+    it('should respect console level in status callback', async () => {
+      // Import the callback after mocks are set up
+      const { defaultStatusCallback, setConsoleLevel } = await import('#src/utils/consoleUtils.js');
+
+      // Set console level to WARNING
+      setConsoleLevel(StatusLevel.WARNING);
+
+      // Should display WARNING and ERROR
+      defaultStatusCallback(StatusLevel.WARNING, 'Warning message');
+      defaultStatusCallback(StatusLevel.ERROR, 'Error message');
+      expect(systemUtilsMock.warn).toHaveBeenCalledWith('Warning message');
+      expect(systemUtilsMock.log).toHaveBeenCalledWith('Error message');
+
+      // Should NOT display INFO, SUCCESS, DISPLAY, or DEBUG
+      defaultStatusCallback(StatusLevel.INFO, 'Info message');
+      defaultStatusCallback(StatusLevel.SUCCESS, 'Success message');
+      defaultStatusCallback(StatusLevel.DISPLAY, 'Display message');
+      defaultStatusCallback(StatusLevel.DEBUG, 'Debug message');
+      expect(systemUtilsMock.info).not.toHaveBeenCalled();
+      expect(systemUtilsMock.log).toHaveBeenCalledTimes(1); // Only error message
+      expect(systemUtilsMock.warn).toHaveBeenCalledTimes(1); // Only warning message
+      expect(systemUtilsMock.debug).not.toHaveBeenCalled();
     });
   });
 
@@ -289,6 +489,18 @@ describe('consoleUtils', () => {
   });
 
   describe('session logging with disabled state', () => {
+    beforeEach(async () => {
+      // Set console level to show messages
+      const { setConsoleLevel } = await import('#src/utils/consoleUtils.js');
+      setConsoleLevel(StatusLevel.DEBUG);
+    });
+
+    afterEach(async () => {
+      // Reset console level after each test
+      const { resetConsoleLevel } = await import('#src/utils/consoleUtils.js');
+      resetConsoleLevel();
+    });
+
     it('should not log to session when logging is disabled', async () => {
       // Import the functions after mocks are set up
       const { initSessionLogging, displayInfo } = await import('#src/utils/consoleUtils.js');
@@ -307,9 +519,9 @@ describe('consoleUtils', () => {
     });
   });
 
-  describe('parseBooleanOrString', async () => {
-    const { parseBooleanOrString } = await import('#src/utils/consoleUtils.js');
-    it('parses false-like tokens', () => {
+  describe('parseBooleanOrString', () => {
+    it('parses false-like tokens', async () => {
+      const { parseBooleanOrString } = await import('#src/utils/consoleUtils.js');
       expect(parseBooleanOrString('false')).toEqual({ kind: 'boolean', value: false });
       expect(parseBooleanOrString('False')).toEqual({ kind: 'boolean', value: false });
       expect(parseBooleanOrString('0')).toEqual({ kind: 'boolean', value: false });
@@ -317,7 +529,8 @@ describe('consoleUtils', () => {
       expect(parseBooleanOrString('NO')).toEqual({ kind: 'boolean', value: false });
     });
 
-    it('parses true-like tokens', () => {
+    it('parses true-like tokens', async () => {
+      const { parseBooleanOrString } = await import('#src/utils/consoleUtils.js');
       expect(parseBooleanOrString('true')).toEqual({ kind: 'boolean', value: true });
       expect(parseBooleanOrString('True')).toEqual({ kind: 'boolean', value: true });
       expect(parseBooleanOrString('1')).toEqual({ kind: 'boolean', value: true });
@@ -325,14 +538,16 @@ describe('consoleUtils', () => {
       expect(parseBooleanOrString('YES')).toEqual({ kind: 'boolean', value: true });
     });
 
-    it('returns string for non-boolean tokens', () => {
+    it('returns string for non-boolean tokens', async () => {
+      const { parseBooleanOrString } = await import('#src/utils/consoleUtils.js');
       expect(parseBooleanOrString('review.md')).toEqual({ kind: 'string', value: 'review.md' });
       expect(parseBooleanOrString('out/rev.md')).toEqual({ kind: 'string', value: 'out/rev.md' });
       // literal string, not a special token
       expect(parseBooleanOrString(' -w0 ')).toEqual({ kind: 'string', value: '-w0' });
     });
 
-    it('returns none for nullish or empty input', () => {
+    it('returns none for nullish or empty input', async () => {
+      const { parseBooleanOrString } = await import('#src/utils/consoleUtils.js');
       expect(parseBooleanOrString(undefined)).toEqual({ kind: 'none' });
       expect(parseBooleanOrString(null)).toEqual({ kind: 'none' });
       expect(parseBooleanOrString('')).toEqual({ kind: 'none' });
@@ -340,9 +555,9 @@ describe('consoleUtils', () => {
     });
   });
 
-  describe('coerceBooleanOrString', async () => {
-    const { coerceBooleanOrString } = await import('#src/utils/consoleUtils.js');
-    it('coerces to boolean for boolean-like tokens', () => {
+  describe('coerceBooleanOrString', () => {
+    it('coerces to boolean for boolean-like tokens', async () => {
+      const { coerceBooleanOrString } = await import('#src/utils/consoleUtils.js');
       expect(coerceBooleanOrString('false')).toBe(false);
       expect(coerceBooleanOrString('0')).toBe(false);
       expect(coerceBooleanOrString('n')).toBe(false);
@@ -351,13 +566,15 @@ describe('consoleUtils', () => {
       expect(coerceBooleanOrString('y')).toBe(true);
     });
 
-    it('coerces to string for other values', () => {
+    it('coerces to string for other values', async () => {
+      const { coerceBooleanOrString } = await import('#src/utils/consoleUtils.js');
       expect(coerceBooleanOrString('review.md')).toBe('review.md');
       expect(coerceBooleanOrString('out/rev.md')).toBe('out/rev.md');
       expect(coerceBooleanOrString(' -wn ')).toBe('-wn');
     });
 
-    it('returns undefined for none', () => {
+    it('returns undefined for none', async () => {
+      const { coerceBooleanOrString } = await import('#src/utils/consoleUtils.js');
       expect(coerceBooleanOrString(undefined)).toBeUndefined();
       expect(coerceBooleanOrString(null)).toBeUndefined();
       expect(coerceBooleanOrString('   ')).toBeUndefined();

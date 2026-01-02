@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RawGthConfig } from '#src/config.js';
+import { StatusLevel } from '#src/core/types.js';
 import { platform } from 'node:os';
 
 const fsMock = {
@@ -21,6 +22,7 @@ const consoleUtilsMock = {
   displayWarning: vi.fn(),
   displaySuccess: vi.fn(),
   displayDebug: vi.fn(),
+  setConsoleLevel: vi.fn(),
 };
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
@@ -109,6 +111,7 @@ describe('config', async () => {
       expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'vertexai' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -118,6 +121,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
@@ -188,6 +195,7 @@ describe('config', async () => {
       expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'anthropic' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -197,6 +205,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
@@ -225,6 +237,40 @@ describe('config', async () => {
         },
         includeCurrentDateAfterGuidelines: false,
       });
+    });
+
+    it('Should accept consoleLevel as string in JSON config', async () => {
+      const jsonConfig = {
+        llm: {
+          type: 'vertexai',
+        },
+        consoleLevel: 'debug',
+      } as RawGthConfig;
+
+      fsMock.existsSync.mockImplementation((path: string) => {
+        return path && path.includes('.gsloth.config.json');
+      });
+      fsMock.readFileSync.mockImplementation((path: string) => {
+        if (path && path.includes('.gsloth.config.json')) return JSON.stringify(jsonConfig);
+        return '';
+      });
+
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+        return `/mock/read/${filename}`;
+      });
+
+      vi.doMock('#src/presets/vertexai.js', () => ({
+        processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
+        postProcessJsonConfig: undefined,
+      }));
+
+      const { initConfig } = await import('#src/config.js');
+
+      const config = await initConfig({});
+
+      expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
+      expect(consoleUtilsMock.setConsoleLevel).toHaveBeenCalledWith(StatusLevel.DEBUG);
+      expect(config.consoleLevel).toBe(StatusLevel.DEBUG);
     });
 
     it('Should try MJS config when JSON and JS configs do not exist', async () => {
@@ -266,6 +312,7 @@ describe('config', async () => {
       expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'groq' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -275,6 +322,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         streamSessionInferenceLog: true,
@@ -722,6 +773,7 @@ describe('config', async () => {
       expect(consoleUtilsMock.displaySuccess).not.toHaveBeenCalled();
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: mockLlm,
         modelDisplayName: 'test-model',
         contentProvider: 'file',
@@ -734,6 +786,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         commands: {
           pr: {
@@ -1045,6 +1101,7 @@ describe('config', async () => {
       const config = await initConfig({ customConfigPath });
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'vertexai' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -1055,6 +1112,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {
@@ -1108,6 +1169,7 @@ describe('config', async () => {
       const config = await initConfig({ customConfigPath });
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'anthropic' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -1118,6 +1180,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {
@@ -1171,6 +1237,7 @@ describe('config', async () => {
       const config = await initConfig({ customConfigPath });
 
       expect(config).toEqual({
+        consoleLevel: StatusLevel.INFO,
         llm: { type: 'groq' },
         contentProvider: 'file',
         requirementsProvider: 'file',
@@ -1181,6 +1248,10 @@ describe('config', async () => {
         writeOutputToFile: true,
         useColour: true,
         filesystem: 'read',
+        aiignore: {
+          enabled: true,
+          patterns: undefined,
+        },
         debugLog: false,
         canInterruptInferenceWithEsc: true,
         commands: {

@@ -39,7 +39,7 @@ export async function getDefaultTools(
   config: GthConfig,
   command?: GthCommand
 ): Promise<StructuredToolInterface[]> {
-  const filesystemTools = filterFilesystemTools(config.filesystem);
+  const filesystemTools = filterFilesystemTools(config.filesystem, config.aiignore);
   const builtInTools = await getBuiltInTools(config);
   const devTools = await filterDevTools(command, config.commands?.code?.devTools);
   const customTools = getCustomTools(config, command);
@@ -94,9 +94,13 @@ function getCustomTools(config: GthConfig, command?: GthCommand): StructuredTool
  */
 
 function filterFilesystemTools(
-  filesystemConfig: string[] | 'all' | 'read' | 'none'
+  filesystemConfig: string[] | 'all' | 'read' | 'none',
+  aiignoreConfig?: {
+    enabled?: boolean;
+    patterns?: string[];
+  }
 ): StructuredToolInterface[] {
-  const toolkit = new GthFileSystemToolkit([getProjectDir()]);
+  const toolkit = new GthFileSystemToolkit([getProjectDir()], aiignoreConfig);
   if (filesystemConfig === 'all') {
     return toolkit.getTools();
   }

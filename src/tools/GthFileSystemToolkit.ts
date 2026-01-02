@@ -6,6 +6,8 @@ import os from 'os';
 import { createTwoFilesPatch } from 'diff';
 import { minimatch } from 'minimatch';
 import { displayInfo } from '#src/utils/consoleUtils.js';
+import { shouldIgnoreFile } from '#src/utils/aiignoreUtils.js';
+import { getProjectDir } from '#src/utils/systemUtils.js';
 
 /**
  * Filesystem toolkit
@@ -116,12 +118,23 @@ interface FileInfo {
 export default class GthFileSystemToolkit extends BaseToolkit {
   tools: StructuredToolInterface[];
   private allowedDirectories: string[];
+  private aiignoreConfig?: {
+    enabled?: boolean;
+    patterns?: string[];
+  };
 
-  constructor(allowedDirectories: string[] = [process.cwd()]) {
+  constructor(
+    allowedDirectories: string[] = [process.cwd()],
+    aiignoreConfig?: {
+      enabled?: boolean;
+      patterns?: string[];
+    }
+  ) {
     super();
     this.allowedDirectories = allowedDirectories.map((dir) =>
       this.normalizePath(path.resolve(this.expandHome(dir)))
     );
+    this.aiignoreConfig = aiignoreConfig;
     this.tools = this.createTools();
   }
 
@@ -236,6 +249,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
     excludePatterns: string[] = []
   ): Promise<string[]> {
     const results: string[] = [];
+    const aiignoreConfig = this.aiignoreConfig;
 
     async function search(currentPath: string, validatePathFn: (path: string) => Promise<string>) {
       const entries = await fs.readdir(currentPath, { withFileTypes: true });
@@ -253,6 +267,18 @@ export default class GthFileSystemToolkit extends BaseToolkit {
           });
 
           if (shouldExclude) {
+            continue;
+          }
+
+          // Check if file should be ignored by aiignore
+          const shouldIgnore = shouldIgnoreFile(
+            fullPath,
+            getProjectDir(),
+            aiignoreConfig?.patterns,
+            aiignoreConfig?.enabled
+          );
+
+          if (shouldIgnore) {
             continue;
           }
 
@@ -582,7 +608,17 @@ export default class GthFileSystemToolkit extends BaseToolkit {
           displayInfo(`\n📁 Listing directory: ${args.path}\n`);
           const validPath = await this.validatePath(args.path);
           const entries = await fs.readdir(validPath, { withFileTypes: true });
-          return entries
+          const aiignoreConfig = this.aiignoreConfig;
+          const filteredEntries = entries.filter((entry) => {
+            const fullPath = path.join(validPath, entry.name);
+            return !shouldIgnoreFile(
+              fullPath,
+              getProjectDir(),
+              aiignoreConfig?.patterns,
+              aiignoreConfig?.enabled
+            );
+          });
+          return filteredEntries
             .map((entry) => `${entry.isDirectory() ? '[DIR]' : '[FILE]'} ${entry.name}`)
             .join('\n');
         },
@@ -603,9 +639,19 @@ export default class GthFileSystemToolkit extends BaseToolkit {
           displayInfo(`\n📁 Listing directory with sizes: ${args.path}\n`);
           const validPath = await this.validatePath(args.path);
           const entries = await fs.readdir(validPath, { withFileTypes: true });
+          const aiignoreConfig = this.aiignoreConfig;
+          const filteredEntries = entries.filter((entry) => {
+            const fullPath = path.join(validPath, entry.name);
+            return !shouldIgnoreFile(
+              fullPath,
+              getProjectDir(),
+              aiignoreConfig?.patterns,
+              aiignoreConfig?.enabled
+            );
+          });
 
           const detailedEntries = await Promise.all(
-            entries.map(async (entry) => {
+            filteredEntries.map(async (entry) => {
               const entryPath = path.join(validPath, entry.name);
               try {
                 const stats = await fs.stat(entryPath);
@@ -682,6 +728,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
             const validPath = await this.validatePath(currentPath);
             const entries = await fs.readdir(validPath, { withFileTypes: true });
             const result: TreeEntry[] = [];
+            const aiignoreConfig = this.aiignoreConfig;
 
             for (const entry of entries) {
               const entryData: TreeEntry = {
@@ -689,6 +736,19 @@ export default class GthFileSystemToolkit extends BaseToolkit {
                 type: entry.isDirectory() ? 'directory' : 'file',
               };
               if (IGNORED_DIRS.indexOf(entry.name) >= 0) {
+                entryData.ignored = true;
+              }
+
+              // Check if file should be ignored by aiignore
+              const fullPath = path.join(currentPath, entry.name);
+              const shouldIgnore = shouldIgnoreFile(
+                fullPath,
+                getProjectDir(),
+                aiignoreConfig?.patterns,
+                aiignoreConfig?.enabled
+              );
+
+              if (shouldIgnore) {
                 entryData.ignored = true;
               }
 

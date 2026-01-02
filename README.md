@@ -155,6 +155,8 @@ For OpenAI-compatible providers like Inception, use `gsloth init openai` and mod
 
 More detailed information on configuration can be found in [CONFIGURATION.md](./docs/CONFIGURATION.md)
 
+Gaunt Sloth also supports `.aiignore` for excluding files from filesystem tools, with overrides via config.
+
 ### Custom Tools
 
 Gaunt Sloth supports defining custom shell commands that the AI can execute. These custom tools:

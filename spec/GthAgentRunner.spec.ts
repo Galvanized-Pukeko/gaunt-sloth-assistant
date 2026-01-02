@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { HumanMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import type { GthConfig } from '#src/config.js';
-import type { StatusUpdateCallback } from '#src/core/GthLangChainAgent.js';
+import type { StatusUpdateCallback } from '#src/core/types.js';
 
 // Mock the GthLangChainAgent - using a simplified approach
 const mockAgent = {
