@@ -18,14 +18,14 @@ export async function processJsonConfig(
   return new gemini.ChatGoogleGenerativeAI({
     ...llmConfig,
     apiKey: googleApiKey,
-    model: llmConfig.model || 'gemini-2.5-pro',
+    model: llmConfig.model || 'gemini-3-pro-preview',
   });
 }
 
 const jsonContent = `{
   "llm": {
     "type": "google-genai",
-    "model": "gemini-2.5-pro"
+    "model": "gemini-3-pro-preview"
   }
 }`;
 

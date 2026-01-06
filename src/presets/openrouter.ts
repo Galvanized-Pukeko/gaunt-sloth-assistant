@@ -25,7 +25,7 @@ export async function processJsonConfig(
   const configFields = {
     ...llmConfig,
     apiKey: openRouterApiKey,
-    model: llmConfig.model || 'moonshotai/kimi-k2',
+    model: llmConfig.model || 'qwen/qwen3-coder',
     configuration: {
       baseURL: 'https://openrouter.ai/api/v1',
       ...(llmConfig.configuration || {}),
@@ -55,7 +55,7 @@ function getApiKey(llmConfig: OpenAIChatInput & ChatOpenAIFields & BaseChatModel
 const jsonContent = `{
   "llm": {
     "type": "openrouter",
-    "model": "moonshotai/kimi-k2"
+    "model": "qwen/qwen3-coder"
   }
 }`;
 

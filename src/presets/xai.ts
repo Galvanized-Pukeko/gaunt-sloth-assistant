@@ -18,14 +18,14 @@ export async function processJsonConfig(
   return new ChatXAI({
     ...llmConfig,
     apiKey,
-    model: llmConfig.model || 'grok-4-0709',
+    model: llmConfig.model || 'grok-4-1-fast',
   });
 }
 
 const jsonContent = `{
   "llm": {
     "type": "xai",
-    "model": "grok-4-0709"
+    "model": "grok-4-1-fast"
   }
 }`;
 

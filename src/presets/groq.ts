@@ -13,14 +13,14 @@ export async function processJsonConfig(llmConfig: ChatGroqInput): Promise<BaseC
   return new groq.ChatGroq({
     ...llmConfig,
     apiKey: groqApiKey,
-    model: llmConfig.model || 'deepseek-r1-distill-llama-70b',
+    model: llmConfig.model || 'openai/gpt-oss-120b',
   });
 }
 
 const jsonContent = `{
   "llm": {
     "type": "groq",
-    "model": "deepseek-r1-distill-llama-70b"
+    "model": "openai/gpt-oss-120b"
   }
 }`;
 

@@ -19,7 +19,7 @@ import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 const jsonContent = `{
   "llm": {
     "type": "vertexai",
-    "model": "gemini-2.5-pro"
+    "model": "gemini-3-pro-preview"
   }
 }`;
 
@@ -40,6 +40,6 @@ export async function processJsonConfig(llmConfig: ChatVertexAIInput): Promise<B
   const vertexAi = await import('@langchain/google-vertexai');
   return new vertexAi.ChatVertexAI({
     ...llmConfig,
-    model: llmConfig.model || 'gemini-2.5-pro',
+    model: llmConfig.model || 'gemini-3-pro-preview',
   });
 }
