@@ -197,11 +197,28 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLogObject('Stream RunConfig', runConfig);
 
     this.statusUpdate(StatusLevel.INFO, '\nThinking...\n');
-    const stream = await this.agent.stream({ messages }, { ...runConfig, streamMode: 'messages' });
 
     const statusUpdate = this.statusUpdate;
-    const interruptState = { escape: false };
-    waitForEscape(() => (interruptState.escape = true), this.config.canInterruptInferenceWithEsc);
+    const interruptState = { escape: false, messageShown: false };
+    const abortController = new AbortController();
+    const showInterruptMessage = () => {
+      if (!interruptState.messageShown) {
+        interruptState.messageShown = true;
+        statusUpdate(StatusLevel.WARNING, '\n\nInterrupted by user, exiting\n\n');
+      }
+    };
+    waitForEscape(() => {
+      interruptState.escape = true;
+      showInterruptMessage();
+      if (!abortController.signal.aborted) {
+        abortController.abort();
+      }
+    }, this.config.canInterruptInferenceWithEsc);
+
+    const stream = await this.agent.stream(
+      { messages },
+      { ...runConfig, streamMode: 'messages', signal: abortController.signal }
+    );
 
     return new IterableReadableStream({
       async start(controller) {
@@ -219,26 +236,36 @@ export class GthLangChainAgent implements GthAgentInterface {
               controller.enqueue(text);
             }
             if (interruptState.escape) {
-              statusUpdate(StatusLevel.WARNING, '\n\nInterrupted by user, exiting\n\n');
+              if (typeof stream.cancel === 'function') {
+                await stream.cancel();
+              }
               break;
             }
           }
-          stopWaitingForEscape();
           debugLog(`Stream completed. Total chunks: ${totalChunks}`);
           controller.close();
         } catch (error) {
-          stopWaitingForEscape();
-          debugLogError('stream processing', error);
-          if (error instanceof Error) {
-            if (error?.name === 'ToolException') {
-              statusUpdate(StatusLevel.ERROR, `Tool execution failed: ${error?.message}`);
+          if (interruptState.escape || (error instanceof Error && error.name === 'AbortError')) {
+            showInterruptMessage();
+            controller.close();
+          } else {
+            debugLogError('stream processing', error);
+            if (error instanceof Error) {
+              if (error?.name === 'ToolException') {
+                statusUpdate(StatusLevel.ERROR, `Tool execution failed: ${error?.message}`);
+              }
             }
+            controller.error(error);
           }
-          controller.error(error);
+        } finally {
+          stopWaitingForEscape();
         }
       },
       async cancel() {
         stopWaitingForEscape();
+        if (!abortController.signal.aborted) {
+          abortController.abort();
+        }
         // Clean up the underlying stream if it has a cancel method
         if (stream && typeof stream.cancel === 'function') {
           await stream.cancel();
