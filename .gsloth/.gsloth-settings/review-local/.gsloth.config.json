@@ -5,9 +5,60 @@
   },
   "filesystem": "read",
   "includeCurrentDateAfterGuidelines": true,
+  "writeOutputToFile": true,
+  "consoleLevel": "info",
   "organization": {
     "name": "Galvanized Pukeko",
     "locale": "en-NZ",
     "timezone": "Pacific/Auckland"
+  },
+  "commands": {
+    "review": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 6,
+        "errorOnReviewFail": true
+      }
+    },
+    "pr": {
+      "rating": {
+        "enabled": true,
+        "passThreshold": 6,
+        "errorOnReviewFail": true
+      }
+    }
+  },
+  "customTools": {
+    "git_diff": {
+      "command": "git --no-pager diff",
+      "description": "View current diff with `git --no-pager diff`"
+    },
+    "view_issue": {
+      "command": "gh issue view ${issue}",
+      "description": "View a GitHub issue by number",
+      "parameters": {
+        "issue": {
+          "description": "GitHub issue number to view"
+        }
+      }
+    },
+    "view_pr_diff": {
+      "command": "gh pr diff ${pr}",
+      "description": "View the diff for a GitHub pull request",
+      "parameters": {
+        "pr": {
+          "description": "GitHub PR number to view diff for"
+        }
+      }
+    },
+    "diff_since_release": {
+      "command": "git --no-pager diff ${release}..HEAD",
+      "description": "View git diff from a release tag to HEAD",
+      "parameters": {
+        "release": {
+          "description": "Release tag to diff from (e.g., v1.0.0)"
+        }
+      }
+    }
   }
 }
