@@ -50,8 +50,9 @@ describe('utils', () => {
 
       try {
         // Import the function after mocks are set up
-        const { generateStandardFileName, toFileSafeString } =
-          await import('#src/utils/fileUtils.js');
+        const { generateStandardFileName, toFileSafeString } = await import(
+          '#src/utils/fileUtils.js'
+        );
 
         // Define test commands
         const commands = ['ASK', 'REVIEW', 'PR-123'];
