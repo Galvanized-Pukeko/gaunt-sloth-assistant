@@ -24,8 +24,7 @@ For minor, e.g., from 0.0.8 to 0.1.0
 
 ```bash
 npm version minor -m "Release notes"
-git push
-git push --tags
+git push --follow-tags
 ```
 
 Type `\` and then Enter to type new line in message.
