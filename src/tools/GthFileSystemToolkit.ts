@@ -1,6 +1,7 @@
 import { BaseToolkit, StructuredToolInterface, tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import fs from 'fs/promises';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import os from 'os';
 import { createTwoFilesPatch } from 'diff';
@@ -250,15 +251,30 @@ export default class GthFileSystemToolkit extends BaseToolkit {
   ): Promise<string[]> {
     const results: string[] = [];
     const aiignoreConfig = this.aiignoreConfig;
+    const pendingDirs: string[] = [rootPath];
 
-    async function search(currentPath: string, validatePathFn: (path: string) => Promise<string>) {
-      const entries = await fs.readdir(currentPath, { withFileTypes: true });
+    while (pendingDirs.length > 0) {
+      const currentPath = pendingDirs.pop();
+      if (!currentPath) {
+        continue;
+      }
+
+      let entries: Dirent[];
+      try {
+        entries = (await fs.readdir(currentPath, {
+          withFileTypes: true,
+          encoding: 'utf8',
+        })) as Dirent[];
+      } catch {
+        continue;
+      }
 
       for (const entry of entries) {
-        const fullPath = path.join(currentPath, entry.name);
+        const entryName = entry.name.toString();
+        const fullPath = path.join(currentPath, entryName);
 
         try {
-          await validatePathFn(fullPath);
+          await this.validatePath(fullPath);
 
           const relativePath = path.relative(rootPath, fullPath);
           const shouldExclude = excludePatterns.some((pattern) => {
@@ -270,7 +286,6 @@ export default class GthFileSystemToolkit extends BaseToolkit {
             continue;
           }
 
-          // Check if file should be ignored by aiignore
           const shouldIgnore = shouldIgnoreFile(
             fullPath,
             getProjectDir(),
@@ -282,12 +297,26 @@ export default class GthFileSystemToolkit extends BaseToolkit {
             continue;
           }
 
-          if (entry.name.toLowerCase().includes(pattern.toLowerCase())) {
+          if (entryName.toLowerCase().includes(pattern.toLowerCase())) {
             results.push(fullPath);
           }
 
-          if (entry.isDirectory()) {
-            await search(fullPath, validatePathFn);
+          let isDirectory = entry.isDirectory();
+          if (
+            !isDirectory &&
+            typeof entry.isSymbolicLink === 'function' &&
+            entry.isSymbolicLink()
+          ) {
+            try {
+              const stats = await fs.stat(fullPath);
+              isDirectory = stats.isDirectory();
+            } catch {
+              isDirectory = false;
+            }
+          }
+
+          if (isDirectory) {
+            pendingDirs.push(fullPath);
           }
         } catch {
           continue;
@@ -295,7 +324,6 @@ export default class GthFileSystemToolkit extends BaseToolkit {
       }
     }
 
-    await search(rootPath, this.validatePath.bind(this));
     return results;
   }
 
