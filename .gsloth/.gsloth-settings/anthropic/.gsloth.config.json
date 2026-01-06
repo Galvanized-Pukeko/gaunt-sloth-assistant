@@ -1,0 +1,17 @@
+{
+  "llm": {
+    "type": "anthropic",
+    "model": "claude-sonnet-4-5"
+  },
+  "commands": {
+    "code": {
+      "filesystem": "all",
+      "devTools": {
+        "run_build": "npm run build",
+        "run_tests": "npm test",
+        "run_lint": "npm run lint-n-fix",
+        "run_single_test": "npm test"
+      }
+    }
+  }
+}
