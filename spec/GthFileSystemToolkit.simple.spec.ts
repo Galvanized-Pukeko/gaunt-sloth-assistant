@@ -2,6 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import os from 'os';
 import path from 'node:path';
 
+const consoleUtilsMock = {
+  display: vi.fn(),
+  displayError: vi.fn(),
+  displayInfo: vi.fn(),
+  displayWarning: vi.fn(),
+  displaySuccess: vi.fn(),
+  displayDebug: vi.fn(),
+};
+
 // Simple mock that allows all operations
 const fsMock = {
   readFile: vi.fn(),
@@ -16,6 +25,7 @@ const fsMock = {
 
 // Keep the original path methods for basic functionality
 vi.mock('fs/promises', () => ({ default: fsMock }));
+vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 describe('GthFileSystemToolkit - Basic Tests', () => {
   let GthFileSystemToolkit: typeof import('#src/tools/GthFileSystemToolkit.js').default;
@@ -105,6 +115,34 @@ describe('GthFileSystemToolkit - Basic Tests', () => {
 
       expect(result).toContain('Allowed directories:');
       expect(result).toContain(process.cwd());
+    });
+
+    it('search_files should return matches from subdirectories', async () => {
+      const tool = toolkit.tools.find((t) => t.name === 'search_files')!;
+      const rootPath = process.cwd();
+
+      const makeDirent = (name: string, isDirectory: boolean) => ({
+        name,
+        isDirectory: () => isDirectory,
+        isSymbolicLink: () => false,
+      });
+
+      fsMock.readdir.mockImplementation((currentPath) => {
+        if (currentPath === rootPath) {
+          return Promise.resolve([makeDirent('sub', true), makeDirent('root.txt', false)]);
+        }
+
+        if (currentPath === path.join(rootPath, 'sub')) {
+          return Promise.resolve([makeDirent('nested.txt', false)]);
+        }
+
+        return Promise.resolve([]);
+      });
+
+      const result = await tool.invoke({ path: rootPath, pattern: 'txt', excludePatterns: [] });
+
+      expect(result).toContain(path.join(rootPath, 'root.txt'));
+      expect(result).toContain(path.join(rootPath, 'sub', 'nested.txt'));
     });
   });
 
