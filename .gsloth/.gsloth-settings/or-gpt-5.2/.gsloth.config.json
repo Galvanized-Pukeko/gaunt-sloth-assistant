@@ -3,7 +3,6 @@
     "type": "openrouter",
     "model": "openai/gpt-5.2"
   },
-  "middleware": ["binary-content-injection"],
   "commands": {
     "code": {
       "filesystem": "all",

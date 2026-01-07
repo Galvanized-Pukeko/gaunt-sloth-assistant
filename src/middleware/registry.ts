@@ -70,6 +70,7 @@ const predefinedMiddlewareFactories = {
    * Image format transformation middleware.
    * Transforms image content blocks from OpenAI format to Anthropic format for Anthropic models.
    * Does nothing for other providers (they use OpenAI format natively).
+   * TODO 199 we probably need to remove this
    */
   'image-format-transform': (
     settings: Record<string, unknown>,
@@ -149,6 +150,7 @@ export async function createSummarizationMiddleware(
 /**
  * Resolve middleware configuration into middleware instances.
  * Converts string identifiers and config objects into actual middleware.
+ * Automatically injects binary-content-injection middleware if binaryFormats is enabled.
  *
  * @param configs - Array of middleware configurations
  * @param gthConfig - Full Gaunt Sloth configuration
@@ -158,13 +160,26 @@ export async function resolveMiddleware(
   configs: MiddlewareConfig[] | undefined,
   gthConfig: GthConfig
 ): Promise<AgentMiddleware[]> {
-  if (!configs || configs.length === 0) {
-    return [];
-  }
-
+  const configsToResolve = configs || [];
   const middleware: AgentMiddleware[] = [];
 
-  for (const config of configs) {
+  // Auto-inject binary-content-injection middleware if binaryFormats is configured
+  const hasBinaryFormats =
+    gthConfig.binaryFormats !== undefined &&
+    gthConfig.binaryFormats !== false &&
+    gthConfig.binaryFormats.length > 0;
+  const hasBinaryMiddleware = configsToResolve.some(
+    (c) =>
+      c === 'binary-content-injection' ||
+      (typeof c === 'object' && 'name' in c && c.name === 'binary-content-injection')
+  );
+
+  if (hasBinaryFormats && !hasBinaryMiddleware) {
+    debugLog('Auto-injecting binary-content-injection middleware (binaryFormats is enabled)');
+    middleware.push(await createPredefinedMiddleware('binary-content-injection', {}, gthConfig));
+  }
+
+  for (const config of configsToResolve) {
     try {
       // Handle string configuration (predefined middleware with defaults)
       if (typeof config === 'string') {

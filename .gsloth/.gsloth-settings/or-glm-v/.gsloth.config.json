@@ -3,7 +3,6 @@
     "type": "openrouter",
     "model": "z-ai/glm-4.6v"
   },
-  "middleware": ["binary-content-injection"],
   "commands": {
     "code": {
       "filesystem": "all",

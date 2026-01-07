@@ -3,7 +3,6 @@
     "type": "openrouter",
     "model": "x-ai/grok-4.1-fast"
   },
-  "middleware": ["binary-content-injection"],
   "commands": {
     "code": {
       "filesystem": "all",

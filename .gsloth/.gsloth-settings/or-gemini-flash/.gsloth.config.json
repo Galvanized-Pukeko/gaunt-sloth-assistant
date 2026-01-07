@@ -3,7 +3,6 @@
     "type": "openrouter",
     "model": "google/gemini-3-flash-preview"
   },
-  "middleware": ["binary-content-injection"],
   "commands": {
     "code": {
       "filesystem": "all",
