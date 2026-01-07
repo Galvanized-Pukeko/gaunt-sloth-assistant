@@ -3,5 +3,11 @@
     "type": "openrouter",
     "model": "z-ai/glm-4.5-air"
   },
-  "canInterruptInferenceWithEsc": false
+  "canInterruptInferenceWithEsc": false,
+  "pr": {
+    "filesystem": "none"
+  },
+  "review": {
+    "filesystem": "none"
+  }
 }

@@ -3,5 +3,11 @@
     "type": "xai",
     "model": "grok-4-1-fast"
   },
-  "canInterruptInferenceWithEsc": false
+  "canInterruptInferenceWithEsc": false,
+  "pr": {
+    "filesystem": "none"
+  },
+  "review": {
+    "filesystem": "none"
+  }
 }

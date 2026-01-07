@@ -7,5 +7,11 @@
       "baseURL": "https://api.inceptionlabs.ai/v1"
     }
   },
-  "canInterruptInferenceWithEsc": false
+  "canInterruptInferenceWithEsc": false,
+  "pr": {
+    "filesystem": "none"
+  },
+  "review": {
+    "filesystem": "none"
+  }
 }

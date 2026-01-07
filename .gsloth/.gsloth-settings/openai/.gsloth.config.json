@@ -3,7 +3,6 @@
     "type": "openai",
     "model": "gpt-5-mini"
   },
-  "canInterruptInferenceWithEsc": false,
   "pr": {
     "filesystem": "none"
   },

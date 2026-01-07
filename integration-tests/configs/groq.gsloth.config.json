@@ -3,5 +3,11 @@
     "type": "groq",
     "model": "openai/gpt-oss-120b"
   },
-  "canInterruptInferenceWithEsc": false
+  "canInterruptInferenceWithEsc": false,
+  "pr": {
+    "filesystem": "none"
+  },
+  "review": {
+    "filesystem": "none"
+  }
 }

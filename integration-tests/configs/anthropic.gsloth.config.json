@@ -4,5 +4,11 @@
     "model": "claude-3-5-haiku-latest",
     "temperature": 0
   },
-  "canInterruptInferenceWithEsc": false
+  "canInterruptInferenceWithEsc": false,
+  "pr": {
+    "filesystem": "none"
+  },
+  "review": {
+    "filesystem": "none"
+  }
 }

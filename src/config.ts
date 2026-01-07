@@ -45,6 +45,11 @@ import { existsSync, readFileSync } from 'node:fs';
 export interface GthConfig {
   llm: BaseChatModel;
   /**
+   * Binary format support configuration.
+   * Disabled by default unless explicitly configured.
+   */
+  binaryFormats?: false | BinaryFormatConfig[];
+  /**
    * Content Provider. Provider used to fetch content (usually diff) for `review` or `pr` command.
    *
    * {@link DEFAULT_CONFIG#contentProvider}
@@ -188,6 +193,7 @@ export interface GthConfig {
       customTools?: CustomToolsConfig | false;
       logWorkForReviewInSeconds?: number;
       rating?: RatingConfig;
+      binaryFormats?: false | BinaryFormatConfig[];
     };
     review?: {
       requirementsProvider?: string;
@@ -196,22 +202,26 @@ export interface GthConfig {
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
       rating?: RatingConfig;
+      binaryFormats?: false | BinaryFormatConfig[];
     };
     ask?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      binaryFormats?: false | BinaryFormatConfig[];
     };
     chat?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      binaryFormats?: false | BinaryFormatConfig[];
     };
     code?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
       devTools?: GthDevToolsConfig;
+      binaryFormats?: false | BinaryFormatConfig[];
     };
   };
   modelDisplayName?: string;
@@ -239,6 +249,27 @@ export type ConsoleLevelInput =
 export interface RawGthConfig extends Omit<GthConfig, 'llm' | 'consoleLevel'> {
   llm: LLMConfig;
   consoleLevel?: ConsoleLevelInput;
+}
+
+export type BinaryFormatType = 'image' | 'document' | 'audio' | 'video' | 'binary';
+
+export interface BinaryFormatConfig {
+  /**
+   * The type/category of binary format.
+   */
+  type: BinaryFormatType;
+  /**
+   * List of allowed extensions for this type (without leading dot).
+   */
+  extensions: string[];
+  /**
+   * Maximum file size in bytes. Defaults to 10MB when omitted.
+   */
+  maxSize?: number;
+  /**
+   * Optional MIME type overrides for extensions not in the default mapping.
+   */
+  mimeTypes?: Record<string, string>;
 }
 
 export type CustomToolsConfig = Record<string, CustomCommandConfig>;

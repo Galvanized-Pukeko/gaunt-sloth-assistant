@@ -107,6 +107,60 @@ You can control this behavior in config:
 
 When `.aiignore` is missing, Gaunt Sloth logs the message at debug level only.
 
+## Binary Format Configuration
+
+Gaunt Sloth can process binary formats (images, documents, audio, video) when your LLM model
+supports multimodal inputs.
+
+Important notes:
+- Binary formats are disabled by default
+- You must explicitly configure which extensions to allow
+- Check your LLM provider documentation for supported formats
+
+Enable binary formats by adding the `binaryFormats` array to your config:
+
+```json
+{
+  "binaryFormats": [
+    { "type": "image", "extensions": ["png", "jpg", "jpeg", "webp", "gif"] },
+    { "type": "document", "extensions": ["pdf"] }
+  ]
+}
+```
+
+Format types:
+
+| Type | Description |
+|------|-------------|
+| `image` | Image files for vision-capable models |
+| `document` | Document files (e.g., PDFs) |
+| `audio` | Audio files for speech-capable models |
+| `video` | Video files for video-capable models |
+| `binary` | Arbitrary binary files (use with caution) |
+
+Each format type supports:
+- `type` (required): The format type category
+- `extensions` (required): Array of allowed file extensions (without dots)
+- `maxSize` (optional): Maximum file size in bytes (default: 10MB)
+- `mimeTypes` (optional): Custom MIME type mappings for unusual extensions
+
+Binary formats can also be configured per command:
+
+```json
+{
+  "commands": {
+    "review": {
+      "binaryFormats": [
+        { "type": "image", "extensions": ["png", "jpg"] }
+      ]
+    },
+    "code": {
+      "binaryFormats": false
+    }
+  }
+}
+```
+
 ## Console Logging Level
 
 Console output can be filtered using `consoleLevel`. The default is `info`, which hides debug-level output.
