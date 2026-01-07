@@ -2,6 +2,7 @@
   "llm": {
     "type": "vertexai",
     "model": "gemini-3-pro-preview",
+    "location": "global",
     "temperature": 0
   },
   "canInterruptInferenceWithEsc": false,
@@ -10,5 +11,8 @@
   },
   "review": {
     "filesystem": "none"
-  }
+  },
+  "binaryFormats": [
+    { "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"] }
+  ]
 }
