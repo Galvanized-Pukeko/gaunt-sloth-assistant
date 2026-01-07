@@ -1,9 +1,10 @@
 {
   "llm": {
-    "type": "anthropic",
-    "model": "claude-sonnet-4-5"
+    "type": "openrouter",
+    "model": "anthropic/claude-sonnet-4.5"
   },
   "middleware": ["binary-content-injection"],
+  "debugLog": true,
   "commands": {
     "code": {
       "filesystem": "all",

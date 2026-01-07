@@ -24,6 +24,14 @@ import {
   createReviewRateMiddleware,
   type ReviewRateMiddlewareSettings,
 } from '#src/middleware/reviewRateMiddleware.js';
+import {
+  createImageFormatMiddleware,
+  type ImageFormatMiddlewareSettings,
+} from '#src/middleware/imageFormatMiddleware.js';
+import {
+  createBinaryContentInjectionMiddleware,
+  type BinaryContentInjectionMiddlewareSettings,
+} from '#src/middleware/binaryContentInjectionMiddleware.js';
 
 type PredefinedMiddlewareFactory = (
   settings: Record<string, unknown>,
@@ -58,6 +66,30 @@ const predefinedMiddlewareFactories = {
     gthConfig: GthConfig
   ): Promise<AgentMiddleware> =>
     createReviewRateMiddleware(settings as ReviewRateMiddlewareSettings, gthConfig),
+  /**
+   * Image format transformation middleware.
+   * Transforms image content blocks from OpenAI format to Anthropic format for Anthropic models.
+   * Does nothing for other providers (they use OpenAI format natively).
+   */
+  'image-format-transform': (
+    settings: Record<string, unknown>,
+    gthConfig: GthConfig
+  ): Promise<AgentMiddleware> =>
+    createImageFormatMiddleware(settings as ImageFormatMiddlewareSettings, gthConfig),
+  /**
+   * Binary content injection middleware.
+   * Intercepts tool results containing binary data (images, PDFs, audio) and injects them
+   * as HumanMessage content blocks before the next model call.
+   * This works around LangChain's limitation where ToolMessage doesn't support binary content.
+   */
+  'binary-content-injection': (
+    settings: Record<string, unknown>,
+    gthConfig: GthConfig
+  ): Promise<AgentMiddleware> =>
+    createBinaryContentInjectionMiddleware(
+      settings as BinaryContentInjectionMiddlewareSettings,
+      gthConfig
+    ),
 } satisfies Record<string, PredefinedMiddlewareFactory>;
 
 function isPredefinedMiddlewareName(

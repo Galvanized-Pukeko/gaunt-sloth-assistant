@@ -1,7 +1,7 @@
 {
   "llm": {
-    "type": "anthropic",
-    "model": "claude-sonnet-4-5"
+    "type": "openrouter",
+    "model": "x-ai/grok-4.1-fast"
   },
   "middleware": ["binary-content-injection"],
   "commands": {

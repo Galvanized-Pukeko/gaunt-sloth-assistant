@@ -601,38 +601,18 @@ export default class GthFileSystemToolkit extends BaseToolkit {
 
         try {
           const result = await readBinaryFile(validPath, maxSize, mimeType);
-          if (formatType === 'image') {
-            return [
-              {
-                type: 'image',
-                source_type: 'base64',
-                mime_type: mimeType,
-                data: result.data,
-                metadata: {
-                  path: validPath,
-                  size: result.size,
-                },
-              },
-            ];
-          }
 
-          const blockType = formatType === 'audio' ? 'audio' : 'file';
-          const metadata = {
+          // Return structure that middleware will process:
+          // - text summary for the model
+          // - binary data for middleware to inject as HumanMessage
+          return {
+            __binaryContent: true,  // Flag for middleware to detect
+            formatType,
+            media_type: mimeType,
+            data: result.data,
             path: validPath,
             size: result.size,
-            formatType,
-            ...(blockType === 'file' && { filename: path.basename(validPath) }),
           };
-
-          return [
-            {
-              type: blockType,
-              source_type: 'base64',
-              mime_type: mimeType,
-              data: result.data,
-              metadata,
-            },
-          ];
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return `Error reading binary file: ${message}`;

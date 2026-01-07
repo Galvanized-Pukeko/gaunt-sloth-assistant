@@ -3,6 +3,7 @@
     "type": "openai",
     "model": "gpt-5-mini"
   },
+  "middleware": ["binary-content-injection"],
   "pr": {
     "filesystem": "none"
   },
