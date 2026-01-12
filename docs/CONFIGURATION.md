@@ -123,20 +123,19 @@ Enable binary formats by adding the `binaryFormats` array to your config:
 {
   "binaryFormats": [
     { "type": "image", "extensions": ["png", "jpg", "jpeg", "webp", "gif"] },
-    { "type": "document", "extensions": ["pdf"] }
+    { "type": "file", "extensions": ["pdf"] }
   ]
 }
 ```
 
 Format types:
 
-| Type | Description |
-|------|-------------|
-| `image` | Image files for vision-capable models |
-| `document` | Document files (e.g., PDFs) |
-| `audio` | Audio files for speech-capable models |
-| `video` | Video files for video-capable models |
-| `binary` | Arbitrary binary files (use with caution) |
+| Type     | Description                               |
+|----------|-------------------------------------------|
+| `image`  | Image files for vision-capable models     |
+| `file`   | Other files (e.g., PDFs)                  |
+| `audio`  | Audio files for speech-capable models     |
+| `video`  | Video files for video-capable models      |
 
 Each format type supports:
 - `type` (required): The format type category
