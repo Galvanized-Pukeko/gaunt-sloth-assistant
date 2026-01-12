@@ -133,12 +133,15 @@ export function createImageFormatMiddleware(
         const transformedContent = transformToolResult(result.content);
 
         if (result.content !== transformedContent) {
-          debugLog('Image format middleware: transformed LangChain universal format → Anthropic format');
+          debugLog(
+            'Image format middleware: transformed LangChain universal format → Anthropic format'
+          );
         }
 
         // Return a new ToolMessage with transformed content
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         return new ToolMessage({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content: transformedContent as any,
           tool_call_id: result.tool_call_id,
           name: result.name,

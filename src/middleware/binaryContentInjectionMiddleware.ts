@@ -109,7 +109,7 @@ export function createBinaryContentInjectionMiddleware(
         if (typeof content === 'string' && content.trim().startsWith('{')) {
           try {
             content = JSON.parse(content);
-          } catch (e) {
+          } catch (_) {
             // Not JSON, proceed with original string
           }
         }

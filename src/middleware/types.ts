@@ -80,6 +80,7 @@ export interface ImageFormatTransformConfig {
  * This middleware intercepts tool results containing binary data (images, PDFs, audio)
  * and injects them as HumanMessage content blocks.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface BinaryContentInjectionConfig {
   // No additional configuration needed currently
   // Reserved for future options like max binary size, format filtering, etc.

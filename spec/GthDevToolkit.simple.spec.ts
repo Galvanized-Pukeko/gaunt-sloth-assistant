@@ -111,12 +111,16 @@ describe('GthDevToolkit - Basic Tests', () => {
   describe('buildSingleTestCommand', () => {
     it('should build command with placeholder', () => {
       toolkit = new GthDevToolkit({ run_single_test: 'npm test -- ${testPath}' });
-      expect(toolkit['buildSingleTestCommand']('spec/test-open-router-image.ts')).toBe('npm test -- spec/test-open-router-image.ts');
+      expect(toolkit['buildSingleTestCommand']('spec/test-open-router-image.ts')).toBe(
+        'npm test -- spec/test-open-router-image.ts'
+      );
     });
 
     it('should build command without placeholder', () => {
       toolkit = new GthDevToolkit({ run_single_test: 'npm test' });
-      expect(toolkit['buildSingleTestCommand']('spec/test-open-router-image.ts')).toBe('npm test spec/test-open-router-image.ts');
+      expect(toolkit['buildSingleTestCommand']('spec/test-open-router-image.ts')).toBe(
+        'npm test spec/test-open-router-image.ts'
+      );
     });
 
     it('should throw if no command configured', () => {
@@ -209,9 +213,9 @@ describe('GthDevToolkit - Basic Tests', () => {
 
     it('should reject absolute paths in run_single_test', async () => {
       const tool = toolkit.tools.find((t) => t.name === 'run_single_test')!;
-      await expect(tool.invoke({ testPath: '/absolute/path/test-open-router-image.ts' })).rejects.toThrow(
-        "Absolute paths are not allowed for parameter 'testPath'"
-      );
+      await expect(
+        tool.invoke({ testPath: '/absolute/path/test-open-router-image.ts' })
+      ).rejects.toThrow("Absolute paths are not allowed for parameter 'testPath'");
     });
 
     it('should reject shell injection in run_single_test', async () => {

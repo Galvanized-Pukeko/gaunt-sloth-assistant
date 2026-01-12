@@ -606,7 +606,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
           // - text summary for the model
           // - binary data for middleware to inject as HumanMessage
           return {
-            __binaryContent: true,  // Flag for middleware to detect
+            __binaryContent: true, // Flag for middleware to detect
             formatType,
             media_type: mimeType,
             data: result.data,
