@@ -16,18 +16,10 @@ import type { GthConfig } from '#src/config.js';
 import { debugLog } from '#src/utils/debugUtils.js';
 import { ToolMessage, HumanMessage } from '@langchain/core/messages';
 import type { MessageContent } from '@langchain/core/messages';
+import type { BinaryContentData } from '#src/types/binaryContent.js';
 
 export interface BinaryContentInjectionMiddlewareSettings {
   name?: 'binary-content-injection';
-}
-
-interface BinaryContentData {
-  __binaryContent: true;
-  formatType: string;
-  media_type: string;
-  data: string;
-  path: string;
-  size: number;
 }
 
 function isBinaryContentData(content: unknown): content is BinaryContentData {
@@ -53,7 +45,7 @@ function createContentBlock(binaryData: BinaryContentData): Record<string, unkno
     };
   }
 
-  // For audio and documents, use Anthropic format
+  // For audio and files, use Anthropic format
   // (these are less commonly supported across providers)
   if (formatType === 'audio') {
     return {
@@ -66,7 +58,7 @@ function createContentBlock(binaryData: BinaryContentData): Record<string, unkno
     };
   }
 
-  // PDF and other documents
+  // PDF and other files
   return {
     type: 'document',
     source: {
@@ -81,7 +73,8 @@ function getFormatLabel(formatType: string): string {
   const labels: Record<string, string> = {
     image: 'image',
     audio: 'audio',
-    pdf: 'PDF document',
+    file: 'file',
+    binary: 'binary file',
   };
   return labels[formatType] || 'file';
 }

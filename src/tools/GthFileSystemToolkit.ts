@@ -11,6 +11,7 @@ import { shouldIgnoreFile } from '#src/utils/aiignoreUtils.js';
 import { getProjectDir } from '#src/utils/systemUtils.js';
 import type { BinaryFormatConfig, BinaryFormatType } from '#src/config.js';
 import { getFormatForExtension, getMimeType, readBinaryFile } from '#src/tools/binaryUtils.js';
+import type { BinaryContentData } from '#src/types/binaryContent.js';
 
 /**
  * Filesystem toolkit
@@ -21,8 +22,10 @@ import { getFormatForExtension, getMimeType, readBinaryFile } from '#src/tools/b
 const IGNORED_DIRS = ['node_modules', '.git', '.idea', 'dist'];
 
 // Helper function to create a tool with filesystem type
+type GthToolResult = string | BinaryContentData;
+
 function createGthTool<T extends z.ZodSchema>(
-  fn: (args: z.infer<T>) => Promise<unknown>,
+  fn: (args: z.infer<T>) => Promise<GthToolResult>,
   config: {
     name: string;
     description: string;
@@ -46,7 +49,7 @@ const ReadFileArgsSchema = z.object({
 const ReadBinaryArgsSchema = z.object({
   path: z.string().describe('Path to the binary file to read'),
   formatHint: z
-    .enum(['image', 'document', 'audio', 'video', 'binary'])
+    .enum(['image', 'file', 'audio', 'video', 'binary'])
     .optional()
     .describe(
       'Optional hint for the format type. If not provided, determined from file extension via config.'
@@ -548,7 +551,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
 
   private createReadBinaryTool(): StructuredToolInterface {
     return createGthTool(
-      async (args: z.infer<typeof ReadBinaryArgsSchema>): Promise<unknown> => {
+      async (args: z.infer<typeof ReadBinaryArgsSchema>): Promise<GthToolResult> => {
         if (!this.binaryFormats || !Array.isArray(this.binaryFormats)) {
           return 'Binary formats are not configured. Add binaryFormats to your config to enable this feature.';
         }
@@ -621,7 +624,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
       {
         name: 'read_binary',
         description:
-          'Read a binary file (image, document, audio, video) and return its base64-encoded content. ' +
+          'Read a binary file (image, file, audio, video) and return its base64-encoded content. ' +
           'Only works for file types configured in binaryFormats.',
         schema: ReadBinaryArgsSchema,
       },

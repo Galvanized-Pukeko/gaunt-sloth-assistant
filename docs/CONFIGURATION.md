@@ -109,7 +109,7 @@ When `.aiignore` is missing, Gaunt Sloth logs the message at debug level only.
 
 ## Binary Format Configuration
 
-Gaunt Sloth can process binary formats (images, documents, audio, video) when your LLM model
+Gaunt Sloth can process binary formats (images, files, audio, video) when your LLM model
 supports multimodal inputs.
 
 Important notes:

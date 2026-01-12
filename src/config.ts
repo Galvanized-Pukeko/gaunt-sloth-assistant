@@ -251,7 +251,7 @@ export interface RawGthConfig extends Omit<GthConfig, 'llm' | 'consoleLevel'> {
   consoleLevel?: ConsoleLevelInput;
 }
 
-export type BinaryFormatType = 'image' | 'document' | 'audio' | 'video' | 'binary';
+export type BinaryFormatType = 'image' | 'file' | 'audio' | 'video' | 'binary';
 
 export interface BinaryFormatConfig {
   /**

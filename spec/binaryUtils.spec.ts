@@ -17,7 +17,7 @@ describe('binaryUtils', () => {
     const { getFormatForExtension } = await import('#src/tools/binaryUtils.js');
     const configs: BinaryFormatConfig[] = [
       { type: 'image', extensions: ['png', 'jpg'] },
-      { type: 'document', extensions: ['pdf'] },
+      { type: 'file', extensions: ['pdf'] },
       { type: 'binary', extensions: ['bin', 'png'] },
     ];
 
