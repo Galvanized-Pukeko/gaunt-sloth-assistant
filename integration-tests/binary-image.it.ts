@@ -53,7 +53,7 @@ describe('Binary Image Integration Tests', () => {
       '-c',
       relativeConfigPath,
       'ask',
-      '"Use the read_binary tool on test-data/image2.png. What is on the picture test-data/image.png?"',
+      '"Use the read_binary tool on test-data/image2.png. What is on the picture test-data/image2.png?"',
     ]);
 
     expect(output.toLowerCase()).toContain('bicycle');
