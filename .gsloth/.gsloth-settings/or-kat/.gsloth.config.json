@@ -1,9 +1,12 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "xiaomi/mimo-v2-flash:free"
+    "model": "kwaipilot/kat-coder-pro"
   },
   "commands": {
+    "ask": {
+      "filesystem": "all"
+    },
     "code": {
       "filesystem": "all",
       "devTools": {

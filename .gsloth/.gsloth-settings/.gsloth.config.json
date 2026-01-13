@@ -1,17 +1,52 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "minimax/minimax-m2.1"
+    "model": "anthropic/claude-sonnet-4.5"
   },
   "commands": {
     "code": {
-      "filesystem": "all",
-      "devTools": {
-        "run_build": "npm run build",
-        "run_tests": "npm test",
-        "run_lint": "npm run lint-n-fix",
-        "run_single_test": "npm test"
+      "filesystem": "all"
+    }
+  },
+  "customTools": {
+    "ask_opus": {
+      "command": "gth -i or-opus ask ${question}",
+      "description": "Ask question using high intelligence Claude Opus model. Opus has web search built-in, but it only has read filesystem access.",
+      "parameters": {
+        "question": {
+          "description": "Ask a brief question referring sourcecode files or create a file in `briefs` dir with more detailed instructions and tell Opus to read it."
+        }
+      }
+    },
+    "quick_coder": {
+      "command": "gth -i or-kat ask ${message}",
+      "description": "Delegate trivial coder tasks to this coder agent. It is highly recommended to use this command for quick and simple coding tasks.",
+      "parameters": {
+        "message": {
+          "description": "Provide simple instructions in message or create a file in `briefs` dir with more detailed instructions and tell coder to read it."
+        }
+      }
+    },
+    "tester": {
+      "command": "gth -i or-tester ask ${message}",
+      "description": "Ask tester to run tests or to run a build. Tester has only read filesystem access. Tester is able to run: lint, unit tests, integration tests, build.",
+      "parameters": {
+        "message": {
+          "description": "A message to ask. Feel free to create a file in `briefs` dir with more detailed instructions and tell tester to read it."
+        }
       }
     }
-  }
+  },
+  "binaryFormats": [{ "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp"] }],
+  "middleware": [
+    {
+      "name": "summarization",
+      "trigger": {
+        "tokens": 190000
+      },
+      "keep": {
+        "tokens": 20000
+      }
+    }
+  ]
 }
