@@ -146,29 +146,8 @@ export default class GthFileSystemToolkit extends BaseToolkit {
   };
   private binaryFormats?: false | BinaryFormatConfig[];
 
-  constructor(options?: GthFileSystemToolkitOptions);
-  constructor(
-    allowedDirectories?: string[],
-    aiignoreConfig?: {
-      enabled?: boolean;
-      patterns?: string[];
-    }
-  );
-  constructor(
-    optionsOrAllowedDirectories: GthFileSystemToolkitOptions | string[] = {},
-    aiignoreConfig?: {
-      enabled?: boolean;
-      patterns?: string[];
-    }
-  ) {
+  constructor(options: GthFileSystemToolkitOptions = {}) {
     super();
-    const options = Array.isArray(optionsOrAllowedDirectories)
-      ? {
-          allowedDirectories: optionsOrAllowedDirectories,
-          aiignoreConfig,
-        }
-      : optionsOrAllowedDirectories;
-
     const allowedDirectories = options.allowedDirectories ?? [process.cwd()];
     this.allowedDirectories = allowedDirectories.map((dir) =>
       this.normalizePath(path.resolve(this.expandHome(dir)))
