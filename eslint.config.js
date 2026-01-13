@@ -16,10 +16,12 @@ const __dirname = path.dirname(__filename);
 const globalIgnores = [
   '**/node_modules/**',
   '**/dist/**',
-  '**/test-data/**',
+  'integration-tests/workdir',
   'docs-generated/**',
   'coverage/**',
   '.git/**',
+  'vitest-it.config.js',
+  'vitest-it.config.d.ts',
 ];
 
 export default defineConfig([
