@@ -34,38 +34,11 @@ function isBinaryContentData(content: unknown): content is BinaryContentData {
 function createContentBlock(binaryData: BinaryContentData): Record<string, unknown> {
   const { formatType, media_type, data } = binaryData;
 
-  // For images, use OpenAI image_url format (works with OpenRouter and most providers)
-  // LangChain will convert this to provider-specific format as needed
-  if (formatType === 'image') {
-    return {
-      type: 'image_url',
-      image_url: {
-        url: `data:${media_type};base64,${data}`,
-      },
-    };
-  }
-
-  // For audio and files, use Anthropic format
-  // (these are less commonly supported across providers)
-  if (formatType === 'audio') {
-    return {
-      type: 'audio',
-      source: {
-        type: 'base64',
-        media_type,
-        data,
-      },
-    };
-  }
-
-  // PDF and other files
   return {
-    type: 'file',
-    source: {
-      type: 'base64',
-      media_type,
-      data,
-    },
+    type: formatType,
+    source_type: 'base64',
+    mime_type: media_type,
+    data: data,
   };
 }
 
@@ -96,6 +69,8 @@ export function createBinaryContentInjectionMiddleware(
           return result;
         }
 
+        console.log(result.name);
+        console.log(result);
         // Parse content if it's a JSON string
         let content = result.content;
         if (typeof content === 'string' && content.trim().startsWith('{')) {

@@ -38,7 +38,7 @@ describe('Binary Image Integration Tests', () => {
       '-c',
       relativeConfigPath,
       'ask',
-      '"Use the read_binary tool on test-data/image.png. What is on the picture test-data/image.png?"',
+      '"Use the gth_read_binary tool on test-data/image.png. What is on the picture test-data/image.png?"',
     ]);
 
     // The image has a picture of a soccer ball,
@@ -55,7 +55,7 @@ describe('Binary Image Integration Tests', () => {
       '-c',
       relativeConfigPath,
       'ask',
-      '"Use the read_binary tool on test-data/image2.png. What is on the picture test-data/image2.png?"',
+      '"Use the gth_read_binary tool on test-data/image2.png. What is on the picture test-data/image2.png?"',
     ]);
 
     // The picture contains a road bike,

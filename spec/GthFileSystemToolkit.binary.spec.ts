@@ -45,22 +45,22 @@ describe('GthFileSystemToolkit - Binary Tool', () => {
     readBinaryFileMock = binaryUtils.readBinaryFile as unknown as ReturnType<typeof vi.fn>;
   });
 
-  it('should not include read_binary when binaryFormats is not configured', () => {
+  it('should not include gth_read_binary when binaryFormats is not configured', () => {
     const toolkit = new GthFileSystemToolkit({ allowedDirectories: [process.cwd()] });
     const toolNames = toolkit.tools.map((tool) => tool.name);
-    expect(toolNames).not.toContain('read_binary');
+    expect(toolNames).not.toContain('gth_read_binary');
   });
 
-  it('should include read_binary when binaryFormats is configured', () => {
+  it('should include gth_read_binary when binaryFormats is configured', () => {
     const toolkit = new GthFileSystemToolkit({
       allowedDirectories: [process.cwd()],
       binaryFormats: [{ type: 'image', extensions: ['png'] }],
     });
     const toolNames = toolkit.tools.map((tool) => tool.name);
-    expect(toolNames).toContain('read_binary');
+    expect(toolNames).toContain('gth_read_binary');
   });
 
-  it('read_binary should return an image payload for image formats', async () => {
+  it('gth_read_binary should return an image payload for image formats', async () => {
     readBinaryFileMock.mockResolvedValue({
       data: 'abc',
       size: 3,
@@ -71,7 +71,7 @@ describe('GthFileSystemToolkit - Binary Tool', () => {
       allowedDirectories: [process.cwd()],
       binaryFormats: [{ type: 'image', extensions: ['png'] }],
     });
-    const tool = toolkit.tools.find((t) => t.name === 'read_binary')!;
+    const tool = toolkit.tools.find((t) => t.name === 'gth_read_binary')!;
     const filePath = path.join(process.cwd(), 'test.png');
 
     const result = await tool.invoke({ path: filePath });
@@ -85,7 +85,7 @@ describe('GthFileSystemToolkit - Binary Tool', () => {
     });
   });
 
-  it('read_binary should return a binary payload for non-image formats', async () => {
+  it('gth_read_binary should return a binary payload for non-image formats', async () => {
     readBinaryFileMock.mockResolvedValue({
       data: 'def',
       size: 3,
@@ -96,7 +96,7 @@ describe('GthFileSystemToolkit - Binary Tool', () => {
       allowedDirectories: [process.cwd()],
       binaryFormats: [{ type: 'audio', extensions: ['mp3'] }],
     });
-    const tool = toolkit.tools.find((t) => t.name === 'read_binary')!;
+    const tool = toolkit.tools.find((t) => t.name === 'gth_read_binary')!;
     const filePath = path.join(process.cwd(), 'test.mp3');
 
     const result = await tool.invoke({ path: filePath, formatHint: 'audio' });
@@ -110,40 +110,40 @@ describe('GthFileSystemToolkit - Binary Tool', () => {
     });
   });
 
-  it('read_binary should reject unconfigured extensions', async () => {
+  it('gth_read_binary should reject unconfigured extensions', async () => {
     const toolkit = new GthFileSystemToolkit({
       allowedDirectories: [process.cwd()],
       binaryFormats: [{ type: 'image', extensions: ['png'] }],
     });
-    const tool = toolkit.tools.find((t) => t.name === 'read_binary')!;
+    const tool = toolkit.tools.find((t) => t.name === 'gth_read_binary')!;
     const filePath = path.join(process.cwd(), 'test.pdf');
 
     const result = await tool.invoke({ path: filePath });
     expect(result).toContain("Extension '.pdf' is not configured");
   });
 
-  it('read_binary should reject aiignored paths', async () => {
+  it('gth_read_binary should reject aiignored paths', async () => {
     aiignoreUtilsMock.shouldIgnoreFile.mockReturnValue(true);
 
     const toolkit = new GthFileSystemToolkit({
       allowedDirectories: [process.cwd()],
       binaryFormats: [{ type: 'image', extensions: ['png'] }],
     });
-    const tool = toolkit.tools.find((t) => t.name === 'read_binary')!;
+    const tool = toolkit.tools.find((t) => t.name === 'gth_read_binary')!;
     const filePath = path.join(process.cwd(), 'test.png');
 
     const result = await tool.invoke({ path: filePath });
     expect(result).toBe('Path is not within allowed directories or is blocked by .aiignore');
   });
 
-  it('read_binary should surface read errors', async () => {
+  it('gth_read_binary should surface read errors', async () => {
     readBinaryFileMock.mockRejectedValue(new Error('boom'));
 
     const toolkit = new GthFileSystemToolkit({
       allowedDirectories: [process.cwd()],
       binaryFormats: [{ type: 'image', extensions: ['png'] }],
     });
-    const tool = toolkit.tools.find((t) => t.name === 'read_binary')!;
+    const tool = toolkit.tools.find((t) => t.name === 'gth_read_binary')!;
     const filePath = path.join(process.cwd(), 'test.png');
 
     const result = await tool.invoke({ path: filePath });

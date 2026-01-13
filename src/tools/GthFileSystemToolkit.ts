@@ -622,7 +622,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
         }
       },
       {
-        name: 'read_binary',
+        name: 'gth_read_binary',
         description:
           'Read a binary file (image, file, audio, video) and return its base64-encoded content. ' +
           'Only works for file types configured in binaryFormats.',

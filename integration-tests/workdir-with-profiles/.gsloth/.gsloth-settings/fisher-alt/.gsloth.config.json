@@ -1,8 +1,7 @@
 {
   "llm": {
-    "type": "vertexai",
-    "model": "gemini-3-pro-preview",
-    "location": "global",
+    "type": "anthropic",
+    "model": "claude-3-5-haiku-latest",
     "temperature": 0
   },
   "canInterruptInferenceWithEsc": false
