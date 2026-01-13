@@ -1,0 +1,13 @@
+{
+  "llm": {
+    "type": "openai",
+    "model": "gpt-5-mini"
+  },
+  "pr": {
+    "filesystem": "none"
+  },
+  "review": {
+    "filesystem": "none"
+  },
+  "binaryFormats": [{ "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp"] }]
+}

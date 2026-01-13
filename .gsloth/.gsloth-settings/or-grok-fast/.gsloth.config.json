@@ -1,0 +1,18 @@
+{
+  "llm": {
+    "type": "openrouter",
+    "model": "x-ai/grok-4.1-fast"
+  },
+  "commands": {
+    "code": {
+      "filesystem": "all",
+      "devTools": {
+        "run_build": "npm run build",
+        "run_tests": "npm test",
+        "run_lint": "npm run lint-n-fix",
+        "run_single_test": "npm test"
+      }
+    }
+  },
+  "binaryFormats": [{ "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp"] }]
+}
