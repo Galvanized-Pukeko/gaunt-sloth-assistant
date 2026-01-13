@@ -2,9 +2,12 @@
  * @packageDocumentation
  * Middleware to inject binary content (images, PDFs, audio) as HumanMessage.
  *
- * Tools return binary data as objects, and this middleware:
- * 1. Detects binary content in ToolMessage results
- * 2. Converts ToolMessage content to simple text
+ * The gth_read_binary tool returns binary data as a special string format:
+ * gth_read_binary;type:${type};path:${path};data:${media_type};base64,${data}
+ *
+ * This middleware:
+ * 1. Detects the gth_read_binary tool calls
+ * 2. Parses the special string format from ToolMessage content
  * 3. Injects HumanMessage with binary content blocks before next model call
  *
  * This works around LangChain's limitation where ToolMessage doesn't properly
@@ -16,22 +19,54 @@ import type { GthConfig } from '#src/config.js';
 import { debugLog } from '#src/utils/debugUtils.js';
 import { ToolMessage, HumanMessage } from '@langchain/core/messages';
 import type { MessageContent } from '@langchain/core/messages';
-import type { BinaryContentData } from '#src/types/binaryContent.js';
 
 export interface BinaryContentInjectionMiddlewareSettings {
   name?: 'binary-content-injection';
 }
 
-function isBinaryContentData(content: unknown): content is BinaryContentData {
-  return (
-    typeof content === 'object' &&
-    content !== null &&
-    '__binaryContent' in content &&
-    content.__binaryContent === true
-  );
+interface ParsedBinaryContent {
+  formatType: string;
+  path: string;
+  media_type: string;
+  data: string;
 }
 
-function createContentBlock(binaryData: BinaryContentData): Record<string, unknown> {
+/**
+ * Parse the special binary format string returned by gth_read_binary tool.
+ * Format: gth_read_binary;type:${type};path:${path};data:${media_type};base64,${data}
+ */
+function parseBinaryContent(content: string): ParsedBinaryContent | null {
+  if (!content.startsWith('gth_read_binary;')) {
+    return null;
+  }
+
+  try {
+    const parts = content.split(';');
+    if (parts.length < 4) {
+      return null;
+    }
+
+    const typeMatch = parts[1]?.match(/^type:(.+)$/);
+    const pathMatch = parts[2]?.match(/^path:(.+)$/);
+    const dataMatch = parts[3]?.match(/^data:(.+)$/);
+    const base64Match = content.match(/;base64,(.+)$/);
+
+    if (!typeMatch || !pathMatch || !dataMatch || !base64Match) {
+      return null;
+    }
+
+    return {
+      formatType: typeMatch[1],
+      path: pathMatch[1],
+      media_type: dataMatch[1],
+      data: base64Match[1],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function createContentBlock(binaryData: ParsedBinaryContent): Record<string, unknown> {
   const { formatType, media_type, data } = binaryData;
 
   return {
@@ -61,61 +96,25 @@ export function createBinaryContentInjectionMiddleware(
     createMiddleware({
       name: 'binary-content-injection',
 
-      // Step 1: Transform ToolMessage content from binary data object to simple text
-      wrapToolCall: async (request, handler) => {
-        const result = await handler(request);
-
-        if (!(result instanceof ToolMessage)) {
-          return result;
-        }
-
-        console.log(result.name);
-        console.log(result);
-        // Parse content if it's a JSON string
-        let content = result.content;
-        if (typeof content === 'string' && content.trim().startsWith('{')) {
-          try {
-            content = JSON.parse(content);
-          } catch (_) {
-            // Not JSON, proceed with original string
-          }
-        }
-
-        // Check if this is binary content
-        if (isBinaryContentData(content)) {
-          const binaryData = content;
-          const formatLabel = getFormatLabel(binaryData.formatType);
-
-          debugLog(
-            `Binary content detected in tool result: ${formatLabel} from ${binaryData.path}`
-          );
-
-          // Convert to simple text and store binary data in artifact
-          return new ToolMessage({
-            content: `Successfully read ${formatLabel} from ${binaryData.path} (${Math.round(binaryData.size / 1024)}KB)`,
-            tool_call_id: result.tool_call_id,
-            name: result.name,
-            // Store binary data in artifact so beforeModel can access it
-            artifact: binaryData,
-            status: result.status || 'success',
-          });
-        }
-
-        return result;
-      },
-
-      // Step 2: Before next model call, inject HumanMessage with binary content
+      // Before next model call, detect and inject HumanMessage with binary content
       beforeModel: async (state) => {
         const messages = state.messages || [];
 
-        // Find recent ToolMessages with binary artifacts
-        const binaryMessages: Array<{ message: ToolMessage; binaryData: BinaryContentData }> = [];
+        // Find recent ToolMessages from gth_read_binary
+        const binaryMessages: Array<{ message: ToolMessage; binaryData: ParsedBinaryContent }> = [];
 
         // Check last few messages (usually just need to check the most recent)
         for (let i = messages.length - 1; i >= Math.max(0, messages.length - 5); i--) {
           const msg = messages[i];
-          if (msg instanceof ToolMessage && isBinaryContentData(msg.artifact)) {
-            binaryMessages.push({ message: msg, binaryData: msg.artifact });
+          if (
+            msg instanceof ToolMessage &&
+            msg.name === 'gth_read_binary' &&
+            typeof msg.content === 'string'
+          ) {
+            const parsedContent = parseBinaryContent(msg.content);
+            if (parsedContent) {
+              binaryMessages.push({ message: msg, binaryData: parsedContent });
+            }
           }
         }
 

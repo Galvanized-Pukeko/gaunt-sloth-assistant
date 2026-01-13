@@ -1,8 +1,9 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "minimax/minimax-m2.1"
+    "model": "anthropic/claude-sonnet-4.5"
   },
+  "debugLog": true,
   "commands": {
     "code": {
       "filesystem": "all",
@@ -13,5 +14,24 @@
         "run_single_test": "npm test"
       }
     }
-  }
+  },
+  "customTools": {
+    "build": {
+      "command": "bun build index.ts --outdir out",
+      "description": "Run build with index.ts as entry-point"
+    },
+    "run_single_integration_test": {
+      "command": "npm run it ${provider} ${testFileName}",
+      "description": "Run single integration test from `integration-tests` dir",
+      "parameters": {
+        "provider": {
+          "description": "Eval name to run"
+        },
+        "testFileName": {
+          "description": "Test file name to run"
+        }
+      }
+    }
+  },
+  "binaryFormats": [{ "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp"] }]
 }

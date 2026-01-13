@@ -11,7 +11,6 @@ import { shouldIgnoreFile } from '#src/utils/aiignoreUtils.js';
 import { getProjectDir } from '#src/utils/systemUtils.js';
 import type { BinaryFormatConfig, BinaryFormatType } from '#src/config.js';
 import { getFormatForExtension, getMimeType, readBinaryFile } from '#src/tools/binaryUtils.js';
-import type { BinaryContentData } from '#src/types/binaryContent.js';
 
 /**
  * Filesystem toolkit
@@ -22,10 +21,8 @@ import type { BinaryContentData } from '#src/types/binaryContent.js';
 const IGNORED_DIRS = ['node_modules', '.git', '.idea', 'dist'];
 
 // Helper function to create a tool with filesystem type
-type GthToolResult = string | BinaryContentData;
-
 function createGthTool<T extends z.ZodSchema>(
-  fn: (args: z.infer<T>) => Promise<GthToolResult>,
+  fn: (args: z.infer<T>) => Promise<string>,
   config: {
     name: string;
     description: string;
@@ -551,7 +548,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
 
   private createReadBinaryTool(): StructuredToolInterface {
     return createGthTool(
-      async (args: z.infer<typeof ReadBinaryArgsSchema>): Promise<GthToolResult> => {
+      async (args: z.infer<typeof ReadBinaryArgsSchema>): Promise<string> => {
         if (!this.binaryFormats || !Array.isArray(this.binaryFormats)) {
           return 'Binary formats are not configured. Add binaryFormats to your config to enable this feature.';
         }
@@ -605,17 +602,9 @@ export default class GthFileSystemToolkit extends BaseToolkit {
         try {
           const result = await readBinaryFile(validPath, maxSize, mimeType);
 
-          // Return structure that middleware will process:
-          // - text summary for the model
-          // - binary data for middleware to inject as HumanMessage
-          return {
-            __binaryContent: true, // Flag for middleware to detect
-            formatType,
-            media_type: mimeType,
-            data: result.data,
-            path: validPath,
-            size: result.size,
-          };
+          // Return special format string that middleware will parse and process:
+          // Format: gth_read_binary;type:${type};path:${path};data:${media_type};base64,${data}
+          return `gth_read_binary;type:${formatType};path:${validPath};data:${mimeType};base64,${result.data}`;
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return `Error reading binary file: ${message}`;
