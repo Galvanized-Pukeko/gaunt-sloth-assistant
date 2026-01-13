@@ -25,10 +25,6 @@ import {
   type ReviewRateMiddlewareSettings,
 } from '#src/middleware/reviewRateMiddleware.js';
 import {
-  createImageFormatMiddleware,
-  type ImageFormatMiddlewareSettings,
-} from '#src/middleware/imageFormatMiddleware.js';
-import {
   createBinaryContentInjectionMiddleware,
   type BinaryContentInjectionMiddlewareSettings,
 } from '#src/middleware/binaryContentInjectionMiddleware.js';
@@ -66,17 +62,6 @@ const predefinedMiddlewareFactories = {
     gthConfig: GthConfig
   ): Promise<AgentMiddleware> =>
     createReviewRateMiddleware(settings as ReviewRateMiddlewareSettings, gthConfig),
-  /**
-   * Image format transformation middleware.
-   * Transforms image content blocks from OpenAI format to Anthropic format for Anthropic models.
-   * Does nothing for other providers (they use OpenAI format natively).
-   * TODO 199 we probably need to remove this
-   */
-  'image-format-transform': (
-    settings: Record<string, unknown>,
-    gthConfig: GthConfig
-  ): Promise<AgentMiddleware> =>
-    createImageFormatMiddleware(settings as ImageFormatMiddlewareSettings, gthConfig),
   /**
    * Binary content injection middleware.
    * Intercepts tool results containing binary data (images, PDFs, audio) and injects them

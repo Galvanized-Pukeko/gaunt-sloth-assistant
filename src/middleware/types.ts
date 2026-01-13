@@ -17,7 +17,6 @@ export type PredefinedMiddlewareName =
   | 'anthropic-prompt-caching'
   | 'summarization'
   | 'review-rate'
-  | 'image-format-transform'
   | 'binary-content-injection';
 
 /**
@@ -93,7 +92,6 @@ export type PredefinedMiddlewareConfig =
   | ({ name: 'anthropic-prompt-caching' } & AnthropicPromptCachingConfig)
   | ({ name: 'summarization' } & SummarizationConfig)
   | ({ name: 'review-rate' } & RatingConfig)
-  | ({ name: 'image-format-transform' } & ImageFormatTransformConfig)
   | ({ name: 'binary-content-injection' } & BinaryContentInjectionConfig);
 
 /**
