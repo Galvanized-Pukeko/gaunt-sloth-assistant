@@ -10,7 +10,7 @@
   },
   "customTools": {
     "ask_opus": {
-      "command": "gth -i or-opus ask ${question}",
+      "command": "gth --nopipe -i sub-opus ask '${question}'",
       "description": "Ask question using high intelligence Claude Opus model. Opus has web search built-in, but it only has read filesystem access.",
       "parameters": {
         "question": {
@@ -19,7 +19,7 @@
       }
     },
     "quick_coder": {
-      "command": "gth -i or-kat ask ${message}",
+      "command": "gth --nopipe -i sub-quick-coder ask '${message}'",
       "description": "Delegate trivial coder tasks to this coder agent. It is highly recommended to use this command for quick and simple coding tasks.",
       "parameters": {
         "message": {
@@ -28,7 +28,7 @@
       }
     },
     "tester": {
-      "command": "gth -i or-tester ask ${message}",
+      "command": "gth --nopipe -i sub-tester ask '${message}'",
       "description": "Ask tester to run tests or to run a build. Tester has only read filesystem access. Tester is able to run: lint, unit tests, integration tests, build.",
       "parameters": {
         "message": {

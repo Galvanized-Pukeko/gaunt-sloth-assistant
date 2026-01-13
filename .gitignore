@@ -13,3 +13,4 @@ gaunt-sloth-assistant.iml
 .gsloth/gth_*
 /gaunt-sloth.log
 req
+out/*
