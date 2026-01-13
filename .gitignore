@@ -2,9 +2,9 @@
 /dist/
 /req/
 /gth_*
-/integration-tests/gth_*
-/integration-tests/testreview.md
-/integration-tests/.gsloth.config.json
+/integration-tests/workdir/gth_*
+/integration-tests/workdir/testreview.md
+/integration-tests/workdir/.gsloth.config.json
 /docs-generated
 .junie
 .idea
