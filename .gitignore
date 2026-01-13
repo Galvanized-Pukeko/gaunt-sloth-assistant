@@ -5,7 +5,7 @@
 /integration-tests/workdir/gth_*
 /integration-tests/workdir/testreview.md
 /integration-tests/workdir/.gsloth.config.json
-/integration-tests/workdir-with-profiles/gth_*
+/integration-tests/workdir-with-profiles/.gsloth/gth_*
 /integration-tests/workdir-with-profiles/testreview.md
 /integration-tests/workdir-with-profiles/.gsloth.config.json
 /docs-generated
@@ -15,6 +15,7 @@ gaunt-sloth-assistant.iml
 .gsloth/.gsloth-settings/jira/
 .gsloth/gth_*
 /gaunt-sloth.log
+/vitest-it.config.d.ts
 /vitest-it.config.js
 /vitest-it.config.js.map
 req
