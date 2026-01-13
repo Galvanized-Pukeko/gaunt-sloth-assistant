@@ -2,11 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { runCommandExpectingExitCode } from './support/commandRunner.ts';
 import { extractReviewScore } from './support/reviewScoreExtractor.ts';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import path from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const WORKDIR = path.resolve('./integration-tests/workdir');
 
 describe('PR Command Integration Tests', () => {
   // Test for PR review with approval
@@ -28,7 +26,7 @@ describe('PR Command Integration Tests', () => {
     const score = extractReviewScore(output);
     expect(score).not.toBeNull();
     expect(score).toBeGreaterThanOrEqual(6); // At or above default threshold of 6
-    const testreview = fs.readFileSync(path.join(__dirname, 'testreview.md'), { encoding: 'utf8' });
+    const testreview = fs.readFileSync(path.join(WORKDIR, 'testreview.md'), { encoding: 'utf8' });
     expect(testreview).toContain('Model:');
     expect(testreview).toMatch(/(?:PASS|FAIL)\s+\d+\/10/);
   });

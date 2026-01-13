@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { runCommandExpectingExitCode, runCommandWithArgs } from './support/commandRunner.ts';
+import path from 'node:path';
+
+const PROFILES_WORKDIR = path.resolve('./integration-tests/workdir-with-profiles');
 
 describe('Review Command Integration Tests', () => {
   it('should work with default profile', async () => {
@@ -7,7 +10,7 @@ describe('Review Command Integration Tests', () => {
       'npx',
       ['gth', 'ask', '"what is your name?"'],
       undefined,
-      './integration-tests/workdir-with-profiles'
+      PROFILES_WORKDIR
     );
 
     expect(output).toContain('Voreinstellung');
@@ -16,7 +19,7 @@ describe('Review Command Integration Tests', () => {
       'npx',
       ['gth', 'ask', '"What is your favourite fish?"'],
       undefined,
-      './integration-tests/workdir-with-profiles'
+      PROFILES_WORKDIR
     );
 
     expect(favouriteFishOutput, 'should use default profile guidelines').toContain('Snapper');
@@ -28,7 +31,7 @@ describe('Review Command Integration Tests', () => {
       'npx',
       ['gth', '-i sorcerer', 'ask', '"what is your name?"'],
       undefined,
-      './integration-tests/workdir-with-profiles'
+      PROFILES_WORKDIR
     );
     expect(nameOutput).toContain('Bomp');
 
@@ -36,7 +39,7 @@ describe('Review Command Integration Tests', () => {
       'npx',
       ['gth', '-i sorcerer', 'review', 'good-spell.txt'],
       undefined,
-      './integration-tests/workdir-with-profiles'
+      PROFILES_WORKDIR
     );
 
     expect(spellReviewOutput).toContain('AXIOS');
@@ -45,7 +48,7 @@ describe('Review Command Integration Tests', () => {
       'npx',
       ['gth', '-i sorcerer', 'review', 'bad-spell.txt'],
       1,
-      './integration-tests/workdir-with-profiles'
+      PROFILES_WORKDIR
     );
 
     expect(failedSpellOutput).not.toContain('AXIOS');
@@ -56,7 +59,7 @@ describe('Review Command Integration Tests', () => {
       'npx',
       ['gth', '-i fisher-alt', 'ask', '"what is your name?"'],
       undefined,
-      './integration-tests/workdir-with-profiles'
+      PROFILES_WORKDIR
     );
 
     expect(
@@ -68,7 +71,7 @@ describe('Review Command Integration Tests', () => {
       'npx',
       ['gth', '-i fisher-alt', 'ask', '"What is your favourite fish?"'],
       undefined,
-      './integration-tests/workdir-with-profiles'
+      PROFILES_WORKDIR
     );
 
     expect(favouriteFishOutput, 'should use profile guidelines').toContain('Flounder');

@@ -7,7 +7,7 @@ describe('Review Command Integration Tests', () => {
   it('should provide positive review for good code and exit with code 0', async () => {
     const { output, exitCode } = await runCommandExpectingExitCode(
       'npx',
-      ['gth', '-wn', 'review', 'test-data/filewithgoodcode.js'],
+      ['gth', '-wn', 'review', 'filewithgoodcode.js'],
       0
     );
 

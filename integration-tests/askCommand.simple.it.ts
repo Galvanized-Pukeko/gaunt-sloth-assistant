@@ -19,7 +19,7 @@ describe('Ask Command Integration Tests', () => {
     const output = await runCommandWithArgs('npx', [
       'gth',
       'ask',
-      '"read file test-data/filewithgoodcode.js"',
+      '"read file filewithgoodcode.js"',
     ]);
 
     // Check for expected content in the response

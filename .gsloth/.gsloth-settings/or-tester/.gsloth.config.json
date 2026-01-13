@@ -24,7 +24,7 @@
       "description": "Run single integration test from `integration-tests` dir",
       "parameters": {
         "provider": {
-          "description": "Eval name to run"
+          "description": "AI provider name to run. Use `vertexai` unless something else is requested.`"
         },
         "testFileName": {
           "description": "Test file name to run"

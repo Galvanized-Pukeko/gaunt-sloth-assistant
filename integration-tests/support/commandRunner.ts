@@ -18,20 +18,21 @@ export async function runCommandWithArgs(
   endOutput?: string,
   workDir?: string
 ): Promise<string> {
-  const testDir = path.resolve(workDir ? workDir : './integration-tests');
+  const testDir = path.resolve(workDir ? workDir : './integration-tests/workdir');
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
 
-    const childProcess = spawn(command, args, {
+    const conf = {
       cwd: testDir,
       env: {
         ...process.env,
       },
-      shell: platform().includes('win'),
+      shell: platform().includes('win') && !platform().includes('darwin'),
       // Explicitly ignore stdin, otherwise the app switches to pipe mode
       stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    };
+    const childProcess = spawn(command, args, conf);
 
     childProcess.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -70,7 +71,7 @@ export async function runCommandExpectingExitCode(
   expectedExitCode: number,
   workDir?: string
 ): Promise<{ output: string; exitCode: number }> {
-  const testDir = path.resolve(workDir ? workDir : './integration-tests');
+  const testDir = path.resolve(workDir ? workDir : './integration-tests/workdir');
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
@@ -80,7 +81,7 @@ export async function runCommandExpectingExitCode(
       env: {
         ...process.env,
       },
-      shell: platform().includes('win'),
+      shell: platform().includes('win') && !platform().includes('darwin'),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -106,14 +107,19 @@ export async function runCommandExpectingExitCode(
   });
 }
 
-export function startChildProcess(command: string, args: string[], stdin: 'ignore' | 'pipe') {
-  const testDir = path.resolve('./integration-tests');
+export function startChildProcess(
+  command: string,
+  args: string[],
+  stdin: 'ignore' | 'pipe',
+  workDir?: string
+) {
+  const testDir = path.resolve(workDir ? workDir : './integration-tests/workdir');
   const childProcess = spawn(command, args, {
     cwd: testDir,
     env: {
       ...process.env,
     },
-    shell: platform().includes('win'),
+    shell: platform().includes('win') && !platform().includes('darwin'),
     // Explicitly ignore stdin, otherwise the app switches to pipe mode
     stdio: [stdin, 'pipe', 'pipe'],
   });

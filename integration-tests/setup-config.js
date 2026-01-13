@@ -31,20 +31,14 @@ if (!validConfigs.includes(configName)) {
 }
 
 const sourceFile = path.join(__dirname, 'configs', `${configName}.gsloth.config.json`);
-const targetFile = path.join(__dirname, '.gsloth.config.json');
+const workdirTargetFile = path.join(__dirname, 'workdir', '.gsloth.config.json');
 
-// Remove existing config if it exists
-if (fs.existsSync(targetFile)) {
-  fs.unlinkSync(targetFile);
-  console.log('Removed existing .gsloth.config.json');
-}
-
-// Copy the selected config
+// Copy the selected config to workdir
 try {
-  fs.copyFileSync(sourceFile, targetFile);
-  console.log(`Copied ${configName}.gsloth.config.json to .gsloth.config.json`);
+  fs.copyFileSync(sourceFile, workdirTargetFile);
+  console.log(`Copied ${configName}.gsloth.config.json to workdir/.gsloth.config.json`);
 } catch (error) {
-  console.error(`Error copying config file: ${error.message}`);
+  console.error(`Error copying config file to workdir: ${error.message}`);
   process.exit(1);
 }
 
@@ -116,8 +110,9 @@ if (fs.existsSync(settingsRoot)) {
   console.warn(`Profiles settings directory not found: ${settingsRoot}`);
 }
 
-const reviewPath = path.join(__dirname, 'testreview.md');
-if (fs.existsSync(reviewPath)) {
-  fs.unlinkSync(reviewPath);
-  console.log(`Removed testreview.md`);
+// Clean up testreview.md from workdir
+const workdirReviewPath = path.join(__dirname, 'workdir', 'testreview.md');
+if (fs.existsSync(workdirReviewPath)) {
+  fs.unlinkSync(workdirReviewPath);
+  console.log(`Removed workdir/testreview.md`);
 }

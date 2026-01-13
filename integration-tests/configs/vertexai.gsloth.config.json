@@ -13,6 +13,7 @@
     "filesystem": "none"
   },
   "binaryFormats": [
-    { "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"] }
+    { "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"] },
+    { "type": "file", "extensions": ["pdf"] }
   ]
 }
