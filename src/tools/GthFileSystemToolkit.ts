@@ -603,8 +603,10 @@ export default class GthFileSystemToolkit extends BaseToolkit {
           const result = await readBinaryFile(validPath, maxSize, mimeType);
 
           // Return special format string that middleware will parse and process:
-          // Format: gth_read_binary;type:${type};path:${path};data:${media_type};base64,${data}
-          return `gth_read_binary;type:${formatType};path:${validPath};data:${mimeType};base64,${result.data}`;
+          // Format: gth_read_binary;type:${type};path:${encodedPath};data:${media_type};base64,${data}
+          // Path is URL-encoded to handle special characters like semicolons
+          const encodedPath = encodeURIComponent(validPath);
+          return `gth_read_binary;type:${formatType};path:${encodedPath};data:${mimeType};base64,${result.data}`;
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return `Error reading binary file: ${message}`;

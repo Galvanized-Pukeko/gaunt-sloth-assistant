@@ -3,7 +3,8 @@
  * Middleware to inject binary content (images, PDFs, audio) as HumanMessage.
  *
  * The gth_read_binary tool returns binary data as a special string format:
- * gth_read_binary;type:${type};path:${path};data:${media_type};base64,${data}
+ * gth_read_binary;type:${type};path:${encodedPath};data:${media_type};base64,${data}
+ * where path is URL-encoded to handle special characters like semicolons.
  *
  * This middleware:
  * 1. Detects the gth_read_binary tool calls
@@ -33,7 +34,8 @@ interface ParsedBinaryContent {
 
 /**
  * Parse the special binary format string returned by gth_read_binary tool.
- * Format: gth_read_binary;type:${type};path:${path};data:${media_type};base64,${data}
+ * Format: gth_read_binary;type:${type};path:${encodedPath};data:${media_type};base64,${data}
+ * Path is URL-encoded to handle special characters.
  */
 function parseBinaryContent(content: string): ParsedBinaryContent | null {
   if (!content.startsWith('gth_read_binary;')) {
@@ -55,9 +57,12 @@ function parseBinaryContent(content: string): ParsedBinaryContent | null {
       return null;
     }
 
+    // Decode the URL-encoded path
+    const decodedPath = decodeURIComponent(pathMatch[1]);
+
     return {
       formatType: typeMatch[1],
-      path: pathMatch[1],
+      path: decodedPath,
       media_type: dataMatch[1],
       data: base64Match[1],
     };

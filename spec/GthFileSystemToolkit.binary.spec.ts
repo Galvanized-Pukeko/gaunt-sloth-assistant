@@ -75,7 +75,8 @@ describe('GthFileSystemToolkit - Binary Tool', () => {
     const filePath = path.join(process.cwd(), 'test.png');
 
     const result = await tool.invoke({ path: filePath });
-    expect(result).toBe(`gth_read_binary;type:image;path:${filePath};data:image/png;base64,abc`);
+    const encodedPath = encodeURIComponent(filePath);
+    expect(result).toBe(`gth_read_binary;type:image;path:${encodedPath};data:image/png;base64,abc`);
   });
 
   it('gth_read_binary should return a binary payload for non-image formats', async () => {
@@ -93,7 +94,10 @@ describe('GthFileSystemToolkit - Binary Tool', () => {
     const filePath = path.join(process.cwd(), 'test.mp3');
 
     const result = await tool.invoke({ path: filePath, formatHint: 'audio' });
-    expect(result).toBe(`gth_read_binary;type:audio;path:${filePath};data:audio/mpeg;base64,def`);
+    const encodedPath = encodeURIComponent(filePath);
+    expect(result).toBe(
+      `gth_read_binary;type:audio;path:${encodedPath};data:audio/mpeg;base64,def`
+    );
   });
 
   it('gth_read_binary should reject unconfigured extensions', async () => {
