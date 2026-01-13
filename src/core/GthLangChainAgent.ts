@@ -308,6 +308,10 @@ export class GthLangChainAgent implements GthAgentInterface {
         command && config.commands?.[command]?.builtInTools !== undefined
           ? config.commands[command].builtInTools!
           : config.builtInTools,
+      binaryFormats:
+        command && config.commands?.[command]?.binaryFormats !== undefined
+          ? config.commands[command].binaryFormats!
+          : config.binaryFormats,
     };
   }
 

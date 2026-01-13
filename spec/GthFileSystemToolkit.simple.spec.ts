@@ -52,14 +52,14 @@ describe('GthFileSystemToolkit - Basic Tests', () => {
   describe('constructor', () => {
     it('should initialize with default allowed directories', () => {
       // Use current working directory which should be allowed
-      toolkit = new GthFileSystemToolkit([process.cwd()]);
+      toolkit = new GthFileSystemToolkit({ allowedDirectories: [process.cwd()] });
       expect(toolkit).toBeDefined();
       expect(toolkit.tools).toBeDefined();
       expect(toolkit.tools.length).toBe(14); // All filesystem tools
     });
 
     it('should have all expected tools', () => {
-      toolkit = new GthFileSystemToolkit([process.cwd()]);
+      toolkit = new GthFileSystemToolkit({ allowedDirectories: [process.cwd()] });
       const toolNames = toolkit.tools.map((t) => t.name);
 
       expect(toolNames).toContain('read_file');
@@ -82,7 +82,7 @@ describe('GthFileSystemToolkit - Basic Tests', () => {
   describe('basic tool functionality', () => {
     beforeEach(() => {
       // Use a path that should be allowed (current directory)
-      toolkit = new GthFileSystemToolkit([process.cwd()]);
+      toolkit = new GthFileSystemToolkit({ allowedDirectories: [process.cwd()] });
     });
 
     it('read_file tool should be defined and callable', async () => {
@@ -148,7 +148,7 @@ describe('GthFileSystemToolkit - Basic Tests', () => {
 
   describe('utility methods', () => {
     beforeEach(() => {
-      toolkit = new GthFileSystemToolkit([process.cwd()]);
+      toolkit = new GthFileSystemToolkit({ allowedDirectories: [process.cwd()] });
     });
 
     it('should format file sizes correctly', () => {
@@ -177,7 +177,7 @@ describe('GthFileSystemToolkit - Basic Tests', () => {
 
     describe('path validation', () => {
       beforeEach(() => {
-        toolkit = new GthFileSystemToolkit([process.cwd()]);
+        toolkit = new GthFileSystemToolkit({ allowedDirectories: [process.cwd()] });
       });
 
       it('should allow paths within allowed directories', async () => {

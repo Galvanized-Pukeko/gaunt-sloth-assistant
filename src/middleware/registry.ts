@@ -24,6 +24,10 @@ import {
   createReviewRateMiddleware,
   type ReviewRateMiddlewareSettings,
 } from '#src/middleware/reviewRateMiddleware.js';
+import {
+  createBinaryContentInjectionMiddleware,
+  type BinaryContentInjectionMiddlewareSettings,
+} from '#src/middleware/binaryContentInjectionMiddleware.js';
 
 type PredefinedMiddlewareFactory = (
   settings: Record<string, unknown>,
@@ -58,6 +62,20 @@ const predefinedMiddlewareFactories = {
     gthConfig: GthConfig
   ): Promise<AgentMiddleware> =>
     createReviewRateMiddleware(settings as ReviewRateMiddlewareSettings, gthConfig),
+  /**
+   * Binary content injection middleware.
+   * Intercepts tool results containing binary data (images, PDFs, audio) and injects them
+   * as HumanMessage content blocks before the next model call.
+   * This works around LangChain's limitation where ToolMessage doesn't support binary content.
+   */
+  'binary-content-injection': (
+    settings: Record<string, unknown>,
+    gthConfig: GthConfig
+  ): Promise<AgentMiddleware> =>
+    createBinaryContentInjectionMiddleware(
+      settings as BinaryContentInjectionMiddlewareSettings,
+      gthConfig
+    ),
 } satisfies Record<string, PredefinedMiddlewareFactory>;
 
 function isPredefinedMiddlewareName(
@@ -117,6 +135,7 @@ export async function createSummarizationMiddleware(
 /**
  * Resolve middleware configuration into middleware instances.
  * Converts string identifiers and config objects into actual middleware.
+ * Automatically injects binary-content-injection middleware if binaryFormats is enabled.
  *
  * @param configs - Array of middleware configurations
  * @param gthConfig - Full Gaunt Sloth configuration
@@ -126,13 +145,27 @@ export async function resolveMiddleware(
   configs: MiddlewareConfig[] | undefined,
   gthConfig: GthConfig
 ): Promise<AgentMiddleware[]> {
-  if (!configs || configs.length === 0) {
-    return [];
-  }
-
+  const configsToResolve = configs || [];
   const middleware: AgentMiddleware[] = [];
 
-  for (const config of configs) {
+  // Auto-inject binary-content-injection middleware if binaryFormats is configured
+  // It is only auto-injected if binaryFormats is enabled.
+  const hasBinaryFormats =
+    gthConfig.binaryFormats !== undefined &&
+    gthConfig.binaryFormats !== false &&
+    gthConfig.binaryFormats.length > 0;
+  const hasBinaryMiddleware = configsToResolve.some(
+    (c) =>
+      c === 'binary-content-injection' ||
+      (typeof c === 'object' && 'name' in c && c.name === 'binary-content-injection')
+  );
+
+  if (hasBinaryFormats && !hasBinaryMiddleware) {
+    debugLog('Auto-injecting binary-content-injection middleware (binaryFormats is enabled)');
+    middleware.push(await createPredefinedMiddleware('binary-content-injection', {}, gthConfig));
+  }
+
+  for (const config of configsToResolve) {
     try {
       // Handle string configuration (predefined middleware with defaults)
       if (typeof config === 'string') {

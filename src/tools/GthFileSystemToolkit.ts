@@ -9,6 +9,8 @@ import { minimatch } from 'minimatch';
 import { displayInfo } from '#src/utils/consoleUtils.js';
 import { shouldIgnoreFile } from '#src/utils/aiignoreUtils.js';
 import { getProjectDir } from '#src/utils/systemUtils.js';
+import type { BinaryFormatConfig, BinaryFormatType } from '#src/config.js';
+import { getFormatForExtension, getMimeType, readBinaryFile } from '#src/tools/binaryUtils.js';
 
 /**
  * Filesystem toolkit
@@ -39,6 +41,16 @@ const ReadFileArgsSchema = z.object({
   path: z.string(),
   tail: z.number().optional().describe('If provided, returns only the last N lines of the file'),
   head: z.number().optional().describe('If provided, returns only the first N lines of the file'),
+});
+
+const ReadBinaryArgsSchema = z.object({
+  path: z.string().describe('Path to the binary file to read'),
+  formatHint: z
+    .enum(['image', 'file', 'audio', 'video'])
+    .optional()
+    .describe(
+      'Optional hint for the format type. If not provided, determined from file extension via config.'
+    ),
 });
 
 const ReadMultipleFilesArgsSchema = z.object({
@@ -116,6 +128,15 @@ interface FileInfo {
   permissions: string;
 }
 
+export interface GthFileSystemToolkitOptions {
+  allowedDirectories?: string[];
+  aiignoreConfig?: {
+    enabled?: boolean;
+    patterns?: string[];
+  };
+  binaryFormats?: false | BinaryFormatConfig[];
+}
+
 export default class GthFileSystemToolkit extends BaseToolkit {
   tools: StructuredToolInterface[];
   private allowedDirectories: string[];
@@ -123,19 +144,16 @@ export default class GthFileSystemToolkit extends BaseToolkit {
     enabled?: boolean;
     patterns?: string[];
   };
+  private binaryFormats?: false | BinaryFormatConfig[];
 
-  constructor(
-    allowedDirectories: string[] = [process.cwd()],
-    aiignoreConfig?: {
-      enabled?: boolean;
-      patterns?: string[];
-    }
-  ) {
+  constructor(options: GthFileSystemToolkitOptions = {}) {
     super();
+    const allowedDirectories = options.allowedDirectories ?? [process.cwd()];
     this.allowedDirectories = allowedDirectories.map((dir) =>
       this.normalizePath(path.resolve(this.expandHome(dir)))
     );
-    this.aiignoreConfig = aiignoreConfig;
+    this.aiignoreConfig = options.aiignoreConfig;
+    this.binaryFormats = options.binaryFormats;
     this.tools = this.createTools();
   }
 
@@ -507,8 +525,85 @@ export default class GthFileSystemToolkit extends BaseToolkit {
     }
   }
 
+  private createReadBinaryTool(): StructuredToolInterface {
+    return createGthTool(
+      async (args: z.infer<typeof ReadBinaryArgsSchema>): Promise<string> => {
+        if (!this.binaryFormats || !Array.isArray(this.binaryFormats)) {
+          return 'Binary formats are not configured. Add binaryFormats to your config to enable this feature.';
+        }
+
+        displayInfo(`\n📁 Reading binary file: ${args.path}\n`);
+        let validPath: string;
+        try {
+          validPath = await this.validatePath(args.path);
+        } catch {
+          return 'Path is not within allowed directories or is blocked by .aiignore';
+        }
+
+        const aiignoreConfig = this.aiignoreConfig;
+        const shouldIgnore = shouldIgnoreFile(
+          validPath,
+          getProjectDir(),
+          aiignoreConfig?.patterns,
+          aiignoreConfig?.enabled
+        );
+        if (shouldIgnore) {
+          return 'Path is not within allowed directories or is blocked by .aiignore';
+        }
+
+        const ext = path.extname(validPath).toLowerCase().slice(1);
+        let formatType: BinaryFormatType | null = null;
+        let formatConfig: BinaryFormatConfig | null = null;
+
+        if (args.formatHint) {
+          const hintedConfig = this.binaryFormats.find(
+            (config) => config.type === args.formatHint && config.extensions.includes(ext)
+          );
+          if (hintedConfig) {
+            formatType = hintedConfig.type;
+            formatConfig = hintedConfig;
+          }
+        } else {
+          const formatMatch = getFormatForExtension(validPath, this.binaryFormats);
+          if (formatMatch) {
+            formatType = formatMatch.type;
+            formatConfig = formatMatch.config;
+          }
+        }
+
+        if (!formatType || !formatConfig) {
+          return `Extension '.${ext}' is not configured for any binary format type. Configure it in binaryFormats.`;
+        }
+
+        const maxSize = formatConfig.maxSize ?? 10 * 1024 * 1024;
+        const mimeType = getMimeType(ext, formatConfig);
+
+        try {
+          const result = await readBinaryFile(validPath, maxSize, mimeType);
+
+          // Return special format string that middleware will parse and process:
+          // Format: gth_read_binary;type:${type};path:${encodedPath};data:${media_type};base64,${data}
+          // Path is URL-encoded to handle special characters like semicolons
+          const encodedPath = encodeURIComponent(validPath);
+          return `gth_read_binary;type:${formatType};path:${encodedPath};data:${mimeType};base64,${result.data}`;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return `Error reading binary file: ${message}`;
+        }
+      },
+      {
+        name: 'gth_read_binary',
+        description:
+          'Read a binary file (image, file, audio, video) and return its base64-encoded content. ' +
+          'Only works for file types configured in binaryFormats.',
+        schema: ReadBinaryArgsSchema,
+      },
+      'read'
+    );
+  }
+
   private createTools(): StructuredToolInterface[] {
-    return [
+    const tools: StructuredToolInterface[] = [
       createGthTool(
         async (args: z.infer<typeof ReadFileArgsSchema>): Promise<string> => {
           displayInfo(`\n📁 Reading file: ${args.path}\n`);
@@ -951,5 +1046,11 @@ export default class GthFileSystemToolkit extends BaseToolkit {
         'read'
       ),
     ];
+
+    if (this.binaryFormats && Array.isArray(this.binaryFormats) && this.binaryFormats.length > 0) {
+      tools.push(this.createReadBinaryTool());
+    }
+
+    return tools;
   }
 }

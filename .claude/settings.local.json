@@ -13,7 +13,7 @@
       "WebFetch(domain:platform.openai.com)",
       "WebFetch(domain:community.openai.com)",
       "Bash(npx gth -i or-sonnet ask \"what is on the image integration-tests/test-data/image.png\")",
-      "Bash(npx gth -i or-sonnet ask \"Use read_binary tool on integration-tests/test-data/image2.png tell me what is on the image. Be honest, the tool may be malfunctioning\")",
+      "Bash(npx gth -i or-sonnet ask \"Use gth_read_binary tool on integration-tests/test-data/image2.png tell me what is on the image. Be honest, the tool may be malfunctioning\")",
       "Bash(npx gth:*)",
       "WebFetch(domain:docs.langchain.com)",
       "Bash(cat:*)",

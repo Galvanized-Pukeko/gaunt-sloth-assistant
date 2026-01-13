@@ -13,7 +13,11 @@ import { AgentMiddleware } from 'langchain';
 /**
  * Predefined middleware types that can be configured via JSON config.
  */
-export type PredefinedMiddlewareName = 'anthropic-prompt-caching' | 'summarization' | 'review-rate';
+export type PredefinedMiddlewareName =
+  | 'anthropic-prompt-caching'
+  | 'summarization'
+  | 'review-rate'
+  | 'binary-content-injection';
 
 /**
  * Configuration for Anthropic prompt caching middleware.
@@ -60,12 +64,35 @@ export interface SummarizationConfig {
 }
 
 /**
+ * Configuration for image format transformation middleware.
+ */
+export interface ImageFormatTransformConfig {
+  /**
+   * Detail level for image processing.
+   * Examples: "low", "high", "auto"
+   */
+  detail?: 'low' | 'high' | 'auto';
+}
+
+/**
+ * Configuration for binary content injection middleware.
+ * This middleware intercepts tool results containing binary data (images, PDFs, audio)
+ * and injects them as HumanMessage content blocks.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface BinaryContentInjectionConfig {
+  // No additional configuration needed currently
+  // Reserved for future options like max binary size, format filtering, etc.
+}
+
+/**
  * Union type of all predefined middleware configurations.
  */
 export type PredefinedMiddlewareConfig =
   | ({ name: 'anthropic-prompt-caching' } & AnthropicPromptCachingConfig)
   | ({ name: 'summarization' } & SummarizationConfig)
-  | ({ name: 'review-rate' } & RatingConfig);
+  | ({ name: 'review-rate' } & RatingConfig)
+  | ({ name: 'binary-content-injection' } & BinaryContentInjectionConfig);
 
 /**
  * Middleware configuration that can be specified in JSON or JS config.

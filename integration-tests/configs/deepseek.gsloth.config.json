@@ -3,5 +3,11 @@
     "type": "deepseek",
     "model": "deepseek-reasoner"
   },
-  "canInterruptInferenceWithEsc": false
+  "canInterruptInferenceWithEsc": false,
+  "pr": {
+    "filesystem": "none"
+  },
+  "review": {
+    "filesystem": "none"
+  }
 }
