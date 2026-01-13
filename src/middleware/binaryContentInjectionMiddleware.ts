@@ -74,7 +74,6 @@ function getFormatLabel(formatType: string): string {
     image: 'image',
     audio: 'audio',
     file: 'file',
-    binary: 'binary file',
   };
   return labels[formatType] || 'file';
 }

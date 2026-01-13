@@ -49,7 +49,7 @@ const ReadFileArgsSchema = z.object({
 const ReadBinaryArgsSchema = z.object({
   path: z.string().describe('Path to the binary file to read'),
   formatHint: z
-    .enum(['image', 'file', 'audio', 'video', 'binary'])
+    .enum(['image', 'file', 'audio', 'video'])
     .optional()
     .describe(
       'Optional hint for the format type. If not provided, determined from file extension via config.'
