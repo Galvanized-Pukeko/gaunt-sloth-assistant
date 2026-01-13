@@ -5,6 +5,7 @@
   },
   "consoleLevel": "display",
   "canInterruptInferenceWithEsc": false,
+  "writeOutputToFile": false,
   "commands": {
     "ask": {
       "filesystem": "read"

@@ -3,6 +3,7 @@
     "type": "openrouter",
     "model": "kwaipilot/kat-coder-pro"
   },
+  "writeOutputToFile": false,
   "consoleLevel": "display",
   "canInterruptInferenceWithEsc": false,,
   "commands": {
