@@ -16,6 +16,7 @@
  */
 
 import { createMiddleware, type AgentMiddleware } from 'langchain';
+import path from 'node:path';
 import type { GthConfig } from '#src/config.js';
 import { debugLog } from '#src/utils/debugUtils.js';
 import { ToolMessage, HumanMessage } from '@langchain/core/messages';
@@ -78,13 +79,17 @@ function createContentBlock(binaryData: ParsedBinaryContent): Record<string, unk
     type: formatType,
     source_type: 'base64',
     mime_type: media_type,
-    data: data,
+    data,
+    metadata: {
+      filename: path.basename(binaryData.path),
+    },
   };
 }
 
 function getFormatLabel(formatType: string): string {
   const labels: Record<string, string> = {
     image: 'image',
+    video: 'video',
     audio: 'audio',
     file: 'file',
   };
