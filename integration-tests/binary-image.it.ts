@@ -41,6 +41,8 @@ describe('Binary Image Integration Tests', () => {
       '"Use the read_binary tool on test-data/image.png. What is on the picture test-data/image.png?"',
     ]);
 
+    // The image has a picture of a soccer ball,
+    // any kind of ball would include the word ball.
     expect(output.toLowerCase()).toContain('ball');
   });
 
@@ -56,6 +58,8 @@ describe('Binary Image Integration Tests', () => {
       '"Use the read_binary tool on test-data/image2.png. What is on the picture test-data/image2.png?"',
     ]);
 
-    expect(output.toLowerCase()).toContain('bicycle');
+    // The picture contains a road bike,
+    // any variations of bicycle would either include cycle or bike.
+    expect(output.toLowerCase()).to.contain.oneOf(['cycle', 'bike']);
   });
 });
