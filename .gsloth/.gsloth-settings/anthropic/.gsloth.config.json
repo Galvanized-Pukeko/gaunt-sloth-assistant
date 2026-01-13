@@ -13,6 +13,5 @@
         "run_single_test": "npm test"
       }
     }
-  },
-  "binaryFormats": [{ "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp"] }]
+  }
 }
