@@ -8,6 +8,7 @@
 /integration-tests/workdir-with-profiles/.gsloth/gth_*
 /integration-tests/workdir-with-profiles/testreview.md
 /integration-tests/workdir-with-profiles/.gsloth.config.json
+/integration-tests/workdir-with-profiles/**/.gsloth.config.json
 /docs-generated
 .junie
 .idea
