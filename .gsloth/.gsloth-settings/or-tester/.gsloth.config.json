@@ -1,11 +1,11 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "anthropic/claude-sonnet-4.5"
+    "model": "xiaomi/mimo-v2-flash:free"
   },
   "commands": {
-    "code": {
-      "filesystem": "all",
+    "ask": {
+      "filesystem": "read",
       "devTools": {
         "run_build": "npm run build",
         "run_tests": "npm test",
@@ -31,6 +31,5 @@
         }
       }
     }
-  },
-  "binaryFormats": [{ "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp"] }]
+  }
 }
