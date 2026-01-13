@@ -14,5 +14,5 @@
       }
     }
   },
-  "binaryFormats": [{ "type": "image", "extensions": ["png","jpg", "jpeg", "gif", "webp"] }]
+  "binaryFormats": [{ "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp"] }]
 }
