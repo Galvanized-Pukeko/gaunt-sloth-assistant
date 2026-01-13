@@ -149,6 +149,7 @@ export async function resolveMiddleware(
   const middleware: AgentMiddleware[] = [];
 
   // Auto-inject binary-content-injection middleware if binaryFormats is configured
+  // It is only auto-injected if binaryFormats is enabled.
   const hasBinaryFormats =
     gthConfig.binaryFormats !== undefined &&
     gthConfig.binaryFormats !== false &&

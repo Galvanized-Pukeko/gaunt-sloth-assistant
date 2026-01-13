@@ -60,7 +60,7 @@ function createContentBlock(binaryData: BinaryContentData): Record<string, unkno
 
   // PDF and other files
   return {
-    type: 'document',
+    type: 'file',
     source: {
       type: 'base64',
       media_type,

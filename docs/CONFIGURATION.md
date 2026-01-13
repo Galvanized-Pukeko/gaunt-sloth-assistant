@@ -128,6 +128,8 @@ Enable binary formats by adding the `binaryFormats` array to your config:
 }
 ```
 
+Presence of `binaryFormats` in the config auto-injects `binary-content-injection` middleware.
+
 Format types:
 
 | Type     | Description                               |
