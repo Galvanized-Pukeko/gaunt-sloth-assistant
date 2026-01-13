@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { runCommandWithArgs } from './support/commandRunner';
+import { runCommandWithArgs } from './support/commandRunner.ts';
 
 describe('Binary Image Integration Tests', () => {
   let tempDir: string;
@@ -29,7 +29,7 @@ describe('Binary Image Integration Tests', () => {
     }
   });
 
-  it('should recognize the image content', async () => {
+  it('should recognize the image content (ball)', async () => {
     const testRoot = path.join(process.cwd(), 'integration-tests');
     const relativeConfigPath = path.relative(testRoot, tempConfigPath);
 
@@ -42,5 +42,20 @@ describe('Binary Image Integration Tests', () => {
     ]);
 
     expect(output.toLowerCase()).toContain('ball');
+  });
+
+  it('should recognize the image content (bicycle)', async () => {
+    const testRoot = path.join(process.cwd(), 'integration-tests');
+    const relativeConfigPath = path.relative(testRoot, tempConfigPath);
+
+    const output = await runCommandWithArgs('npx', [
+      'gth',
+      '-c',
+      relativeConfigPath,
+      'ask',
+      '"Use the read_binary tool on test-data/image2.png. What is on the picture test-data/image.png?"',
+    ]);
+
+    expect(output.toLowerCase()).toContain('bicycle');
   });
 });
