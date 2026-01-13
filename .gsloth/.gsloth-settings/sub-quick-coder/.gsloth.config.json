@@ -1,0 +1,23 @@
+{
+  "llm": {
+    "type": "openrouter",
+    "model": "kwaipilot/kat-coder-pro"
+  },
+  "writeOutputToFile": false,
+  "consoleLevel": "display",
+  "canInterruptInferenceWithEsc": false,,
+  "commands": {
+    "ask": {
+      "filesystem": "all"
+    },
+    "code": {
+      "filesystem": "all",
+      "devTools": {
+        "run_build": "npm run build",
+        "run_tests": "npm test",
+        "run_lint": "npm run lint-n-fix",
+        "run_single_test": "npm test"
+      }
+    }
+  }
+}

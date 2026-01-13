@@ -56,12 +56,16 @@ export default class GthCustomToolkit extends BaseToolkit {
       paramValue.includes('&') ||
       paramValue.includes(';') ||
       paramValue.includes('`') ||
+      paramValue.includes("'") ||
       paramValue.includes('$') ||
       paramValue.includes('$(') ||
       paramValue.includes('\n') ||
       paramValue.includes('\r')
     ) {
-      throw new Error(`Shell injection attempts are not allowed in parameter '${paramName}'`);
+      throw new Error(
+        `Shell injection attempts are not allowed in parameter '${paramName}'.` +
+          'Disallowed symbols pipe, ampersand, semicolon, backtick, single quote, dollar sign, command substitution, newline, carriage return'
+      );
     }
 
     // Check for null bytes
