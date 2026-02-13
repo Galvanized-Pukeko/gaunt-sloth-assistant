@@ -1,9 +1,12 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "anthropic/claude-opus-4.6:online"
+    "model": "moonshotai/kimi-k2.5"
   },
   "commands": {
+    "ask": {
+      "filesystem": "all"
+    },
     "code": {
       "filesystem": "all",
       "devTools": {

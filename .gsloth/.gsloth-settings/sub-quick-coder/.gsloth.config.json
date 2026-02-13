@@ -5,7 +5,7 @@
   },
   "writeOutputToFile": false,
   "consoleLevel": "display",
-  "canInterruptInferenceWithEsc": false,,
+  "canInterruptInferenceWithEsc": false,
   "commands": {
     "ask": {
       "filesystem": "all"
