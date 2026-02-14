@@ -313,11 +313,7 @@ export default class GthCustomToolkit extends BaseToolkit {
       const stringArgs = args as Record<string, string>;
 
       try {
-        const command = this.buildCustomCommand(
-          config.command,
-          stringArgs,
-          config.parameters
-        );
+        const command = this.buildCustomCommand(config.command, stringArgs, config.parameters);
         return await this.executeCommand(command, name);
       } catch (validationError) {
         // If validation fails, prompt the user for confirmation
