@@ -187,7 +187,11 @@ export default class GthCustomToolkit extends BaseToolkit {
     }
   }
 
-  private async executeCommand(command: string, toolName: string): Promise<string> {
+  private async executeCommand(
+    command: string,
+    toolName: string,
+    timeoutSeconds?: number
+  ): Promise<string> {
     displayInfo(`\n🔧 Executing ${toolName}: ${command}`);
 
     return new Promise((resolve, reject) => {
@@ -196,6 +200,15 @@ export default class GthCustomToolkit extends BaseToolkit {
       });
 
       let output = '';
+      let timedOut = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      if (timeoutSeconds !== undefined && timeoutSeconds > 0) {
+        timer = setTimeout(() => {
+          timedOut = true;
+          child.kill();
+        }, timeoutSeconds * 1000);
+      }
 
       // Capture output if available (when stdio is not 'inherit')
       if (child.stdout) {
@@ -215,7 +228,16 @@ export default class GthCustomToolkit extends BaseToolkit {
       }
 
       child.on('close', (code) => {
-        if (code === 0) {
+        if (timer) clearTimeout(timer);
+        if (timedOut) {
+          resolve(
+            `Executing '${command}'...\n\n` +
+              `<COMMAND_OUTPUT>\n` +
+              output +
+              `</COMMAND_OUTPUT>\n` +
+              `\n\nCommand '${command}' timed out after ${timeoutSeconds} seconds`
+          );
+        } else if (code === 0) {
           resolve(
             `Executing '${command}'...\n\n` +
               `<COMMAND_OUTPUT>\n` +
@@ -235,6 +257,7 @@ export default class GthCustomToolkit extends BaseToolkit {
       });
 
       child.on('error', (error) => {
+        if (timer) clearTimeout(timer);
         const errorMsg = `Failed to execute command '${command}': ${error.message}`;
         displayError(errorMsg);
         reject(new Error(errorMsg));
@@ -314,7 +337,7 @@ export default class GthCustomToolkit extends BaseToolkit {
 
       try {
         const command = this.buildCustomCommand(config.command, stringArgs, config.parameters);
-        return await this.executeCommand(command, name);
+        return await this.executeCommand(command, name, config.timeout);
       } catch (validationError) {
         // If validation fails, prompt the user for confirmation
         const errorMessage =

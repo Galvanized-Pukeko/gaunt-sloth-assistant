@@ -5,6 +5,7 @@ A proper preamble is paramount for good inference.
 Check [.gsloth.guidelines.md](https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/blob/main/.gsloth.guidelines.md) for example.
 
 Your project should have the following files in order for gsloth to function:
+
 - Configuration file (one of):
   - `.gsloth.config.js` (JavaScript module)
   - `.gsloth.config.json` (JSON file)
@@ -48,6 +49,7 @@ Identity profiles may be used to define different Gaunt Sloth identities for dif
 Identity profiles can only be activated in directory-based configuration.
 `gth -i devops pr PR_NO` is invoked, the configuration is pulled from `.gsloth/.gsloth-settings/devops/` directory,
 which may contain a full set of config files:
+
 ```
 .gsloth.backstory.md
 .gsloth.config.json
@@ -66,6 +68,7 @@ fetched from the installation directory.
 
 By default, Gaunt Sloth writes each response to `gth_<timestamp>_<COMMAND>.md` under `.gsloth/` (or the project root).
 Set `writeOutputToFile` in your config to:
+
 - `true` (default) for standard filenames,
 - `false` to skip writing files,
 - a string for a custom path (behavior depends on the format):
@@ -73,6 +76,7 @@ Set `writeOutputToFile` in your config to:
   - **Paths with separators** (e.g. `"./review.md"` or `"reviews/last.md"`) are always relative to project root
 
 **Examples:**
+
 - `"review.md"` → `.gsloth/review.md` (when `.gsloth` exists) or `review.md` (otherwise)
 - `"./review.md"` → `review.md` (always project root)
 - `"reviews/last.md"` → `reviews/last.md` (always relative to project root)
@@ -85,6 +89,7 @@ Gaunt Sloth can hide files and directories from filesystem tools using a `.aiign
 Patterns use minimatch rules (similar to `.gitignore`), and lines starting with `#` are treated as comments.
 
 **Example `.aiignore`:**
+
 ```
 node_modules/
 dist/
@@ -92,10 +97,12 @@ dist/
 ```
 
 You can control this behavior in config:
+
 - `aiignore.enabled` (boolean, default `true`) to enable/disable `.aiignore` support.
 - `aiignore.patterns` (array of strings) to supply patterns directly instead of reading `.aiignore`.
 
 **Example config:**
+
 ```json
 {
   "aiignore": {
@@ -113,6 +120,7 @@ Gaunt Sloth can process binary formats (images, files, audio, video) when your L
 supports multimodal inputs.
 
 Important notes:
+
 - Binary formats are disabled by default
 - You must explicitly configure which extensions to allow
 - Check your LLM provider documentation for supported formats
@@ -132,14 +140,15 @@ Presence of `binaryFormats` in the config auto-injects `binary-content-injection
 
 Format types:
 
-| Type     | Description                               |
-|----------|-------------------------------------------|
-| `image`  | Image files for vision-capable models     |
-| `file`   | Other files (e.g., PDFs)                  |
-| `audio`  | Audio files for speech-capable models     |
-| `video`  | Video files for video-capable models      |
+| Type    | Description                           |
+| ------- | ------------------------------------- |
+| `image` | Image files for vision-capable models |
+| `file`  | Other files (e.g., PDFs)              |
+| `audio` | Audio files for speech-capable models |
+| `video` | Video files for video-capable models  |
 
 Each format type supports:
+
 - `type` (required): The format type category
 - `extensions` (required): Array of allowed file extensions (without dots)
 - `maxSize` (optional): Maximum file size in bytes (default: 10MB)
@@ -151,9 +160,7 @@ Binary formats can also be configured per command:
 {
   "commands": {
     "review": {
-      "binaryFormats": [
-        { "type": "image", "extensions": ["png", "jpg"] }
-      ]
+      "binaryFormats": [{ "type": "image", "extensions": ["png", "jpg"] }]
     },
     "code": {
       "binaryFormats": false
@@ -169,6 +176,7 @@ Lower levels are more verbose. Valid values for JSON configs:
 `debug`, `info`, `display`, `success`, `warning`, `error`, `stream`.
 
 **Example config:**
+
 ```json
 {
   "consoleLevel": "warning"
@@ -184,17 +192,20 @@ Refer to documentation site for [Default Config Values](https://gaunt-sloth-assi
 It is always worth checking sourcecode in [config.ts](../src/config.ts) for more insightful information.
 
 ## Config initialization
+
 Configuration can be created with `gsloth init [vendor]` command.
 Currently, anthropic, groq, deepseek, openai, google-genai, vertexai, openrouter and xai can be configured with `gsloth init [vendor]`.
 For providers using OpenAI format (like Inception), use `gsloth init openai` and then modify the configuration.
 
 ### Google GenAI (AI Studio)
+
 ```bash
 cd ./your-project
 gsloth init google-genai
 ```
 
 ### Google Vertex AI
+
 ```bash
 cd ./your-project
 gsloth init vertexai
@@ -203,32 +214,40 @@ gcloud auth application-default login
 ```
 
 ### Anthropic
+
 ```bash
 cd ./your-project
 gsloth init anthropic
 ```
+
 Make sure you either define `ANTHROPIC_API_KEY` environment variable or edit your configuration file and set up your key.
 
 ### Groq
+
 ```bash
 cd ./your-project
 gsloth init groq
 ```
+
 Make sure you either define `GROQ_API_KEY` environment variable or edit your configuration file and set up your key.
 
 ### DeepSeek
+
 ```bash
 cd ./your-project
 gsloth init deepseek
 ```
+
 Make sure you either define `DEEPSEEK_API_KEY` environment variable or edit your configuration file and set up your key.
 (note this meant to be an API key from deepseek.com, rather than from a distributor like TogetherAI)
 
 ### OpenAI
+
 ```bash
 cd ./your-project
 gsloth init openai
 ```
+
 Make sure you either define `OPENAI_API_KEY` environment variable or edit your configuration file and set up your key.
 
 ### Open Router
@@ -250,6 +269,7 @@ gsloth init openai
 ```
 
 Then edit your configuration file to point to your LM Studio server:
+
 ```json
 {
   "llm": {
@@ -264,6 +284,7 @@ Then edit your configuration file to point to your LM Studio server:
 ```
 
 **Configuration notes:**
+
 - LM Studio uses OpenAI format, so set `type` to `"openai"`
 - The `apiKey` can be any random string (e.g., `"none"`) - LM Studio doesn't validate it
 - The default `baseURL` is `http://127.0.0.1:1234/v1`, but adjust the port if you've configured LM Studio differently
@@ -274,13 +295,16 @@ Then edit your configuration file to point to your LM Studio server:
 For a complete example, see [examples/lmstudio/.gsloth.config.json](../examples/lmstudio/.gsloth.config.json).
 
 ### Other OpenAI-compatible providers (Inception, etc.)
+
 For providers that use OpenAI-compatible APIs:
+
 ```bash
 cd ./your-project
 gsloth init openai
 ```
 
 Then edit your configuration file to add the custom base URL and API key. For example, for Inception:
+
 ```json
 {
   "llm": {
@@ -293,13 +317,16 @@ Then edit your configuration file to add the custom base URL and API key. For ex
   }
 }
 ```
-* apiKeyEnvironmentVariable property can be used to point to the correct API key environment variable.
+
+- apiKeyEnvironmentVariable property can be used to point to the correct API key environment variable.
 
 ### xAI
+
 ```bash
 cd ./your-project
 gsloth init xai
 ```
+
 Make sure you either define `XAI_API_KEY` environment variable or edit your configuration file and set up your key.
 
 ## Examples of configuration for different providers
@@ -309,6 +336,7 @@ Make sure you either define `XAI_API_KEY` environment variable or edit your conf
 JSON configuration is simpler but less flexible than JavaScript configuration. It should directly contain the configuration object.
 
 **Example of .gsloth.config.json for Anthropic**
+
 ```json
 {
   "llm": {
@@ -318,9 +346,11 @@ JSON configuration is simpler but less flexible than JavaScript configuration. I
   }
 }
 ```
+
 You can use the `ANTHROPIC_API_KEY` environment variable instead of specifying `apiKey` in the config.
 
 **Example of .gsloth.config.json for Groq**
+
 ```json
 {
   "llm": {
@@ -330,9 +360,11 @@ You can use the `ANTHROPIC_API_KEY` environment variable instead of specifying `
   }
 }
 ```
+
 You can use the `GROQ_API_KEY` environment variable instead of specifying `apiKey` in the config.
 
 **Example of .gsloth.config.json for DeepSeek**
+
 ```json
 {
   "llm": {
@@ -342,9 +374,11 @@ You can use the `GROQ_API_KEY` environment variable instead of specifying `apiKe
   }
 }
 ```
+
 You can use the `DEEPSEEK_API_KEY` environment variable instead of specifying `apiKey` in the config.
 
 **Example of .gsloth.config.json for OpenAI**
+
 ```json
 {
   "llm": {
@@ -354,9 +388,11 @@ You can use the `DEEPSEEK_API_KEY` environment variable instead of specifying `a
   }
 }
 ```
+
 You can use the `OPENAI_API_KEY` environment variable instead of specifying `apiKey` in the config.
 
 **Example of .gsloth.config.json for LM Studio (OpenAI-compatible)**
+
 ```json
 {
   "llm": {
@@ -369,10 +405,12 @@ You can use the `OPENAI_API_KEY` environment variable instead of specifying `api
   }
 }
 ```
+
 LM Studio runs locally and doesn't require a real API key. Use any string for `apiKey`.
 **Note:** The model must support tool calling. Tested models include gpt-oss, granite, nemotron, seed, and qwen3.
 
 **Example of .gsloth.config.json for Inception (OpenAI-compatible)**
+
 ```json
 {
   "llm": {
@@ -385,9 +423,11 @@ LM Studio runs locally and doesn't require a real API key. Use any string for `a
   }
 }
 ```
+
 You can use the `INCEPTION_API_KEY` environment variable as specified in `apiKeyEnvironmentVariable`.
 
 **Example of .gsloth.config.json for Google GenAI**
+
 ```json
 {
   "llm": {
@@ -397,9 +437,11 @@ You can use the `INCEPTION_API_KEY` environment variable as specified in `apiKey
   }
 }
 ```
+
 You can use the `GOOGLE_API_KEY` environment variable instead of specifying `apiKey` in the config.
 
 **Example of .gsloth.config.json for VertexAI**
+
 ```json
 {
   "llm": {
@@ -408,9 +450,11 @@ You can use the `GOOGLE_API_KEY` environment variable instead of specifying `api
   }
 }
 ```
+
 VertexAI typically uses gcloud authentication; no `apiKey` is needed in the config.
 
 **Example of .gsloth.config.json for Open Router**
+
 ```json
 {
   "llm": {
@@ -424,6 +468,7 @@ Make sure you either define `OPEN_ROUTER_API_KEY` environment variable or edit y
 When changing a model, make sure you're using a model which supports tools.
 
 **Example of .gsloth.config.json for xAI**
+
 ```json
 {
   "llm": {
@@ -433,6 +478,7 @@ When changing a model, make sure you're using a model which supports tools.
   }
 }
 ```
+
 You can use the `XAI_API_KEY` environment variable instead of specifying `apiKey` in the config.
 
 ### JavaScript Configuration
@@ -442,28 +488,34 @@ You can use the `XAI_API_KEY` environment variable instead of specifying `apiKey
 JavaScript configuration provides more flexibility than JSON configuration, allowing you to use dynamic imports and include custom tools.
 
 **For a complete working example** demonstrating custom middleware and custom tools, see:
+
 - [JavaScript Config Example README](../examples/js-config/README.md) - Full documentation and usage guide
 - [Example Config File](../examples/js-config/.gsloth.config.js) - Complete working example with custom logging middleware and custom logger tool
 
 The example demonstrates:
+
 - Custom middleware with all lifecycle hooks (`beforeAgent`, `beforeModel`, `afterModel`, `afterAgent`)
 - Custom tool creation using LangChain's `tool()` API
 - Combining built-in and custom middleware
 - Practical patterns for extending Gaunt Sloth functionality
 
 **Example with Custom Tools**
+
 ```javascript
 // .gsloth.config.mjs
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 
-const parrotTool = tool((s) => {
-  console.log(s);
-}, {
-  name: 'parrot_tool',
-  description: `This tool will simply print the string`,
-  schema: z.string(),
-});
+const parrotTool = tool(
+  (s) => {
+    console.log(s);
+  },
+  {
+    name: 'parrot_tool',
+    description: `This tool will simply print the string`,
+    schema: z.string(),
+  }
+);
 
 export async function configure() {
   const anthropic = await import('@langchain/google-vertexai');
@@ -471,99 +523,105 @@ export async function configure() {
     llm: new anthropic.ChatVertexAI({
       model: 'gemini-2.5-pro',
     }),
-    tools: [
-      parrotTool
-    ]
+    tools: [parrotTool],
   };
 }
 ```
 
 **Example of .gsloth.config.mjs for Anthropic**
+
 ```javascript
 export async function configure() {
-    const anthropic = await import('@langchain/anthropic');
-    return {
-        llm: new anthropic.ChatAnthropic({
-            apiKey: process.env.ANTHROPIC_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-            model: "claude-sonnet-4-5"
-        })
-    };
+  const anthropic = await import('@langchain/anthropic');
+  return {
+    llm: new anthropic.ChatAnthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
+      model: 'claude-sonnet-4-5',
+    }),
+  };
 }
 ```
 
 **Example of .gsloth.config.mjs for Groq**
+
 ```javascript
 export async function configure() {
-    const groq = await import('@langchain/groq');
-    return {
-        llm: new groq.ChatGroq({
-            model: "deepseek-r1-distill-llama-70b", // Check other models available
-            apiKey: process.env.GROQ_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-        })
-    };
+  const groq = await import('@langchain/groq');
+  return {
+    llm: new groq.ChatGroq({
+      model: 'deepseek-r1-distill-llama-70b', // Check other models available
+      apiKey: process.env.GROQ_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
+    }),
+  };
 }
 ```
 
 **Example of .gsloth.config.mjs for DeepSeek**
+
 ```javascript
 export async function configure() {
-    const deepseek = await import('@langchain/deepseek');
-    return {
-        llm: new deepseek.ChatDeepSeek({
-            model: 'deepseek-reasoner',
-            apiKey: process.env.DEEPSEEK_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-        })
-    };
+  const deepseek = await import('@langchain/deepseek');
+  return {
+    llm: new deepseek.ChatDeepSeek({
+      model: 'deepseek-reasoner',
+      apiKey: process.env.DEEPSEEK_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
+    }),
+  };
 }
 ```
 
 **Example of .gsloth.config.mjs for OpenAI**
+
 ```javascript
 export async function configure() {
-    const openai = await import('@langchain/openai');
-    return {
-        llm: new openai.ChatOpenAI({
-            model: 'gpt-4o',
-            apiKey: process.env.OPENAI_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-        })
-    };
+  const openai = await import('@langchain/openai');
+  return {
+    llm: new openai.ChatOpenAI({
+      model: 'gpt-4o',
+      apiKey: process.env.OPENAI_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
+    }),
+  };
 }
 ```
 
 **Example of .gsloth.config.mjs for LM Studio (OpenAI-compatible)**
+
 ```javascript
 export async function configure() {
-    const openai = await import('@langchain/openai');
-    return {
-        llm: new openai.ChatOpenAI({
-            model: 'openai/gpt-oss-20b',
-            apiKey: 'none', // LM Studio doesn't validate API keys
-            configuration: {
-                baseURL: 'http://127.0.0.1:1234/v1',
-            },
-        })
-    };
+  const openai = await import('@langchain/openai');
+  return {
+    llm: new openai.ChatOpenAI({
+      model: 'openai/gpt-oss-20b',
+      apiKey: 'none', // LM Studio doesn't validate API keys
+      configuration: {
+        baseURL: 'http://127.0.0.1:1234/v1',
+      },
+    }),
+  };
 }
 ```
+
 **Note:** The model must support tool calling. Tested models include gpt-oss, granite, nemotron, seed, and qwen3.
 
 **Example of .gsloth.config.mjs for Inception (OpenAI-compatible)**
+
 ```javascript
 export async function configure() {
-    const openai = await import('@langchain/openai');
-    return {
-        llm: new openai.ChatOpenAI({
-            model: 'mercury-coder',
-            apiKey: process.env.INCEPTION_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-            configuration: {
-                baseURL: 'https://api.inceptionlabs.ai/v1',
-            },
-        })
-    };
+  const openai = await import('@langchain/openai');
+  return {
+    llm: new openai.ChatOpenAI({
+      model: 'mercury-coder',
+      apiKey: process.env.INCEPTION_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
+      configuration: {
+        baseURL: 'https://api.inceptionlabs.ai/v1',
+      },
+    }),
+  };
 }
 ```
 
 **Example of .gsloth.config.mjs for Google GenAI**
+
 ```javascript
 export async function configure() {
   const googleGenai = await import('@langchain/google-genai');
@@ -571,7 +629,7 @@ export async function configure() {
     llm: new googleGenai.ChatGoogleGenerativeAI({
       model: 'gemini-2.5-pro',
       apiKey: process.env.GOOGLE_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-    })
+    }),
   };
 }
 ```
@@ -579,31 +637,33 @@ export async function configure() {
 **Example of .gsloth.config.mjs for VertexAI**
 VertexAI usually needs `gcloud auth application-default login`
 (or both `gcloud auth login` and `gcloud auth application-default login`) and does not need any separate API keys.
+
 ```javascript
 export async function configure() {
-    const vertexAi = await import('@langchain/google-vertexai');
-    return {
-        llm: new vertexAi.ChatVertexAI({
-            model: "gemini-2.5-pro", // Consider checking for latest recommended model versions
-            // API Key from AI Studio should also work
-            //// Other parameters might be relevant depending on Vertex AI API updates.
-            //// The project is not in the interface, but it is in documentation and it seems to work.
-            // project: 'your-cool-google-cloud-project',
-        })
-    }
+  const vertexAi = await import('@langchain/google-vertexai');
+  return {
+    llm: new vertexAi.ChatVertexAI({
+      model: 'gemini-2.5-pro', // Consider checking for latest recommended model versions
+      // API Key from AI Studio should also work
+      //// Other parameters might be relevant depending on Vertex AI API updates.
+      //// The project is not in the interface, but it is in documentation and it seems to work.
+      // project: 'your-cool-google-cloud-project',
+    }),
+  };
 }
 ```
 
 **Example of .gsloth.config.mjs for xAI**
+
 ```javascript
 export async function configure() {
-    const xai = await import('@langchain/xai');
-    return {
-        llm: new xai.ChatXAI({
-            model: 'grok-4-0709',
-            apiKey: process.env.XAI_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
-        })
-    };
+  const xai = await import('@langchain/xai');
+  return {
+    llm: new xai.ChatXAI({
+      model: 'grok-4-0709',
+      apiKey: process.env.XAI_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
+    }),
+  };
 }
 ```
 
@@ -650,12 +710,14 @@ To connect to the Atlassian Jira MCP server using OAuth, add the following to yo
 For a complete working example, see [examples/jira-mcp](../examples/jira-mcp).
 
 **OAuth Authentication Flow:**
+
 1. When you first use a command that requires the MCP server, your browser will open automatically
 2. Complete the OAuth authentication in your browser
 3. The authentication tokens are stored securely in `~/.gsloth/.gsloth-auth/`
 4. Future sessions will use the stored tokens automatically
 
 **Token Storage:**
+
 - OAuth tokens are stored in JSON files under `~/.gsloth/.gsloth-auth/`
 - Each server's tokens are stored in a separate file named after the server URL
 - The storage location is cross-platform (Windows, macOS, Linux)
@@ -675,10 +737,7 @@ for example, configuration for reference sequential thinking MCP follows:
     "sequential-thinking": {
       "transport": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
     }
   }
 }
@@ -719,7 +778,7 @@ To set GitHub as your default requirements provider, add this to your configurat
 
 ```json
 {
-  "llm": {"type": "vertexai", "model": "gemini-2.5-pro"},
+  "llm": { "type": "vertexai", "model": "gemini-2.5-pro" },
   "commands": {
     "pr": {
       "requirementsProvider": "github"
@@ -785,7 +844,7 @@ JSON:
 
 ```json
 {
-  "llm": {"type": "vertexai", "model": "gemini-2.5-pro"},
+  "llm": { "type": "vertexai", "model": "gemini-2.5-pro" },
   "requirementsProvider": "jira",
   "requirementsProviderConfig": {
     "jira": {
@@ -801,7 +860,7 @@ Optionally displayUrl can be defined to have a clickable link in the output:
 
 ```json
 {
-  "llm": {"type": "vertexai", "model": "gemini-2.5-pro"},
+  "llm": { "type": "vertexai", "model": "gemini-2.5-pro" },
   "requirementsProvider": "jira",
   "requirementsProviderConfig": {
     "jira": {
@@ -818,17 +877,17 @@ export async function configure() {
   const vertexAi = await import('@langchain/google-vertexai');
   return {
     llm: new vertexAi.ChatVertexAI({
-      model: "gemini-2.5-pro"
+      model: 'gemini-2.5-pro',
     }),
     requirementsProvider: 'jira',
     requirementsProviderConfig: {
-      'jira': {
+      jira: {
         username: 'username@yourcompany.com', // Your Jira username/email
-        token: 'YOUR_JIRA_PAT_TOKEN',        // Your Personal Access Token
-        cloudId: 'YOUR_ATLASSIAN_CLOUD_ID'    // Your Atlassian Cloud ID
-      }
-    }
-  }
+        token: 'YOUR_JIRA_PAT_TOKEN', // Your Personal Access Token
+        cloudId: 'YOUR_ATLASSIAN_CLOUD_ID', // Your Atlassian Cloud ID
+      },
+    },
+  };
 }
 ```
 
@@ -875,7 +934,7 @@ JSON:
 
 ```json
 {
-  "llm": {"type": "vertexai", "model": "gemini-2.5-pro"},
+  "llm": { "type": "vertexai", "model": "gemini-2.5-pro" },
   "requirementsProvider": "jira-legacy",
   "requirementsProviderConfig": {
     "jira-legacy": {
@@ -894,17 +953,17 @@ export async function configure() {
   const vertexAi = await import('@langchain/google-vertexai');
   return {
     llm: new vertexAi.ChatVertexAI({
-      model: "gemini-2.5-pro"
+      model: 'gemini-2.5-pro',
     }),
     requirementsProvider: 'jira-legacy',
     requirementsProviderConfig: {
       'jira-legacy': {
         username: 'username@yourcompany.com', // Your Jira username/email
-        token: 'YOUR_JIRA_LEGACY_TOKEN',     // Replace with your real Jira API token
-        baseUrl: 'https://yourcompany.atlassian.net/rest/api/2/issue/'  // Your Jira instance base URL
-      }
-    }
-  }
+        token: 'YOUR_JIRA_LEGACY_TOKEN', // Replace with your real Jira API token
+        baseUrl: 'https://yourcompany.atlassian.net/rest/api/2/issue/', // Your Jira instance base URL
+      },
+    },
+  };
 }
 ```
 
@@ -1012,7 +1071,26 @@ Custom tools can accept parameters that are validated for security:
 }
 ```
 
+### Custom Tools with Timeout
+
+Custom tools can have an optional timeout (in seconds). If the command exceeds this duration it is killed:
+
+```json
+{
+  "customTools": {
+    "deploy_staging": {
+      "command": "npm run deploy:staging",
+      "description": "Deploy to staging environment",
+      "timeout": 120
+    }
+  }
+}
+```
+
+When omitted, no timeout is applied.
+
 **Parameter Interpolation:**
+
 - Use `${parameterName}` placeholders in commands
 - If no placeholders exist, parameters are appended in definition order
 - All parameters are validated to prevent security issues
@@ -1022,6 +1100,7 @@ Custom tools can accept parameters that are validated for security:
 You can override or disable custom tools for specific commands:
 
 **Override for specific command:**
+
 ```json
 {
   "customTools": {
@@ -1044,6 +1123,7 @@ You can override or disable custom tools for specific commands:
 ```
 
 **Disable for specific command:**
+
 ```json
 {
   "customTools": {
@@ -1064,13 +1144,13 @@ You can override or disable custom tools for specific commands:
 
 ### Custom Tools vs Development Tools
 
-| Feature | Custom Tools | Dev Tools |
-|---------|-------------|-----------|
-| **Location** | Root-level `customTools` | `commands.code.devTools` |
-| **Availability** | All commands | Code command only |
-| **Purpose** | User-defined shell commands | Predefined build/test/lint tools |
-| **Per-Command** | Yes | No (code only) |
-| **Parameters** | Yes | Limited (run_single_test only) |
+| Feature          | Custom Tools                | Dev Tools                        |
+| ---------------- | --------------------------- | -------------------------------- |
+| **Location**     | Root-level `customTools`    | `commands.code.devTools`         |
+| **Availability** | All commands                | Code command only                |
+| **Purpose**      | User-defined shell commands | Predefined build/test/lint tools |
+| **Per-Command**  | Yes                         | No (code only)                   |
+| **Parameters**   | Yes                         | Limited (run_single_test only)   |
 
 Both can be used together:
 
@@ -1097,6 +1177,7 @@ Both can be used together:
 ### Security Validation
 
 All custom tool parameters are automatically validated to prevent:
+
 - **Shell injection**: Blocks `|`, `&`, `;`, `` ` ``, `$`, `$(`, newlines
 - **Directory traversal**: Blocks `..`, `/../`, `\..\\`
 - **Absolute paths**: Only relative paths allowed
@@ -1196,12 +1277,12 @@ In this example, only the `usbDevice` parameter allows absolute paths, while `le
 
 Available `allow` values:
 
-| Value                  | What it permits                                      |
-|------------------------|------------------------------------------------------|
-| `absolute-paths`       | Absolute paths like `/dev/ttyUSB0` or `/usr/bin/env` |
-| `directory-traversal`  | Path components containing `..`                      |
-| `shell-injection`      | Shell metacharacters (`\|`, `&`, `;`, etc.)          |
-| `null-bytes`           | Null byte characters                                 |
+| Value                 | What it permits                                      |
+| --------------------- | ---------------------------------------------------- |
+| `absolute-paths`      | Absolute paths like `/dev/ttyUSB0` or `/usr/bin/env` |
+| `directory-traversal` | Path components containing `..`                      |
+| `shell-injection`     | Shell metacharacters (`\|`, `&`, `;`, etc.)          |
+| `null-bytes`          | Null byte characters                                 |
 
 Checks **not** listed in `allow` remain enforced. Each parameter can have its own `allow` list, providing fine-grained control over validation.
 
@@ -1223,9 +1304,7 @@ Reduces API costs by caching prompts (Anthropic models only):
     "type": "anthropic",
     "model": "claude-sonnet-4-5"
   },
-  "middleware": [
-    "anthropic-prompt-caching"
-  ]
+  "middleware": ["anthropic-prompt-caching"]
 }
 ```
 
@@ -1250,9 +1329,7 @@ Automatically condenses conversation history when approaching token limits:
 
 ```json
 {
-  "middleware": [
-    "summarization"
-  ]
+  "middleware": ["summarization"]
 }
 ```
 
@@ -1271,6 +1348,7 @@ With custom configuration:
 ```
 
 Configuration options:
+
 - `maxTokensBeforeSummary`: Maximum tokens before triggering summarization (default: 10000)
 - `messagesToKeep`: Number of recent messages to keep after summarization
 - `summaryPrompt`: Custom prompt template for summarization
@@ -1320,15 +1398,12 @@ const requestLogger = createMiddleware({
 
 export async function configure() {
   const anthropic = await import('@langchain/anthropic');
-  
+
   return {
     llm: new anthropic.ChatAnthropic({
-      model: "claude-sonnet-4-5"
+      model: 'claude-sonnet-4-5',
     }),
-    middleware: [
-      "summarization",
-      requestLogger
-    ]
+    middleware: ['summarization', requestLogger],
   };
 }
 ```
@@ -1346,6 +1421,7 @@ The `review` and `pr` commands **automatically provide** automated review scorin
 ### Default Behavior
 
 **Out of the box, without any configuration:**
+
 - ✅ Rating is **enabled**
 - ✅ Pass threshold is **6/10**
 - ✅ Failed reviews (< 6) **exit with code 1** for CI/CD integration
@@ -1511,19 +1587,19 @@ See [examples/a2a](../examples/a2a) for a working example.
 Some AI providers provide integrated server tools, such as web search.
 
 **.gsloth.config.json for OpenAI Web Search**
+
 ```json
 {
   "llm": {
     "type": "openai",
     "model": "gpt-4o"
   },
-  "tools": [
-    { "type": "web_search_preview" }
-  ]
+  "tools": [{ "type": "web_search_preview" }]
 }
 ```
 
 **.gsloth.config.json for Anthropic Web Search**
+
 ```json
 {
   "llm": {

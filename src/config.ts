@@ -365,6 +365,12 @@ export interface CustomCommandConfig {
    * Parameters are validated for security (no shell injection, directory traversal, etc.).
    */
   parameters?: Record<string, CustomCommandParameter>;
+  /**
+   * Optional timeout in seconds.
+   * When set, the command will be killed if it exceeds this duration.
+   * When omitted, no timeout is applied.
+   */
+  timeout?: number;
 }
 
 /**

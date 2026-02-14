@@ -602,5 +602,78 @@ describe('GthCustomToolkit', () => {
       );
       expect(consoleUtilsMock.displayError).toHaveBeenCalled();
     });
+
+    it('should kill command after timeout and report timeout message', async () => {
+      vi.useFakeTimers();
+      const mockKill = vi.fn();
+      let closeCallback: ((_code: number | null) => void) | undefined;
+      const mockChild = {
+        on: vi.fn((event: string, callback: (_arg: any) => void) => {
+          if (event === 'close') closeCallback = callback;
+        }),
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        kill: mockKill,
+      };
+      childProcessMock.spawn.mockReturnValueOnce(mockChild as any);
+
+      const resultPromise = toolkit['executeCommand']('slow cmd', 'test_tool', 10);
+
+      // Advance past timeout
+      vi.advanceTimersByTime(10_000);
+
+      // Simulate the close event that follows child.kill()
+      expect(mockKill).toHaveBeenCalled();
+      closeCallback?.(null);
+
+      const result = await resultPromise;
+      expect(result).toContain("Command 'slow cmd' timed out after 10 seconds");
+
+      vi.useRealTimers();
+    });
+
+    it('should not timeout when timeoutSeconds is not provided', async () => {
+      const result = await toolkit['executeCommand']('echo test', 'test_tool');
+      expect(result).toContain("Command 'echo test' completed successfully");
+      expect(result).not.toContain('timed out');
+    });
+  });
+
+  describe('custom command tool invocation with timeout', () => {
+    it('should pass timeout from config to executeCommand', async () => {
+      vi.useFakeTimers();
+      const mockKill = vi.fn();
+      let closeCallback: ((_code: number | null) => void) | undefined;
+      const mockChild = {
+        on: vi.fn((event: string, callback: (_arg: any) => void) => {
+          if (event === 'close') closeCallback = callback;
+        }),
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        kill: mockKill,
+      };
+      childProcessMock.spawn.mockReturnValueOnce(mockChild as any);
+
+      toolkit = new GthCustomToolkit({
+        slow_deploy: {
+          command: 'npm run deploy',
+          description: 'Deploy (slow)',
+          timeout: 5,
+        },
+      });
+
+      const tool = toolkit.tools.find((t) => t.name === 'slow_deploy')!;
+      const resultPromise = tool.invoke({});
+
+      // advanceTimersByTimeAsync flushes microtasks (LangChain async chain) before advancing
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(mockKill).toHaveBeenCalled();
+      closeCallback?.(null);
+
+      const result = await resultPromise;
+      expect(result).toContain('timed out after 5 seconds');
+
+      vi.useRealTimers();
+    });
   });
 });
