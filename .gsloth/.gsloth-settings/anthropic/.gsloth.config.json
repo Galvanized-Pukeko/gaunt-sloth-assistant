@@ -1,7 +1,7 @@
 {
   "llm": {
     "type": "anthropic",
-    "model": "claude-sonnet-4-5"
+    "model": "claude-opus-4-6"
   },
   "commands": {
     "code": {
@@ -13,5 +13,12 @@
         "run_single_test": "npm test"
       }
     }
-  }
+  },
+  "middleware": [
+    "anthropic-prompt-caching",
+    {
+      "name": "summarization",
+      "maxTokensBeforeSummary": 12000
+    }
+  ]
 }

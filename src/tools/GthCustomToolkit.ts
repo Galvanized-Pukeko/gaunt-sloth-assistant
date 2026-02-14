@@ -7,9 +7,14 @@ import { BaseToolkit, StructuredToolInterface, tool } from '@langchain/core/tool
 import { z } from 'zod';
 import { spawn } from 'child_process';
 import path from 'node:path';
-import { displayInfo, displayError } from '#src/utils/consoleUtils.js';
-import { CustomToolsConfig, CustomCommandConfig } from '#src/config.js';
-import { stdout } from '#src/utils/systemUtils.js';
+import { displayInfo, displayError, displayWarning } from '#src/utils/consoleUtils.js';
+import {
+  CustomToolsConfig,
+  CustomCommandConfig,
+  CustomCommandParameter,
+  ValidationCheck,
+} from '#src/config.js';
+import { createInterface, stdin, stdout } from '#src/utils/systemUtils.js';
 
 // Helper function to create a tool with execute type
 function createCustomTool<T extends z.ZodSchema>(
@@ -37,30 +42,41 @@ export default class GthCustomToolkit extends BaseToolkit {
   }
 
   /**
-   * Validate parameter value to prevent security issues
+   * Validate parameter value to prevent security issues.
+   * Checks can be selectively skipped via the `allow` list.
    */
-  validateParameterValue(paramValue: string, paramName: string): string {
+  validateParameterValue(
+    paramValue: string,
+    paramName: string,
+    allow: ValidationCheck[] = []
+  ): string {
+    const allowSet = new Set(allow);
+
     // Check for absolute paths
-    if (path.isAbsolute(paramValue)) {
+    if (!allowSet.has('absolute-paths') && path.isAbsolute(paramValue)) {
       throw new Error(`Absolute paths are not allowed for parameter '${paramName}'`);
     }
 
     // Check for directory traversal attempts
-    if (paramValue.includes('..') || paramValue.includes('\\..\\') || paramValue.includes('/../')) {
+    if (
+      !allowSet.has('directory-traversal') &&
+      (paramValue.includes('..') || paramValue.includes('\\..\\') || paramValue.includes('/../'))
+    ) {
       throw new Error(`Directory traversal attempts are not allowed in parameter '${paramName}'`);
     }
 
     // Check for pipe attempts and other shell injection
     if (
-      paramValue.includes('|') ||
-      paramValue.includes('&') ||
-      paramValue.includes(';') ||
-      paramValue.includes('`') ||
-      paramValue.includes("'") ||
-      paramValue.includes('$') ||
-      paramValue.includes('$(') ||
-      paramValue.includes('\n') ||
-      paramValue.includes('\r')
+      !allowSet.has('shell-injection') &&
+      (paramValue.includes('|') ||
+        paramValue.includes('&') ||
+        paramValue.includes(';') ||
+        paramValue.includes('`') ||
+        paramValue.includes("'") ||
+        paramValue.includes('$') ||
+        paramValue.includes('$(') ||
+        paramValue.includes('\n') ||
+        paramValue.includes('\r'))
     ) {
       throw new Error(
         `Shell injection attempts are not allowed in parameter '${paramName}'.` +
@@ -69,15 +85,30 @@ export default class GthCustomToolkit extends BaseToolkit {
     }
 
     // Check for null bytes
-    if (paramValue.includes('\0')) {
+    if (!allowSet.has('null-bytes') && paramValue.includes('\0')) {
       throw new Error(`Null bytes are not allowed in parameter '${paramName}'`);
     }
 
     // Normalize the path to remove any redundant separators
+    // Skip normalization when absolute paths are allowed, since normalize
+    // would strip the leading separator context on some values
+    if (allowSet.has('absolute-paths')) {
+      // Still do the post-normalization traversal check when traversal is not allowed
+      if (!allowSet.has('directory-traversal')) {
+        const normalizedValue = path.normalize(paramValue);
+        if (normalizedValue.includes('..')) {
+          throw new Error(
+            `Directory traversal attempts are not allowed in parameter '${paramName}'`
+          );
+        }
+      }
+      return paramValue;
+    }
+
     const normalizedValue = path.normalize(paramValue);
 
     // Double-check after normalization
-    if (normalizedValue.includes('..')) {
+    if (!allowSet.has('directory-traversal') && normalizedValue.includes('..')) {
       throw new Error(`Directory traversal attempts are not allowed in parameter '${paramName}'`);
     }
 
@@ -90,7 +121,7 @@ export default class GthCustomToolkit extends BaseToolkit {
   buildCustomCommand(
     commandTemplate: string,
     parameters: Record<string, string>,
-    parameterConfig?: Record<string, { description: string }>
+    parameterConfig?: Record<string, CustomCommandParameter>
   ): string {
     let command = commandTemplate;
     const paramNames = Object.keys(parameters);
@@ -101,7 +132,8 @@ export default class GthCustomToolkit extends BaseToolkit {
     if (hasPlaceholders) {
       // Replace all placeholders with validated parameter values
       for (const [name, value] of Object.entries(parameters)) {
-        const validatedValue = this.validateParameterValue(value, name);
+        const allow = parameterConfig?.[name]?.allow || [];
+        const validatedValue = this.validateParameterValue(value, name, allow);
         const placeholder = `\${${name}}`;
         command = command.replace(
           new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
@@ -114,7 +146,8 @@ export default class GthCustomToolkit extends BaseToolkit {
       const appendValues: string[] = [];
       for (const name of orderedParams) {
         if (parameters[name] !== undefined) {
-          const validatedValue = this.validateParameterValue(parameters[name], name);
+          const allow = parameterConfig[name]?.allow || [];
+          const validatedValue = this.validateParameterValue(parameters[name], name, allow);
           appendValues.push(validatedValue);
         }
       }
@@ -124,6 +157,34 @@ export default class GthCustomToolkit extends BaseToolkit {
     }
 
     return command;
+  }
+
+  /**
+   * Prompt the user to confirm execution of a command that failed validation.
+   * Returns true if the user confirms, false otherwise.
+   */
+  async promptUserForValidationOverride(
+    command: string,
+    toolName: string,
+    validationError: string
+  ): Promise<boolean> {
+    displayWarning(`\n⚠️  Validation failed for tool '${toolName}': ${validationError}`);
+    displayWarning(`The agent is trying to execute: ${command}`);
+    displayWarning(
+      'You can add "allow" to this tool\'s configuration in .gsloth.config.json to skip this check (permanent). ' +
+        'Available values: "absolute-paths", "directory-traversal", "shell-injection", "null-bytes"'
+    );
+
+    // Write prompt manually to avoid double-echo when readline echoes input
+    stdout.write('Do you want to allow this execution (one-time)? (y/N): ');
+
+    const rl = createInterface({ input: stdin });
+    try {
+      const answer = await rl.question('');
+      return answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes';
+    } finally {
+      rl.close();
+    }
   }
 
   private async executeCommand(command: string, toolName: string): Promise<string> {
@@ -201,6 +262,43 @@ export default class GthCustomToolkit extends BaseToolkit {
   }
 
   /**
+   * Build command without validation (for display in the user prompt).
+   * Simply interpolates parameters into the template without security checks.
+   */
+  private buildCommandForDisplay(
+    commandTemplate: string,
+    parameters: Record<string, string>,
+    parameterConfig?: Record<string, CustomCommandParameter>
+  ): string {
+    let command = commandTemplate;
+    const paramNames = Object.keys(parameters);
+    const hasPlaceholders = paramNames.some((name) => command.includes(`\${${name}}`));
+
+    if (hasPlaceholders) {
+      for (const [name, value] of Object.entries(parameters)) {
+        const placeholder = `\${${name}}`;
+        command = command.replace(
+          new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          value
+        );
+      }
+    } else if (paramNames.length > 0 && parameterConfig) {
+      const orderedParams = Object.keys(parameterConfig);
+      const appendValues: string[] = [];
+      for (const name of orderedParams) {
+        if (parameters[name] !== undefined) {
+          appendValues.push(parameters[name]);
+        }
+      }
+      if (appendValues.length > 0) {
+        command = `${command} ${appendValues.join(' ')}`;
+      }
+    }
+
+    return command;
+  }
+
+  /**
    * Create a tool for a custom command
    */
   private createCustomCommandTool(
@@ -213,8 +311,38 @@ export default class GthCustomToolkit extends BaseToolkit {
     const toolFn = async (args: any): Promise<string> => {
       // All parameters are strings, safe to cast
       const stringArgs = args as Record<string, string>;
-      const command = this.buildCustomCommand(config.command, stringArgs, config.parameters);
-      return await this.executeCommand(command, name);
+
+      try {
+        const command = this.buildCustomCommand(
+          config.command,
+          stringArgs,
+          config.parameters
+        );
+        return await this.executeCommand(command, name);
+      } catch (validationError) {
+        // If validation fails, prompt the user for confirmation
+        const errorMessage =
+          validationError instanceof Error ? validationError.message : String(validationError);
+        const displayCommand = this.buildCommandForDisplay(
+          config.command,
+          stringArgs,
+          config.parameters
+        );
+
+        const userConfirmed = await this.promptUserForValidationOverride(
+          displayCommand,
+          name,
+          errorMessage
+        );
+
+        if (userConfirmed) {
+          return await this.executeCommand(displayCommand, name);
+        }
+
+        throw new Error(
+          `Execution of '${name}' was rejected by user. Validation error: ${errorMessage}`
+        );
+      }
     };
 
     return createCustomTool(toolFn, {

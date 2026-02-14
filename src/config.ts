@@ -311,6 +311,21 @@ export interface RatingConfig {
 }
 
 /**
+ * Validation checks that can be skipped for custom command parameters.
+ * Use with the `allow` property to bypass specific security checks.
+ *
+ * - `absolute-paths`: Allow absolute paths (e.g. `/dev/ttyUSB0`)
+ * - `directory-traversal`: Allow `..` in paths
+ * - `shell-injection`: Allow shell metacharacters (`|`, `&`, `;`, etc.)
+ * - `null-bytes`: Allow null bytes in values
+ */
+export type ValidationCheck =
+  | 'absolute-paths'
+  | 'directory-traversal'
+  | 'shell-injection'
+  | 'null-bytes';
+
+/**
  * Configuration for a custom command parameter.
  * Parameters allow the model to provide dynamic values to commands.
  */
@@ -319,6 +334,14 @@ export interface CustomCommandParameter {
    * Description of the parameter shown to the model.
    */
   description: string;
+  /**
+   * Optional list of validation checks to skip for this parameter's value.
+   * Use when this parameter legitimately requires values that would normally be blocked.
+   * For example, `["absolute-paths"]` allows values like `/dev/ttyUSB0` for this parameter.
+   *
+   * Available checks: `absolute-paths`, `directory-traversal`, `shell-injection`, `null-bytes`
+   */
+  allow?: ValidationCheck[];
 }
 
 /**

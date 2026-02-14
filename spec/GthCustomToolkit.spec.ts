@@ -11,14 +11,19 @@ vi.mock('child_process', () => childProcessMock);
 const consoleUtilsMock = {
   displayInfo: vi.fn(),
   displayError: vi.fn(),
+  displayWarning: vi.fn(),
 };
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 // Mock systemUtils
+const mockRlQuestion = vi.fn();
+const mockRlClose = vi.fn();
 const systemUtilsMock = {
   stdout: {
     write: vi.fn(),
   },
+  stdin: {},
+  createInterface: vi.fn(),
 };
 vi.mock('#src/utils/systemUtils.js', () => systemUtilsMock);
 
@@ -51,6 +56,14 @@ describe('GthCustomToolkit', () => {
       },
     };
     childProcessMock.spawn.mockReturnValue(mockChild as any);
+
+    // Default readline mock - reject by default
+    mockRlQuestion.mockResolvedValue('n');
+    mockRlClose.mockImplementation(() => {});
+    systemUtilsMock.createInterface.mockReturnValue({
+      question: mockRlQuestion,
+      close: mockRlClose,
+    });
 
     ({ default: GthCustomToolkit } = await import('#src/tools/GthCustomToolkit.js'));
   });
@@ -177,6 +190,50 @@ describe('GthCustomToolkit', () => {
         "Shell injection attempts are not allowed in parameter 'param'"
       );
     });
+
+    describe('with allow list', () => {
+      it('should allow absolute paths when absolute-paths is in allow list', () => {
+        const result = toolkit.validateParameterValue('/dev/ttyUSB0', 'device', ['absolute-paths']);
+        expect(result).toBe('/dev/ttyUSB0');
+      });
+
+      it('should still block directory traversal when only absolute-paths is allowed', () => {
+        expect(() =>
+          toolkit.validateParameterValue('/dev/../etc/passwd', 'device', ['absolute-paths'])
+        ).toThrow("Directory traversal attempts are not allowed in parameter 'device'");
+      });
+
+      it('should allow directory traversal when directory-traversal is in allow list', () => {
+        const result = toolkit.validateParameterValue('dir/../file.txt', 'param', [
+          'directory-traversal',
+        ]);
+        expect(result).toBe(path.normalize('dir/../file.txt'));
+      });
+
+      it('should allow shell metacharacters when shell-injection is in allow list', () => {
+        const result = toolkit.validateParameterValue('value|other', 'param', ['shell-injection']);
+        expect(result).toBe('value|other');
+      });
+
+      it('should allow null bytes when null-bytes is in allow list', () => {
+        const result = toolkit.validateParameterValue('value\0other', 'param', ['null-bytes']);
+        expect(result).toBe(path.normalize('value\0other'));
+      });
+
+      it('should allow multiple checks to be skipped simultaneously', () => {
+        const result = toolkit.validateParameterValue('/dev/ttyUSB0', 'device', [
+          'absolute-paths',
+          'shell-injection',
+        ]);
+        expect(result).toBe('/dev/ttyUSB0');
+      });
+
+      it('should still enforce checks not in allow list', () => {
+        expect(() =>
+          toolkit.validateParameterValue('/dev/ttyUSB0;evil', 'device', ['absolute-paths'])
+        ).toThrow("Shell injection attempts are not allowed in parameter 'device'");
+      });
+    });
   });
 
   describe('buildCustomCommand', () => {
@@ -234,6 +291,29 @@ describe('GthCustomToolkit', () => {
       );
       expect(result).toBe('echo test and test again');
     });
+
+    it('should use parameter-level allow list for validation', () => {
+      const result = toolkit.buildCustomCommand(
+        'mpremote connect ${usbDevice} fs cp ${lesson} :main.py',
+        { usbDevice: '/dev/ttyUSB0', lesson: 'fixed/lesson5/Move_Dance1.py' },
+        {
+          usbDevice: { description: 'USB device', allow: ['absolute-paths'] },
+          lesson: { description: 'Lesson file' },
+        }
+      );
+      expect(result).toBe(
+        'mpremote connect /dev/ttyUSB0 fs cp fixed/lesson5/Move_Dance1.py :main.py'
+      );
+    });
+
+    it('should use parameter-level allow list for appended parameters', () => {
+      const result = toolkit.buildCustomCommand(
+        'mpremote connect',
+        { device: '/dev/ttyUSB0' },
+        { device: { description: 'Device', allow: ['absolute-paths'] } }
+      );
+      expect(result).toBe('mpremote connect /dev/ttyUSB0');
+    });
   });
 
   describe('custom command tool invocation', () => {
@@ -284,7 +364,7 @@ describe('GthCustomToolkit', () => {
       expect(result).toContain("Command 'docker build -t myapp:v1.0.0 .' completed successfully");
     });
 
-    it('should reject custom command with invalid parameter values', async () => {
+    it('should prompt user when validation fails and reject on denial', async () => {
       toolkit = new GthCustomToolkit({
         run_script: {
           command: 'npm run ${scriptName}',
@@ -295,9 +375,81 @@ describe('GthCustomToolkit', () => {
         },
       });
 
+      mockRlQuestion.mockResolvedValue('n');
+
       const tool = toolkit.tools.find((t) => t.name === 'run_script')!;
       await expect(tool.invoke({ scriptName: 'evil;rm -rf /' })).rejects.toThrow(
-        "Shell injection attempts are not allowed in parameter 'scriptName'"
+        "Execution of 'run_script' was rejected by user"
+      );
+
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('Validation failed')
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('The agent is trying to execute:')
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('"allow"')
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('.gsloth.config.json')
+      );
+    });
+
+    it('should execute command when user approves validation override', async () => {
+      toolkit = new GthCustomToolkit({
+        deploy_lesson: {
+          command: 'mpremote connect ${usbDevice} fs cp ${lesson} :main.py',
+          description: 'Deploy lesson to robot',
+          parameters: {
+            usbDevice: { description: 'USB device' },
+            lesson: { description: 'Lesson file' },
+          },
+        },
+      });
+
+      mockRlQuestion.mockResolvedValue('y');
+
+      const tool = toolkit.tools.find((t) => t.name === 'deploy_lesson')!;
+      const result = await tool.invoke({
+        usbDevice: '/dev/ttyUSB0',
+        lesson: 'fixed/lesson5/Move_Dance1.py',
+      });
+
+      expect(result).toContain('completed successfully');
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('Validation failed')
+      );
+      expect(childProcessMock.spawn).toHaveBeenCalledWith(
+        'mpremote connect /dev/ttyUSB0 fs cp fixed/lesson5/Move_Dance1.py :main.py',
+        { shell: true }
+      );
+    });
+
+    it('should skip validation and not prompt when parameter-level allow config is provided', async () => {
+      toolkit = new GthCustomToolkit({
+        deploy_lesson: {
+          command: 'mpremote connect ${usbDevice} fs cp ${lesson} :main.py',
+          description: 'Deploy lesson to robot',
+          parameters: {
+            usbDevice: { description: 'USB device', allow: ['absolute-paths'] },
+            lesson: { description: 'Lesson file' },
+          },
+        },
+      });
+
+      const tool = toolkit.tools.find((t) => t.name === 'deploy_lesson')!;
+      const result = await tool.invoke({
+        usbDevice: '/dev/ttyUSB0',
+        lesson: 'fixed/lesson5/Move_Dance1.py',
+      });
+
+      expect(result).toContain('completed successfully');
+      expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
+      expect(systemUtilsMock.createInterface).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).toHaveBeenCalledWith(
+        'mpremote connect /dev/ttyUSB0 fs cp fixed/lesson5/Move_Dance1.py :main.py',
+        { shell: true }
       );
     });
 
@@ -312,6 +464,96 @@ describe('GthCustomToolkit', () => {
       const tool = toolkit.tools.find((t) => t.name === 'my_command')!;
       expect(tool.description).toContain('Say hello');
       expect(tool.description).toContain('[echo hello]');
+    });
+  });
+
+  describe('promptUserForValidationOverride', () => {
+    beforeEach(() => {
+      toolkit = new GthCustomToolkit({});
+    });
+
+    it('should return true when user answers y', async () => {
+      mockRlQuestion.mockResolvedValue('y');
+      const result = await toolkit.promptUserForValidationOverride(
+        'some command',
+        'tool_name',
+        'validation error'
+      );
+      expect(result).toBe(true);
+      expect(mockRlClose).toHaveBeenCalled();
+    });
+
+    it('should return true when user answers yes', async () => {
+      mockRlQuestion.mockResolvedValue('yes');
+      const result = await toolkit.promptUserForValidationOverride(
+        'some command',
+        'tool_name',
+        'validation error'
+      );
+      expect(result).toBe(true);
+    });
+
+    it('should return false when user answers n', async () => {
+      mockRlQuestion.mockResolvedValue('n');
+      const result = await toolkit.promptUserForValidationOverride(
+        'some command',
+        'tool_name',
+        'validation error'
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should return false when user answers empty string', async () => {
+      mockRlQuestion.mockResolvedValue('');
+      const result = await toolkit.promptUserForValidationOverride(
+        'some command',
+        'tool_name',
+        'validation error'
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should display warnings with command and config advice', async () => {
+      mockRlQuestion.mockResolvedValue('n');
+      await toolkit.promptUserForValidationOverride(
+        'mpremote connect /dev/ttyUSB0 fs cp lesson.py :main.py',
+        'deploy_lesson',
+        'Absolute paths are not allowed'
+      );
+
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining("Validation failed for tool 'deploy_lesson'")
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('mpremote connect /dev/ttyUSB0 fs cp lesson.py :main.py')
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('"allow"')
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('.gsloth.config.json')
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('"absolute-paths"')
+      );
+      // Verify (permanent) label on the config advice
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('(permanent)')
+      );
+      // Verify (one-time) label on the interactive prompt written to stdout
+      expect(systemUtilsMock.stdout.write).toHaveBeenCalledWith(
+        expect.stringContaining('(one-time)')
+      );
+      // Verify rl.question is called with empty string (prompt written separately)
+      expect(mockRlQuestion).toHaveBeenCalledWith('');
+    });
+
+    it('should close readline interface even if question throws', async () => {
+      mockRlQuestion.mockRejectedValue(new Error('readline error'));
+      await expect(toolkit.promptUserForValidationOverride('cmd', 'tool', 'error')).rejects.toThrow(
+        'readline error'
+      );
+      expect(mockRlClose).toHaveBeenCalled();
     });
   });
 

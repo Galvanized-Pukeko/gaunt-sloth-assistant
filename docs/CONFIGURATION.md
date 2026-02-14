@@ -1166,6 +1166,45 @@ Example of a secure custom tool that accepts a file path:
 }
 ```
 
+#### Skipping Validation Checks with `allow`
+
+Some parameters legitimately require values that would normally be blocked by validation.
+For example, deploying to a hardware device via `/dev/ttyUSB0` requires an absolute path.
+The `allow` property on individual parameters lets you specify which checks to skip:
+
+```json
+{
+  "customTools": {
+    "deploy_lesson": {
+      "command": "mpremote connect ${usbDevice} fs cp ${lesson} :main.py",
+      "description": "Deploy lesson to the robot.",
+      "parameters": {
+        "usbDevice": {
+          "description": "USB device of robot. Use `/dev/ttyUSB0` unless advised to use other device.",
+          "allow": ["absolute-paths"]
+        },
+        "lesson": {
+          "description": "Lesson to deploy, for example `fixed/lesson2/Move_Forward.py`"
+        }
+      }
+    }
+  }
+}
+```
+
+In this example, only the `usbDevice` parameter allows absolute paths, while `lesson` is still validated normally.
+
+Available `allow` values:
+
+| Value                  | What it permits                                      |
+|------------------------|------------------------------------------------------|
+| `absolute-paths`       | Absolute paths like `/dev/ttyUSB0` or `/usr/bin/env` |
+| `directory-traversal`  | Path components containing `..`                      |
+| `shell-injection`      | Shell metacharacters (`\|`, `&`, `;`, etc.)          |
+| `null-bytes`           | Null byte characters                                 |
+
+Checks **not** listed in `allow` remain enforced. Each parameter can have its own `allow` list, providing fine-grained control over validation.
+
 ## Middleware Configuration
 
 Gaunt Sloth supports middleware to intercept and control agent execution at critical points. Middleware provides hooks for cost optimization, conversation management, and custom logic.
