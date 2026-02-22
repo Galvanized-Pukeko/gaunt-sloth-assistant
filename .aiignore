@@ -20,3 +20,5 @@ gaunt-sloth-assistant.iml
 /vitest-it.config.js
 /vitest-it.config.js.map
 out/*
+req
+readonly
