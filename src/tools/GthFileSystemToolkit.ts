@@ -186,8 +186,27 @@ export default class GthFileSystemToolkit extends BaseToolkit {
     return filepath;
   }
 
+  private sanitizeRequestedPath(requestedPath: string): string {
+    const trimmedPath = requestedPath.trim();
+    if (trimmedPath.length === 0) {
+      throw new Error('Path cannot be empty');
+    }
+
+    const unquotedPath = trimmedPath.replace(/^(['"`])(.*)\1$/, '$2');
+    if (path.isAbsolute(unquotedPath)) {
+      return unquotedPath;
+    }
+
+    if (unquotedPath.startsWith('./') || unquotedPath.startsWith('../')) {
+      return unquotedPath;
+    }
+
+    return `./${unquotedPath}`;
+  }
+
   private async validatePath(requestedPath: string): Promise<string> {
-    const expandedPath = this.expandHome(requestedPath);
+    const sanitizedPath = this.sanitizeRequestedPath(requestedPath);
+    const expandedPath = this.expandHome(sanitizedPath);
     const absolute = path.isAbsolute(expandedPath)
       ? path.resolve(expandedPath)
       : path.resolve(process.cwd(), expandedPath);

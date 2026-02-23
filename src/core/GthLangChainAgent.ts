@@ -163,8 +163,9 @@ export class GthLangChainAgent implements GthAgentInterface {
         if (e instanceof Error && e?.name === 'ToolException') {
           throw e; // Re-throw ToolException to be handled by outer catch
         }
-        this.statusUpdate(StatusLevel.WARNING, `Something went wrong ${(e as Error).message}`);
-        return '';
+        const message = e instanceof Error ? e.message : String(e);
+        this.statusUpdate(StatusLevel.ERROR, `LLM invocation failed: ${message}`);
+        throw e;
       } finally {
         progress.stop();
       }

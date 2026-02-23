@@ -1,25 +1,26 @@
 import { displayWarning } from '#src/utils/consoleUtils.js';
 import { env } from '#src/utils/systemUtils.js';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import type {
-  BaseChatModel,
-  BaseChatModelParams,
-} from '@langchain/core/language_models/chat_models';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { ChatGoogleParams } from '@langchain/google/node';
 
 import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 
 // Function to process JSON config and create Google GenAI LLM instance
 export async function processJsonConfig(
-  llmConfig: ChatGoogleGenerativeAI & BaseChatModelParams
+  llmConfig: ChatGoogleParams & { type?: string; apiKeyEnvironmentVariable?: string }
 ): Promise<BaseChatModel> {
-  const gemini = await import('@langchain/google-genai');
+  const { ChatGoogle } = await import('@langchain/google/node');
   // Use config value if available, otherwise use the environment variable
   const googleApiKey = llmConfig.apiKey || env.GOOGLE_API_KEY;
-  return new gemini.ChatGoogleGenerativeAI({
+  const configFields = {
     ...llmConfig,
     apiKey: googleApiKey,
     model: llmConfig.model || 'gemini-3-pro-preview',
-  });
+    platformType: 'gai' as const,
+  };
+  delete configFields.type;
+  delete configFields.apiKeyEnvironmentVariable;
+  return new ChatGoogle(configFields);
 }
 
 const jsonContent = `{

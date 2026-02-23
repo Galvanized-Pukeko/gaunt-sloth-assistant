@@ -3,6 +3,7 @@ import { GthConfig } from '#src/config.js';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
 import { GthAgentInterface, GthCommand, StatusUpdateCallback } from '#src/core/types.js';
 import { GthLangChainAgent } from '#src/core/GthLangChainAgent.js';
+import { enhanceVertexUnauthorizedMessage } from '#src/utils/vertexaiUtils.js';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { getNewRunnableConfig } from '#src/utils/llmUtils.js';
 import {
@@ -86,19 +87,38 @@ export class GthAgentRunner {
           );
         }
         debugLog(`Stream completed. Total response length: ${result.length}`);
+        if (result.trim().length === 0) {
+          debugLog('Stream produced empty response, retrying once with non-streaming invoke.');
+          const fallback = await this.agent.invoke(messages, this.runConfig);
+          debugLog(`Fallback non-stream response length: ${fallback.length}`);
+          if (fallback.trim().length === 0) {
+            throw new Error(
+              'Model returned an empty response after tool execution. Try again or switch to a more stable model.'
+            );
+          }
+          return fallback;
+        }
         return result;
       } else {
         // Use non-streaming
         debugLog('Using non-streaming mode');
         const result = await this.agent.invoke(messages, this.runConfig);
         debugLog(`Non-stream response length: ${result.length}`);
+        if (result.trim().length === 0) {
+          throw new Error(
+            'Model returned an empty response. Try again or switch to a more stable model.'
+          );
+        }
         return result;
       }
     } catch (error) {
       // Handle agent invocation errors
       debugLogError('Agent processing', error);
+      const originalMessage = error instanceof Error ? error.message : String(error);
+      const enhancedMessage = enhanceVertexUnauthorizedMessage(originalMessage, this.config?.llm);
       throw new Error(
-        `Agent processing failed: ${error instanceof Error ? error.message : String(error)}`
+        `Agent processing failed: ${enhancedMessage}`,
+        error instanceof Error ? { cause: error } : undefined
       );
     }
   }

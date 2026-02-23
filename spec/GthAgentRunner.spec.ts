@@ -151,6 +151,58 @@ describe('GthAgentRunner', () => {
       expect(result).toBe('chunk1chunk2');
     });
 
+    it('should fallback to non-streaming invoke when streaming response is empty', async () => {
+      const runner = new GthAgentRunner(statusUpdateCallback);
+      const mockStream = {
+        async *[Symbol.asyncIterator]() {
+          yield '';
+          yield '';
+        },
+      };
+      mockAgent.stream.mockResolvedValue(mockStream);
+      mockAgent.invoke.mockResolvedValue('fallback response');
+
+      await runner.init(undefined, { ...mockConfig, streamOutput: true });
+
+      const messages = [new HumanMessage('test message')];
+      const result = await runner.processMessages(messages);
+
+      expect(mockAgent.stream).toHaveBeenCalledWith(
+        messages,
+        expect.objectContaining({
+          recursionLimit: 1000,
+          configurable: { thread_id: expect.any(String) },
+        })
+      );
+      expect(mockAgent.invoke).toHaveBeenCalledWith(
+        messages,
+        expect.objectContaining({
+          recursionLimit: 1000,
+          configurable: { thread_id: expect.any(String) },
+        })
+      );
+      expect(result).toBe('fallback response');
+    });
+
+    it('should throw when stream and fallback both return empty response', async () => {
+      const runner = new GthAgentRunner(statusUpdateCallback);
+      const mockStream = {
+        async *[Symbol.asyncIterator]() {
+          yield '';
+          yield '';
+        },
+      };
+      mockAgent.stream.mockResolvedValue(mockStream);
+      mockAgent.invoke.mockResolvedValue('');
+
+      await runner.init(undefined, { ...mockConfig, streamOutput: true });
+
+      const messages = [new HumanMessage('test message')];
+      await expect(runner.processMessages(messages)).rejects.toThrow(
+        'Model returned an empty response after tool execution'
+      );
+    });
+
     it('should handle multiple messages', async () => {
       const runner = new GthAgentRunner(statusUpdateCallback);
       mockAgent.invoke.mockResolvedValue('combined response');
@@ -168,6 +220,50 @@ describe('GthAgentRunner', () => {
         })
       );
       expect(result).toBe('combined response');
+    });
+
+    it('should enrich vertex 401 errors with ADC and API key guidance', async () => {
+      const runner = new GthAgentRunner(statusUpdateCallback);
+      mockAgent.invoke.mockRejectedValue(new Error('Request failed with status code 401'));
+
+      await runner.init(undefined, {
+        ...mockConfig,
+        streamOutput: false,
+        llm: {
+          _llmType: vi.fn().mockReturnValue('google'),
+          verbose: false,
+          _platform: 'gcp',
+        } as any,
+      });
+
+      const messages = [new HumanMessage('test message')];
+      try {
+        await runner.processMessages(messages);
+        expect(true).toBe(false);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        expect(message).toMatch(/gcloud auth application-default login/);
+        expect(message).toMatch(/Google AI Studio key/);
+      }
+    });
+
+    it('should not enrich non-vertex 401 errors', async () => {
+      const runner = new GthAgentRunner(statusUpdateCallback);
+      mockAgent.invoke.mockRejectedValue(new Error('Request failed with status code 401'));
+
+      await runner.init(undefined, {
+        ...mockConfig,
+        streamOutput: false,
+      });
+
+      const messages = [new HumanMessage('test message')];
+      try {
+        await runner.processMessages(messages);
+        expect(true).toBe(false);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        expect(message).not.toMatch(/gcloud auth application-default login/);
+      }
     });
   });
 

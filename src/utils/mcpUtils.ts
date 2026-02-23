@@ -1,7 +1,7 @@
 import { GthConfig } from '#src/config.js';
 import { StatusLevel, StatusUpdateCallback } from '#src/core/types.js';
+import { isVertexGoogleLlm } from '#src/utils/vertexaiUtils.js';
 import { DynamicStructuredTool, ToolSchemaBase } from '@langchain/core/tools';
-import { ChatVertexAI } from '@langchain/google-vertexai';
 
 type JsonInputSchema = {
   type?: string | string[];
@@ -25,7 +25,7 @@ type JsonInputSchema = {
 type McpTool = DynamicStructuredTool<ToolSchemaBase, unknown, unknown, string>;
 
 function isVertexLlm(config: GthConfig): boolean {
-  return config.llm instanceof ChatVertexAI;
+  return isVertexGoogleLlm(config.llm);
 }
 
 function mergeDescription(existing: string | undefined, extra: string): string {

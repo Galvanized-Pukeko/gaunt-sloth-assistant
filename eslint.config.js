@@ -18,6 +18,7 @@ const globalIgnores = [
   '**/dist/**',
   'integration-tests/workdir',
   'docs-generated/**',
+  'readonly/**',
   'coverage/**',
   '.git/**',
   'vitest-it.config.js',

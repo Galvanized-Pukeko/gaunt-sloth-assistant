@@ -11,8 +11,8 @@
  * Hopefully this issue will go away when LangChain switches to the new GenAI dependency.
  */
 import { displayWarning } from '#src/utils/consoleUtils.js';
-import { ChatVertexAIInput } from '@langchain/google-vertexai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { ChatGoogleParams } from '@langchain/google/node';
 
 import { writeFileIfNotExistsWithMessages } from '#src/utils/fileUtils.js';
 
@@ -36,10 +36,16 @@ export function init(configFileName: string): void {
 }
 
 // Function to process JSON config and create VertexAI LLM instance
-export async function processJsonConfig(llmConfig: ChatVertexAIInput): Promise<BaseChatModel> {
-  const vertexAi = await import('@langchain/google-vertexai');
-  return new vertexAi.ChatVertexAI({
+export async function processJsonConfig(
+  llmConfig: ChatGoogleParams & { type?: string; apiKeyEnvironmentVariable?: string }
+): Promise<BaseChatModel> {
+  const { ChatGoogle } = await import('@langchain/google/node');
+  const configFields = {
     ...llmConfig,
     model: llmConfig.model || 'gemini-3-pro-preview',
-  });
+    vertexai: true,
+  };
+  delete configFields.type;
+  delete configFields.apiKeyEnvironmentVariable;
+  return new ChatGoogle(configFields);
 }
