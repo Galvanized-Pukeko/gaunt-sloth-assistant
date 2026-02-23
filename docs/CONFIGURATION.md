@@ -451,7 +451,10 @@ You can use the `GOOGLE_API_KEY` environment variable instead of specifying `api
 }
 ```
 
-VertexAI typically uses gcloud authentication; no `apiKey` is needed in the config.
+VertexAI typically uses gcloud authentication; no `apiKey` is needed in the config. 
+It will give you 401 error if you have `GOOGLE_API_KEY` with AI Studio API key,
+you may need to remove `GOOGLE_API_KEY` from environment variables and authenticate with ADC `gcloud auth application-default login`
+or to use API key issued by Vertex AI.
 
 **Example of .gsloth.config.json for Open Router**
 
@@ -518,10 +521,11 @@ const parrotTool = tool(
 );
 
 export async function configure() {
-  const anthropic = await import('@langchain/google-vertexai');
+  const google = await import('@langchain/google/node');
   return {
-    llm: new anthropic.ChatVertexAI({
+    llm: new google.ChatGoogle({
       model: 'gemini-2.5-pro',
+      vertexai: true,
     }),
     tools: [parrotTool],
   };
@@ -624,11 +628,12 @@ export async function configure() {
 
 ```javascript
 export async function configure() {
-  const googleGenai = await import('@langchain/google-genai');
+  const google = await import('@langchain/google/node');
   return {
-    llm: new googleGenai.ChatGoogleGenerativeAI({
+    llm: new google.ChatGoogle({
       model: 'gemini-2.5-pro',
       apiKey: process.env.GOOGLE_API_KEY, // Default value, but you can provide the key in many different ways, even as literal
+      platformType: 'gai',
     }),
   };
 }
@@ -640,10 +645,11 @@ VertexAI usually needs `gcloud auth application-default login`
 
 ```javascript
 export async function configure() {
-  const vertexAi = await import('@langchain/google-vertexai');
+  const google = await import('@langchain/google/node');
   return {
-    llm: new vertexAi.ChatVertexAI({
+    llm: new google.ChatGoogle({
       model: 'gemini-2.5-pro', // Consider checking for latest recommended model versions
+      vertexai: true,
       // API Key from AI Studio should also work
       //// Other parameters might be relevant depending on Vertex AI API updates.
       //// The project is not in the interface, but it is in documentation and it seems to work.
@@ -874,10 +880,11 @@ JavaScript:
 
 ```javascript
 export async function configure() {
-  const vertexAi = await import('@langchain/google-vertexai');
+  const google = await import('@langchain/google/node');
   return {
-    llm: new vertexAi.ChatVertexAI({
+    llm: new google.ChatGoogle({
       model: 'gemini-2.5-pro',
+      vertexai: true,
     }),
     requirementsProvider: 'jira',
     requirementsProviderConfig: {
@@ -950,10 +957,11 @@ JavaScript:
 
 ```javascript
 export async function configure() {
-  const vertexAi = await import('@langchain/google-vertexai');
+  const google = await import('@langchain/google/node');
   return {
-    llm: new vertexAi.ChatVertexAI({
+    llm: new google.ChatGoogle({
       model: 'gemini-2.5-pro',
+      vertexai: true,
     }),
     requirementsProvider: 'jira-legacy',
     requirementsProviderConfig: {

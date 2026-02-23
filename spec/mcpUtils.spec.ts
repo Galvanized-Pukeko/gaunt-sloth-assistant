@@ -2,8 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import type { GthConfig } from '#src/config.js';
 
-vi.mock('@langchain/google-vertexai', () => ({
-  ChatVertexAI: class ChatVertexAI {},
+vi.mock('@langchain/google/node', () => ({
+  ChatGoogle: class ChatGoogle {
+    _platform: string | undefined;
+
+    constructor(params: { vertexai?: boolean } = {}) {
+      this._platform = params.vertexai ? 'gcp' : undefined;
+    }
+  },
 }));
 
 describe('prepareMcpTools', () => {
@@ -52,8 +58,10 @@ describe('prepareMcpTools', () => {
       schema,
       func: async () => 'ok',
     });
-    const { ChatVertexAI } = await import('@langchain/google-vertexai');
-    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+    const { ChatGoogle } = await import('@langchain/google/node');
+    const config = {
+      llm: new ChatGoogle({ model: 'gemini-2.5-pro', vertexai: true }),
+    } as Partial<GthConfig>;
 
     const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
     const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);
@@ -80,8 +88,10 @@ describe('prepareMcpTools', () => {
       schema,
       func: async () => 'ok',
     });
-    const { ChatVertexAI } = await import('@langchain/google-vertexai');
-    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+    const { ChatGoogle } = await import('@langchain/google/node');
+    const config = {
+      llm: new ChatGoogle({ model: 'gemini-2.5-pro', vertexai: true }),
+    } as Partial<GthConfig>;
 
     const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
     const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);
@@ -126,8 +136,10 @@ describe('prepareMcpTools', () => {
       schema,
       func: async () => 'ok',
     });
-    const { ChatVertexAI } = await import('@langchain/google-vertexai');
-    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+    const { ChatGoogle } = await import('@langchain/google/node');
+    const config = {
+      llm: new ChatGoogle({ model: 'gemini-2.5-pro', vertexai: true }),
+    } as Partial<GthConfig>;
 
     const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
     const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);
@@ -158,8 +170,10 @@ describe('prepareMcpTools', () => {
       schema,
       func: async () => 'ok',
     });
-    const { ChatVertexAI } = await import('@langchain/google-vertexai');
-    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+    const { ChatGoogle } = await import('@langchain/google/node');
+    const config = {
+      llm: new ChatGoogle({ model: 'gemini-2.5-pro', vertexai: true }),
+    } as Partial<GthConfig>;
 
     const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
     const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);
@@ -193,8 +207,10 @@ describe('prepareMcpTools', () => {
       schema,
       func: async () => 'ok',
     });
-    const { ChatVertexAI } = await import('@langchain/google-vertexai');
-    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+    const { ChatGoogle } = await import('@langchain/google/node');
+    const config = {
+      llm: new ChatGoogle({ model: 'gemini-2.5-pro', vertexai: true }),
+    } as Partial<GthConfig>;
 
     const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
     const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);
@@ -237,8 +253,10 @@ describe('prepareMcpTools', () => {
       schema,
       func: async () => 'ok',
     });
-    const { ChatVertexAI } = await import('@langchain/google-vertexai');
-    const config = { llm: new ChatVertexAI() } as Partial<GthConfig>;
+    const { ChatGoogle } = await import('@langchain/google/node');
+    const config = {
+      llm: new ChatGoogle({ model: 'gemini-2.5-pro', vertexai: true }),
+    } as Partial<GthConfig>;
 
     const { prepareMcpTools } = await import('#src/utils/mcpUtils.js');
     const result = prepareMcpTools(vi.fn(), config as GthConfig, [tool]);

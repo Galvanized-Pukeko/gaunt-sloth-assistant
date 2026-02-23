@@ -288,6 +288,25 @@ describe('GthFileSystemToolkit - Basic Tests', () => {
 
         await expect(toolkit['validatePath'](testPath)).rejects.toThrow('Permission denied');
       });
+
+      it('should treat bare and dot-relative file paths the same', async () => {
+        const absolutePath = path.join(process.cwd(), 'it.js');
+        fsMock.realpath.mockResolvedValue(absolutePath);
+
+        const barePathResult = await toolkit['validatePath']('it.js');
+        const dotRelativePathResult = await toolkit['validatePath']('./it.js');
+
+        expect(barePathResult).toBe(absolutePath);
+        expect(dotRelativePathResult).toBe(absolutePath);
+      });
+
+      it('should accept quoted path arguments by unwrapping quotes', async () => {
+        const absolutePath = path.join(process.cwd(), 'it.js');
+        fsMock.realpath.mockResolvedValue(absolutePath);
+
+        const result = await toolkit['validatePath']('"./it.js"');
+        expect(result).toBe(absolutePath);
+      });
     });
   });
 });

@@ -1,7 +1,7 @@
 {
   "llm": {
     "type": "google-genai",
-    "model": "gemini-2.5-pro",
+    "model": "gemini-3.1-pro-preview",
     "temperature": 0
   },
   "canInterruptInferenceWithEsc": false,
@@ -12,6 +12,7 @@
     "filesystem": "none"
   },
   "binaryFormats": [
-    { "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"] }
+    { "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"] },
+    { "type": "file", "extensions": ["pdf"] }
   ]
 }

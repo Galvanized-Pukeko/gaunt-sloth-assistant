@@ -347,14 +347,14 @@ describe('GthLangChainAgent', () => {
         recursionLimit: 1000,
         configurable: { thread_id: 'test-thread-id' },
       };
-      const result = await agent.invoke([new HumanMessage('test message')], runConfig);
-
+      await expect(agent.invoke([new HumanMessage('test message')], runConfig)).rejects.toThrow(
+        'Test error'
+      );
       expect(statusUpdateCallback).toHaveBeenCalledWith(
-        StatusLevel.WARNING,
-        expect.stringContaining('Something went wrong')
+        StatusLevel.ERROR,
+        expect.stringContaining('LLM invocation failed: Test error')
       );
       expect(ProgressIndicatorInstanceMock.stop).toHaveBeenCalled();
-      expect(result).toBe('');
     });
 
     it('should invoke agent in non-streaming mode only', async () => {
