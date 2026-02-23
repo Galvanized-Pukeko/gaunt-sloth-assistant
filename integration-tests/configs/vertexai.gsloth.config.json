@@ -1,7 +1,7 @@
 {
   "llm": {
     "type": "vertexai",
-    "model": "gemini-3-pro-preview",
+    "model": "gemini-2.5-pro",
     "location": "global",
     "temperature": 0
   },
