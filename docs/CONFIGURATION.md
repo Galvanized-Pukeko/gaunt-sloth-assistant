@@ -183,6 +183,18 @@ Lower levels are more verbose. Valid values for JSON configs:
 }
 ```
 
+## No Default Prompts
+
+By default, Gaunt Sloth falls back to its bundled `.gsloth.*.md` prompt files when no user-provided files are found. Setting `noDefaultPrompts` to `true` disables this fallback, so only user-provided prompt files are used. This applies to all `.gsloth.*.md` files including backstory, system, chat, code, guidelines, and review instructions.
+
+**Example config:**
+
+```json
+{
+  "noDefaultPrompts": true
+}
+```
+
 ## Configuration Object
 
 Refer to documentation site for [Configuration Interface](https://gaunt-sloth-assistant.github.io/docs/interfaces/config.GthConfig.html)
@@ -193,9 +205,12 @@ It is always worth checking sourcecode in [config.ts](../src/config.ts) for more
 
 ## Config initialization
 
-Configuration can be created with `gsloth init [vendor]` command.
+Configuration can be created with `gsloth init` command. When called without arguments, it detects available API keys in the environment and prompts you to select a provider.
+You can also specify a provider directly: `gsloth init [vendor]`.
 Currently, anthropic, groq, deepseek, openai, google-genai, vertexai, openrouter and xai can be configured with `gsloth init [vendor]`.
 For providers using OpenAI format (like Inception), use `gsloth init openai` and then modify the configuration.
+
+By default, `gsloth init` creates a `.gsloth` directory in the project root and places configuration files in `.gsloth/.gsloth-settings/`. Project root configuration is still supported for backward compatibility.
 
 ### Google GenAI (AI Studio)
 
