@@ -20,19 +20,21 @@ Every command supports these shared flags:
 Initialize Gaunt Sloth Assistant in your project.
 
 ```bash
-gsloth init <type>
+gsloth init [type]
 ```
 
 ### Arguments
-- `<type>` - Configuration type. Available options: `anthropic`, `groq`, `deepseek`, `openai`, `google-genai`, `vertexai`, `openrouter`, `xai`
+- `[type]` - Configuration type (optional). Available options: `anthropic`, `groq`, `deepseek`, `openai`, `google-genai`, `vertexai`, `openrouter`, `xai`. When omitted, the command detects available API keys in the environment and prompts you to select a provider.
 
 ### Description
-Creates the necessary configuration files for your project. If a `.gsloth` directory exists, files will be placed in `.gsloth/.gsloth-settings/`. Otherwise, they will be created in the project root.
-- `.gsloth.config.js`, `.gsloth.config.json`, or `.gsloth.config.mjs` - Configuration file
+Creates the necessary configuration files for your project. By default, a `.gsloth` directory is created in the project root, and configuration files are placed in `.gsloth/.gsloth-settings/`. For backward compatibility, if configuration is created in a project without a `.gsloth` directory already present, it will be created automatically.
+- `.gsloth.config.json` - Configuration file
 - `.gsloth.guidelines.md` - Project guidelines file
+- `.gsloth.review.md` - Code review instructions
 
 ### Examples
 ```bash
+gsloth init              # Auto-detect API keys and prompt for provider
 gsloth init vertexai
 gsloth init anthropic
 gsloth init groq

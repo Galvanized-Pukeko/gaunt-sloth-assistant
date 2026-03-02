@@ -302,3 +302,89 @@ describe('prompt reading with identityProfile variations', async () => {
     expect(fs.readFileSync).toHaveBeenCalledWith(installPath, { encoding: 'utf8' });
   });
 });
+
+// noDefaultPrompts tests
+describe('noDefaultPrompts behavior', async () => {
+  const prefix = platform() == 'win32' ? 'C:\\' : '/';
+  const mockProjectDir = `${prefix}project`;
+  const mockInstallDir = `${prefix}install`;
+
+  const systemUtils = await import('#src/utils/systemUtils.js');
+  const prompt = await import('#src/utils/llmUtils.js');
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.spyOn(systemUtils, 'getProjectDir').mockReturnValue(mockProjectDir);
+    vi.spyOn(systemUtils, 'getInstallDir').mockReturnValue(mockInstallDir);
+    vi.mocked(fs.existsSync).mockReset();
+    vi.mocked(fs.readFileSync).mockReset();
+  });
+
+  test('readBackstory returns empty string when noDefaultPrompts is true and file not found', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const result = (prompt as any).readBackstory({ noDefaultPrompts: true });
+    expect(result).toBe('');
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+  });
+
+  test('readSystemPrompt returns empty string when noDefaultPrompts is true and file not found', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const result = (prompt as any).readSystemPrompt({ noDefaultPrompts: true });
+    expect(result).toBe('');
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+  });
+
+  test('readChatPrompt returns empty string when noDefaultPrompts is true and file not found', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const result = (prompt as any).readChatPrompt({ noDefaultPrompts: true });
+    expect(result).toBe('');
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+  });
+
+  test('readCodePrompt returns empty string when noDefaultPrompts is true and file not found', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const result = (prompt as any).readCodePrompt({ noDefaultPrompts: true });
+    expect(result).toBe('');
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+  });
+
+  test('readGuidelines returns empty string when noDefaultPrompts is true and file not found', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const result = (prompt as any).readGuidelines({
+      projectGuidelines: '.gsloth.guidelines.md',
+      includeCurrentDateAfterGuidelines: false,
+      noDefaultPrompts: true,
+    });
+    expect(result).toBe('');
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+  });
+
+  test('readReviewInstructions returns empty string when noDefaultPrompts is true and file not found', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const result = (prompt as any).readReviewInstructions({
+      projectReviewInstructions: '.gsloth.review.md',
+      noDefaultPrompts: true,
+    });
+    expect(result).toBe('');
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+  });
+
+  test('readBackstory still reads user file when noDefaultPrompts is true and file exists', () => {
+    const filePath = `${mockProjectDir}${sep}.gsloth.backstory.md`;
+
+    vi.mocked(fs.existsSync).mockImplementation((path) => [filePath].includes(String(path)));
+    vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
+      if (String(path) === filePath) return 'user backstory';
+      throw new Error('not found');
+    });
+
+    const result = (prompt as any).readBackstory({ noDefaultPrompts: true });
+    expect(result).toBe('user backstory');
+  });
+});

@@ -7,6 +7,7 @@ const fsMock = {
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
+  mkdirSync: vi.fn(),
 };
 vi.mock('node:fs', () => fsMock);
 
@@ -1391,6 +1392,12 @@ describe('config', async () => {
 
       await createProjectConfig(configType);
 
+      // Verify .gsloth directory was created
+      expect(fsMock.mkdirSync).toHaveBeenCalledWith(expect.stringContaining('.gsloth'), {
+        recursive: true,
+      });
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith('Created .gsloth directory');
+
       // Verify displayInfo was called
       expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith('Setting up your project\n');
       expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
@@ -1415,6 +1422,33 @@ describe('config', async () => {
         '/mock/write/.gsloth.review.md',
         expect.stringContaining('# Code Review Guidelines')
       );
+    });
+
+    it('Should not recreate .gsloth directory if it already exists', async () => {
+      const configType = 'vertexai';
+      const mockInit = vi.fn();
+
+      vi.doMock('#src/presets/vertexai.js', () => ({
+        init: mockInit,
+      }));
+
+      fileUtilsMock.getGslothConfigWritePath.mockImplementation(
+        (filename: string) => `/mock/write/${filename}`
+      );
+
+      // .gsloth directory already exists
+      fsMock.existsSync.mockImplementation((path: string) => {
+        if (String(path).endsWith('.gsloth')) return true;
+        return false;
+      });
+
+      const { createProjectConfig } = await import('#src/config.js');
+
+      await createProjectConfig(configType);
+
+      // Should NOT create directory since it already exists
+      expect(fsMock.mkdirSync).not.toHaveBeenCalled();
+      expect(consoleUtilsMock.displayInfo).not.toHaveBeenCalledWith('Created .gsloth directory');
     });
 
     it('Should handle invalid config type', async () => {

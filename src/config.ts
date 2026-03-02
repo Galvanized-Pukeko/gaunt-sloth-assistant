@@ -9,6 +9,7 @@
  * Some config params can be overriden from command line, see {@link CommandLineConfigOverrides}
  */
 import {
+  GSLOTH_DIR,
   PROJECT_GUIDELINES,
   PROJECT_REVIEW_INSTRUCTIONS,
   USER_PROJECT_CONFIG_JS,
@@ -31,11 +32,12 @@ import {
   importExternalFile,
   writeFileIfNotExistsWithMessages,
 } from '#src/utils/fileUtils.js';
-import { error, exit, isTTY, setUseColour } from '#src/utils/systemUtils.js';
+import { error, exit, getProjectDir, isTTY, setUseColour } from '#src/utils/systemUtils.js';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import type { Connection } from '@langchain/mcp-adapters';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 /**
  * This is a processed Gaunt Sloth config ready to be passed down into components.
@@ -86,6 +88,12 @@ export interface GthConfig {
     timezone?: string;
   };
   projectReviewInstructions: string;
+  /**
+   * If true, only use user-provided system prompts. Do not fall back to the
+   * bundled `.gsloth.*.md` prompt files shipped with the installation.
+   * This applies to all `.gsloth.*.md` files (backstory, system, chat, code, guidelines, review).
+   */
+  noDefaultPrompts?: boolean;
   filesystem: string[] | 'all' | 'read' | 'none';
   builtInTools?: string[];
   tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
@@ -698,6 +706,9 @@ export async function createProjectConfig(configType: string): Promise<void> {
     exit(1);
   }
 
+  // Ensure .gsloth directory exists (folder configuration mode)
+  ensureGslothDir();
+
   displayInfo(`Setting up your project\n`);
   writeProjectReviewPreamble();
   displayWarning(`Make sure you add as much detail as possible to your ${PROJECT_GUIDELINES}.\n`);
@@ -705,6 +716,19 @@ export async function createProjectConfig(configType: string): Promise<void> {
   displayInfo(`Creating project config for ${configType}`);
   const vendorConfig = await import(`./presets/${configType}.js`);
   vendorConfig.init(getGslothConfigWritePath(USER_PROJECT_CONFIG_JSON));
+}
+
+/**
+ * Ensures that the .gsloth directory exists in the project root.
+ * Creates it if it does not exist.
+ */
+export function ensureGslothDir(): void {
+  const projectDir = getProjectDir();
+  const gslothDirPath = resolve(projectDir, GSLOTH_DIR);
+  if (!existsSync(gslothDirPath)) {
+    mkdirSync(gslothDirPath, { recursive: true });
+    displayInfo(`Created ${GSLOTH_DIR} directory`);
+  }
 }
 
 export function writeProjectReviewPreamble(): void {
