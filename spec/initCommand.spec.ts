@@ -101,7 +101,8 @@ describe('initCommand', () => {
 
     const available = detectAvailableProviders();
 
-    // All 4 mocked providers should be available (vertexai + 3 with keys)
+    // Only 4 providers are in the mocked availableDefaultConfigs: vertexai, anthropic, groq, openrouter
+    // vertexai needs no key; anthropic, groq, openrouter have matching keys set
     expect(available).toContain('vertexai');
     expect(available).toContain('anthropic');
     expect(available).toContain('groq');
@@ -130,12 +131,9 @@ describe('initCommand', () => {
     expect(createProjectConfig).toHaveBeenCalled();
   });
 
-  it('Should show warning when no API keys detected and no argument provided', async () => {
+  it('Should select vertexai when no API keys are set (vertexai needs no key)', async () => {
     systemUtilsMock.env = {};
 
-    // Override providerApiKeyMap to not include vertexai (which needs no key)
-    // Actually vertexai is always available, so with default map we always have at least 1
-    // Let's test the flow when provider is selected
     const mockRl = {
       question: vi.fn().mockResolvedValue('1'),
       close: vi.fn(),
