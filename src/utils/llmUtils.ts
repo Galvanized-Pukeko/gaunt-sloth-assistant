@@ -25,8 +25,10 @@ export function getNewRunnableConfig(): RunnableConfig {
   };
 }
 
-export function readBackstory(config: Pick<GthConfig, 'identityProfile'>): string {
-  return readPromptFile(GSLOTH_BACKSTORY, config.identityProfile);
+export function readBackstory(
+  config: Pick<GthConfig, 'identityProfile' | 'noDefaultPrompts'>
+): string {
+  return readPromptFile(GSLOTH_BACKSTORY, config.identityProfile, config.noDefaultPrompts);
 }
 
 export function readGuidelines(
@@ -37,13 +39,18 @@ export function readGuidelines(
         | 'includeCurrentDateAfterGuidelines'
         | 'organization'
         | 'identityProfile'
+        | 'noDefaultPrompts'
       >
     | string
 ): string {
   if (typeof config === 'string') {
     return readPromptFile(config, undefined);
   }
-  const guidelines = readPromptFile(config.projectGuidelines, config.identityProfile);
+  const guidelines = readPromptFile(
+    config.projectGuidelines,
+    config.identityProfile,
+    config.noDefaultPrompts
+  );
   if (config.includeCurrentDateAfterGuidelines) {
     const currentDate = new Date();
 
@@ -74,30 +81,49 @@ export function readGuidelines(
 }
 
 export function readReviewInstructions(
-  config: Pick<GthConfig, 'projectReviewInstructions' | 'identityProfile'> | string
+  config:
+    | Pick<GthConfig, 'projectReviewInstructions' | 'identityProfile' | 'noDefaultPrompts'>
+    | string
 ): string {
   if (typeof config === 'string') {
     return readPromptFile(config, undefined);
   }
-  return readPromptFile(config.projectReviewInstructions, config.identityProfile);
+  return readPromptFile(
+    config.projectReviewInstructions,
+    config.identityProfile,
+    config.noDefaultPrompts
+  );
 }
 
-export function readSystemPrompt(config: Pick<GthConfig, 'identityProfile'>): string {
-  return readPromptFile(GSLOTH_SYSTEM_PROMPT, config.identityProfile);
+export function readSystemPrompt(
+  config: Pick<GthConfig, 'identityProfile' | 'noDefaultPrompts'>
+): string {
+  return readPromptFile(GSLOTH_SYSTEM_PROMPT, config.identityProfile, config.noDefaultPrompts);
 }
 
-export function readChatPrompt(config: Pick<GthConfig, 'identityProfile'>): string {
-  return readPromptFile(GSLOTH_CHAT_PROMPT, config.identityProfile);
+export function readChatPrompt(
+  config: Pick<GthConfig, 'identityProfile' | 'noDefaultPrompts'>
+): string {
+  return readPromptFile(GSLOTH_CHAT_PROMPT, config.identityProfile, config.noDefaultPrompts);
 }
 
-export function readCodePrompt(config: Pick<GthConfig, 'identityProfile'>): string {
-  return readPromptFile(GSLOTH_CODE_PROMPT, config.identityProfile);
+export function readCodePrompt(
+  config: Pick<GthConfig, 'identityProfile' | 'noDefaultPrompts'>
+): string {
+  return readPromptFile(GSLOTH_CODE_PROMPT, config.identityProfile, config.noDefaultPrompts);
 }
 
-function readPromptFile(filename: string, identityProfile: string | undefined): string {
+function readPromptFile(
+  filename: string,
+  identityProfile: string | undefined,
+  noDefaultPrompts?: boolean
+): string {
   const path = getGslothConfigReadPath(filename, identityProfile);
   if (existsSync(path)) {
     return readFileSync(path, { encoding: 'utf8' });
+  }
+  if (noDefaultPrompts) {
+    return '';
   }
   return readFileFromInstallDir(filename);
 }

@@ -73,7 +73,7 @@ These apply to every command:
 
 ### Available Commands:
 
-- **`init`** - Initialize Gaunt Sloth in your project with a specific AI provider
+- **`init`** - Initialize Gaunt Sloth in your project (auto-detects API keys when called without arguments)
 - **`pr`** - ⚠️ This feature requires GitHub CLI to be installed. Review pull requests with optional requirement integration (GitHub issues or Jira).
 - **`review`** - Review any diff or content from various sources
 - **`ask`** - Ask questions about code or programming topics
@@ -84,7 +84,8 @@ These apply to every command:
 
 **Initialize project:**
 ```bash
-gsloth init anthropic
+gsloth init              # Auto-detect API keys and select provider
+gsloth init anthropic    # Or specify provider directly
 ```
 
 **Review PR with requirements:**
