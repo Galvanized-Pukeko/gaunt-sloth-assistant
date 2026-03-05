@@ -3,7 +3,10 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { runCommandWithArgs } from './support/commandRunner.ts';
 
-const configContent = readFileSync(join(import.meta.dirname, 'workdir/.gsloth.config.json'), 'utf-8');
+const configContent = readFileSync(
+  join(import.meta.dirname, 'workdir/.gsloth.config.json'),
+  'utf-8'
+);
 const hasBinaryFormats = configContent.includes('binaryFormats');
 
 describe('Binary Image Integration Tests', () => {
