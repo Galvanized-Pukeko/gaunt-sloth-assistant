@@ -5,6 +5,7 @@ import { reviewCommand } from '#src/commands/reviewCommand.js';
 import { prCommand } from '#src/commands/prCommand.js';
 import { chatCommand } from '#src/commands/chatCommand.js';
 import { codeCommand } from '#src/commands/codeCommand.js';
+import { apiCommand } from '#src/commands/apiCommand.js';
 import { argv, getSlothVersion, readStdin } from '#src/utils/systemUtils.js';
 import type { CommandLineConfigOverrides } from '#src/config.js';
 
@@ -67,5 +68,6 @@ prCommand(program, cliConfigOverrides);
 askCommand(program, cliConfigOverrides);
 chatCommand(program, cliConfigOverrides);
 codeCommand(program, cliConfigOverrides);
+apiCommand(program, cliConfigOverrides);
 
 await readStdin(program);

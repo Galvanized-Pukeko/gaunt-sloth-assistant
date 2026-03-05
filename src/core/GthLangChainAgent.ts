@@ -299,20 +299,15 @@ export class GthLangChainAgent implements GthAgentInterface {
       this.statusUpdate(StatusLevel.WARNING, 'Model does not seem to support tools.');
       debugLog('Warning: Model does not support tools');
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cmdConfig = (command && config.commands?.[command]) as any;
     return {
       ...config,
-      filesystem:
-        command && config.commands?.[command]?.filesystem !== undefined
-          ? config.commands[command].filesystem!
-          : config.filesystem,
+      filesystem: cmdConfig?.filesystem !== undefined ? cmdConfig.filesystem : config.filesystem,
       builtInTools:
-        command && config.commands?.[command]?.builtInTools !== undefined
-          ? config.commands[command].builtInTools!
-          : config.builtInTools,
+        cmdConfig?.builtInTools !== undefined ? cmdConfig.builtInTools : config.builtInTools,
       binaryFormats:
-        command && config.commands?.[command]?.binaryFormats !== undefined
-          ? config.commands[command].binaryFormats!
-          : config.binaryFormats,
+        cmdConfig?.binaryFormats !== undefined ? cmdConfig.binaryFormats : config.binaryFormats,
     };
   }
 

@@ -223,6 +223,9 @@ export interface GthConfig {
       devTools?: GthDevToolsConfig;
       binaryFormats?: false | BinaryFormatConfig[];
     };
+    api?: {
+      port?: number;
+    };
   };
   modelDisplayName?: string;
 }
@@ -509,6 +512,9 @@ export const DEFAULT_CONFIG = {
     },
     code: {
       filesystem: 'all',
+    },
+    api: {
+      port: 3000,
     },
   },
   streamOutput: true,
@@ -823,6 +829,7 @@ async function mergeConfig(
     ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     ...(config?.commands?.ask && { ask: config.commands.ask }),
     ...(config?.commands?.chat && { chat: config.commands.chat }),
+    ...(config?.commands?.api && { api: config.commands.api }),
   };
 
   const mergedConfig = {

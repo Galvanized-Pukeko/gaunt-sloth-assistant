@@ -20,7 +20,7 @@ export enum StatusLevel {
   ERROR = 5,
   STREAM = 6,
 }
-export type GthCommand = 'ask' | 'pr' | 'review' | 'chat' | 'code';
+export type GthCommand = 'ask' | 'pr' | 'review' | 'chat' | 'code' | 'api';
 
 export interface GthAgentInterface {
   init(
