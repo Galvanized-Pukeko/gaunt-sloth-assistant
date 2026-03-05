@@ -233,6 +233,11 @@ export interface GthConfig {
     };
     api?: {
       port?: number;
+      cors?: {
+        allowOrigin?: string;
+        allowMethods?: string;
+        allowHeaders?: string;
+      };
     };
   };
   modelDisplayName?: string;
@@ -523,6 +528,11 @@ export const DEFAULT_CONFIG = {
     },
     api: {
       port: 3000,
+      cors: {
+        allowOrigin: 'http://localhost:3000',
+        allowMethods: 'POST, GET, OPTIONS',
+        allowHeaders: 'Content-Type, Accept',
+      },
     },
   },
   streamOutput: true,
@@ -853,7 +863,10 @@ async function mergeConfig(
     ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     ...(config?.commands?.ask && { ask: config.commands.ask }),
     ...(config?.commands?.chat && { chat: config.commands.chat }),
-    ...(config?.commands?.api && { api: config.commands.api }),
+    api: deepMerge(
+      DEFAULT_CONFIG.commands.api as Record<string, unknown>,
+      config?.commands?.api as Record<string, unknown> | undefined
+    ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
   };
 
   const mergedConfig = {
