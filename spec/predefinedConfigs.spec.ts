@@ -25,7 +25,7 @@ vi.mock('node:fs', () => fsMock);
 
 const systemUtilsMock = {
   exit: vi.fn(),
-  getProjectDir: vi.fn(),
+  getCurrentWorkDir: vi.fn(),
   getInstallDir: vi.fn(),
   env: {},
 };
@@ -34,7 +34,7 @@ vi.mock('#src/utils/systemUtils.js', () => systemUtilsMock);
 describe('predefined AI provider configurations', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
-    systemUtilsMock.getProjectDir.mockReturnValue('/mock/current/dir');
+    systemUtilsMock.getCurrentWorkDir.mockReturnValue('/mock/current/dir');
     systemUtilsMock.getInstallDir.mockReturnValue('/mock/install/dir');
   });
 

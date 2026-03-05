@@ -8,7 +8,7 @@ import type { RunnableConfig } from '@langchain/core/runnables';
 import { StatusLevel, type StatusUpdateCallback } from '#src/core/types.js';
 
 const systemUtilsMock = {
-  getProjectDir: vi.fn(),
+  getCurrentWorkDir: vi.fn(),
   stopWaitingForEscape: vi.fn(),
   waitForEscape: vi.fn(),
 };
@@ -85,7 +85,7 @@ describe('GthLangChainAgent', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
 
-    systemUtilsMock.getProjectDir.mockReturnValue('/test/dir');
+    systemUtilsMock.getCurrentWorkDir.mockReturnValue('/test/dir');
     multiServerMCPClientMock.mockImplementation(function () {
       return mcpClientInstanceMock;
     });

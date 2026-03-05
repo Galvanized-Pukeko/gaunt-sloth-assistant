@@ -214,7 +214,7 @@ describe('prCommand', () => {
       env: {}, // Empty env object to ensure no environment variables are used
       error: vi.fn(),
       exit: vi.fn(),
-      getProjectDir: vi.fn().mockReturnValue('/mock/dir'),
+      getCurrentWorkDir: vi.fn().mockReturnValue('/mock/dir'),
     }));
 
     const { prCommand } = await import('#src/commands/prCommand.js');

@@ -32,7 +32,7 @@ vi.mock('node:path', () => pathMock);
 
 // Mock systemUtils module
 const systemUtilsMock = {
-  getProjectDir: vi.fn(),
+  getCurrentWorkDir: vi.fn(),
 };
 vi.mock('#src/utils/systemUtils.js', () => systemUtilsMock);
 

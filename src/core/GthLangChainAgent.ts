@@ -14,7 +14,7 @@ import { displayInfo } from '#src/utils/consoleUtils.js';
 import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
-import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
+import { stopWaitingForEscape, waitForEscape, getCurrentWorkDir } from '#src/utils/systemUtils.js';
 import { AIMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
@@ -52,6 +52,8 @@ export class GthLangChainAgent implements GthAgentInterface {
       streamOutput: this.config.streamOutput,
       debugLog: this.config.debugLog,
     });
+
+    this.statusUpdate(StatusLevel.INFO, `Workdir: ${getCurrentWorkDir()}`);
 
     if (this.config.modelDisplayName) {
       this.statusUpdate(StatusLevel.INFO, `Model: ${this.config.modelDisplayName}`);

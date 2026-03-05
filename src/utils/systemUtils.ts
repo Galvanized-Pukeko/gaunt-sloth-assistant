@@ -129,7 +129,15 @@ process.on('SIGTERM', () => {
 });
 
 // Process-related functions and objects
-export const getProjectDir = (): string => process.cwd();
+
+/**
+ * The process.cwd() has a weird behaviour when the app is a part of monorepo,
+ * always returning the directory of this specific project,
+ * this causes integration tests to fail, because they are specifically testing ability to respect actual current dirs.
+ * Gaunt Sloth is a command line tool and it is always supposed to function in the current directory.
+ * Using INIT_CWD forces to always use actual CWD. cwd() fallback is just in case.
+ */
+export const getCurrentWorkDir = (): string => process.env?.INIT_CWD ?? process.cwd();
 export const getInstallDir = (): string => {
   if (innerState.installDir) {
     return innerState.installDir;

@@ -32,7 +32,7 @@ import {
   importExternalFile,
   writeFileIfNotExistsWithMessages,
 } from '#src/utils/fileUtils.js';
-import { error, exit, getProjectDir, isTTY, setUseColour } from '#src/utils/systemUtils.js';
+import { error, exit, getCurrentWorkDir, isTTY, setUseColour } from '#src/utils/systemUtils.js';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import type { Connection } from '@langchain/mcp-adapters';
@@ -729,7 +729,7 @@ export async function createProjectConfig(configType: string): Promise<void> {
  * Creates it if it does not exist.
  */
 export function ensureGslothDir(): void {
-  const projectDir = getProjectDir();
+  const projectDir = getCurrentWorkDir();
   const gslothDirPath = resolve(projectDir, GSLOTH_DIR);
   if (!existsSync(gslothDirPath)) {
     mkdirSync(gslothDirPath, { recursive: true });
