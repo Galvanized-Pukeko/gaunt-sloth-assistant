@@ -35,7 +35,9 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
   const app = express();
   app.use(express.json());
 
-  displayInfo('WARNING: AG-UI server is intended for local clients only. Do not expose to public networks.');
+  displayInfo(
+    'WARNING: AG-UI server is intended for local clients only. Do not expose to public networks.'
+  );
 
   // CORS — wide open, local use only
   app.use((_req, res, next) => {
