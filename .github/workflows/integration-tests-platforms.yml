@@ -1,9 +1,9 @@
-name: Integration tests small
-
-# I think it should instead run on pull_request_target and checkout the PR instead
+name: Integration tests platforms
 
 on:
   push:
+    branches: [ "main" ]
+  pull_request_target:
     branches: [ "main" ]
 
 jobs:
@@ -21,6 +21,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
     
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4

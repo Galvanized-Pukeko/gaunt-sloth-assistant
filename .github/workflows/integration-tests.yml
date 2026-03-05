@@ -1,9 +1,9 @@
 name: Integration tests
 
-# I think it should instead run on pull_request_target and checkout the PR instead
-
 on:
   push:
+    branches: [ "main" ]
+  pull_request_target:
     branches: [ "main" ]
   workflow_dispatch:
     inputs:
@@ -27,7 +27,7 @@ jobs:
         if [ -n "${{ inputs.pr_number }}" ]; then
           echo "ref=refs/pull/${{ inputs.pr_number }}/merge" >> "$GITHUB_OUTPUT"
         else
-          echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+          echo "ref=${{ github.event.pull_request.head.sha || github.ref }}" >> "$GITHUB_OUTPUT"
         fi
 
     - uses: actions/checkout@v4
