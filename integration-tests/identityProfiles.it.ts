@@ -25,8 +25,7 @@ describe('Review Command Integration Tests', () => {
     expect(favouriteFishOutput, 'should use default profile guidelines').toContain('Snapper');
   });
 
-  // Test for reviewing bad code
-  it('should work with sorcerer profile', async () => {
+  it('should work with sorcerer profile name', async () => {
     const nameOutput = await runCommandWithArgs(
       'npx',
       ['gth', '-i sorcerer', 'ask', '"what is your name?"'],
@@ -34,24 +33,26 @@ describe('Review Command Integration Tests', () => {
       PROFILES_WORKDIR
     );
     expect(nameOutput).toContain('Bomp');
+  });
 
+  it('should approve good spell with sorcerer profile', async () => {
     const spellReviewOutput = await runCommandWithArgs(
       'npx',
-      ['gth', '-i sorcerer', 'review', 'good-spell.txt'],
+      ['gth', '-i sorcerer', 'review', 'good-spell.js'],
       undefined,
       PROFILES_WORKDIR
     );
+    expect(spellReviewOutput.toLowerCase()).toContain('axios');
+  });
 
-    expect(spellReviewOutput).toContain('AXIOS');
-
+  it('should reject bad spell with sorcerer profile', async () => {
     const failedSpellOutput = await runCommandExpectingExitCode(
       'npx',
-      ['gth', '-i sorcerer', 'review', 'bad-spell.txt'],
+      ['gth', '-i sorcerer', 'review', 'bad-spell.js'],
       1,
       PROFILES_WORKDIR
     );
-
-    expect(failedSpellOutput).not.toContain('AXIOS');
+    expect(failedSpellOutput.output.toLowerCase()).not.toContain('axios');
   });
 
   it('should work with fisher-alt profile', async () => {

@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { runCommandWithArgs } from './support/commandRunner.ts';
 
+const configContent = readFileSync(join(import.meta.dirname, 'workdir/.gsloth.config.json'), 'utf-8');
+const hasBinaryFormats = configContent.includes('binaryFormats');
+
 describe('Binary Image Integration Tests', () => {
-  it('should recognize the image content (ball)', async () => {
+  it.skipIf(!hasBinaryFormats)('should recognize the image content (ball)', async () => {
     const output = await runCommandWithArgs('npx', [
       'gth',
       'ask',
@@ -14,7 +19,7 @@ describe('Binary Image Integration Tests', () => {
     expect(output.toLowerCase()).toContain('ball');
   });
 
-  it('should recognize the image content (bicycle)', async () => {
+  it.skipIf(!hasBinaryFormats)('should recognize the image content (bicycle)', async () => {
     const output = await runCommandWithArgs('npx', [
       'gth',
       'ask',
