@@ -6,10 +6,12 @@ import { GthConfig } from '#src/config.js';
 import { GthLangChainAgent } from '#src/core/GthLangChainAgent.js';
 import { defaultStatusCallback } from '#src/utils/consoleUtils.js';
 import { displayInfo } from '#src/utils/consoleUtils.js';
-import { getNewRunnableConfig } from '#src/utils/llmUtils.js';
+import { getNewRunnableConfig, buildSystemMessages, readChatPrompt } from '#src/utils/llmUtils.js';
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import type { BaseMessage } from '@langchain/core/messages';
+
+const initializedThreads = new Set<string>();
 
 /**
  * Convert AG-UI message format to LangChain BaseMessage
@@ -73,8 +75,13 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
         })
       );
 
-      // Convert AG-UI messages to LangChain messages
-      const langChainMessages = (messages || []).map(convertMessage);
+      // Build LangChain messages, prepending system prompt for new threads
+      const langChainMessages: BaseMessage[] = [];
+      if (!initializedThreads.has(effectiveThreadId)) {
+        initializedThreads.add(effectiveThreadId);
+        langChainMessages.push(...buildSystemMessages(config, readChatPrompt(config)));
+      }
+      langChainMessages.push(...(messages || []).map(convertMessage));
 
       const messageId = randomUUID();
 
