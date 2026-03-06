@@ -144,9 +144,8 @@ describe('Middleware Registry', () => {
 
   describe('createAnthropicPromptCachingMiddleware', () => {
     it('should create Anthropic caching middleware with default TTL', async () => {
-      const { createAnthropicPromptCachingMiddleware } = await import(
-        '#src/middleware/registry.js'
-      );
+      const { createAnthropicPromptCachingMiddleware } =
+        await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
       const mockMiddleware = createMiddleware({
         name: 'anthropic-caching-middleware',
@@ -161,9 +160,8 @@ describe('Middleware Registry', () => {
     });
 
     it('should create Anthropic caching middleware with custom TTL', async () => {
-      const { createAnthropicPromptCachingMiddleware } = await import(
-        '#src/middleware/registry.js'
-      );
+      const { createAnthropicPromptCachingMiddleware } =
+        await import('#src/middleware/registry.js');
       const mockConfig = { llm: {} } as GthConfig;
       const mockMiddleware = createMiddleware({
         name: 'anthropic-caching-middleware',
