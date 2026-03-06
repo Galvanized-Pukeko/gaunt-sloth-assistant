@@ -18,9 +18,9 @@ import {
   stdin as input,
   stdout as output,
 } from '#src/utils/systemUtils.js';
-import { type BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { type BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
-import { readBackstory, readGuidelines, readSystemPrompt } from '#src/utils/llmUtils.js';
+import { buildSystemMessages } from '#src/utils/llmUtils.js';
 
 export interface SessionConfig {
   mode: 'chat' | 'code';
@@ -63,28 +63,7 @@ export async function createInteractiveSession(
       flushSessionLog(); // Ensure user input is immediately written to file
       const messages: BaseMessage[] = [];
       if (isFirstMessage) {
-        const systemPromptParts = [readBackstory(config), readGuidelines(config)];
-        const modePrompt = sessionConfig.readModePrompt(config);
-        if (modePrompt) {
-          systemPromptParts.push(modePrompt);
-        }
-        const systemPrompt = readSystemPrompt(config);
-        if (systemPrompt) {
-          systemPromptParts.push(systemPrompt);
-        }
-        // TODO add cache control for Anthropic
-        // messages.push(
-        //   new SystemMessage({
-        //     content: [
-        //       {
-        //         text: systemPromptParts.join('\n'),
-        //         type: 'text',
-        //         // cache_control: { type: 'ephemeral' },
-        //       },
-        //     ],
-        //   })
-        // );
-        messages.push(new SystemMessage(systemPromptParts.join('\n')));
+        messages.push(...buildSystemMessages(config, sessionConfig.readModePrompt(config)));
       }
       messages.push(new HumanMessage(userInput));
 

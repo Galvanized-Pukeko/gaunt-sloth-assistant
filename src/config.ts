@@ -32,7 +32,7 @@ import {
   importExternalFile,
   writeFileIfNotExistsWithMessages,
 } from '#src/utils/fileUtils.js';
-import { error, exit, getProjectDir, isTTY, setUseColour } from '#src/utils/systemUtils.js';
+import { error, exit, getCurrentWorkDir, isTTY, setUseColour } from '#src/utils/systemUtils.js';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import type { Connection } from '@langchain/mcp-adapters';
@@ -230,6 +230,14 @@ export interface GthConfig {
       customTools?: CustomToolsConfig | false;
       devTools?: GthDevToolsConfig;
       binaryFormats?: false | BinaryFormatConfig[];
+    };
+    api?: {
+      port?: number;
+      cors?: {
+        allowOrigin?: string;
+        allowMethods?: string;
+        allowHeaders?: string;
+      };
     };
   };
   modelDisplayName?: string;
@@ -518,6 +526,14 @@ export const DEFAULT_CONFIG = {
     code: {
       filesystem: 'all',
     },
+    api: {
+      port: 3000,
+      cors: {
+        allowOrigin: 'http://localhost:3000',
+        allowMethods: 'POST, GET, OPTIONS',
+        allowHeaders: 'Content-Type, Accept',
+      },
+    },
   },
   streamOutput: true,
   writeOutputToFile: true,
@@ -723,7 +739,7 @@ export async function createProjectConfig(configType: string): Promise<void> {
  * Creates it if it does not exist.
  */
 export function ensureGslothDir(): void {
-  const projectDir = getProjectDir();
+  const projectDir = getCurrentWorkDir();
   const gslothDirPath = resolve(projectDir, GSLOTH_DIR);
   if (!existsSync(gslothDirPath)) {
     mkdirSync(gslothDirPath, { recursive: true });
@@ -847,6 +863,10 @@ async function mergeConfig(
     ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     ...(config?.commands?.ask && { ask: config.commands.ask }),
     ...(config?.commands?.chat && { chat: config.commands.chat }),
+    api: deepMerge(
+      DEFAULT_CONFIG.commands.api as Record<string, unknown>,
+      config?.commands?.api as Record<string, unknown> | undefined
+    ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
   };
 
   const mergedConfig = {

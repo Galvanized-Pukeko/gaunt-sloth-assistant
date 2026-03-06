@@ -81,6 +81,11 @@ vi.mock('#src/utils/llmUtils.js', () => ({
   readGuidelines: vi.fn().mockReturnValue('Mock guidelines'),
   readSystemPrompt: vi.fn().mockReturnValue('Mock system prompt'),
   readCodePrompt: vi.fn().mockReturnValue('Mock code prompt'),
+  buildSystemMessages: vi
+    .fn()
+    .mockReturnValue([
+      new SystemMessage('Mock backstory\nMock guidelines\nMock code prompt\nMock system prompt'),
+    ]),
 }));
 
 const gthAgentRunnerMock = vi.fn(function GthAgentRunnerMock() {

@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { getInstallDir, getProjectDir } from '#src/utils/systemUtils.js';
+import { getInstallDir, getCurrentWorkDir } from '#src/utils/systemUtils.js';
 import { GSLOTH_DIR, GSLOTH_SETTINGS_DIR } from '#src/constants.js';
 import { GthConfig } from '#src/config.js';
 import {
@@ -17,7 +17,7 @@ import { wrapContent } from '#src/utils/llmUtils.js';
  * @returns Boolean indicating whether .gsloth directory exists
  */
 export function gslothDirExists(): boolean {
-  const currentDir = getProjectDir();
+  const currentDir = getCurrentWorkDir();
   const gslothDirPath = resolve(currentDir, GSLOTH_DIR);
   return existsSync(gslothDirPath);
 }
@@ -28,7 +28,7 @@ export function gslothDirExists(): boolean {
  * @returns The resolved path where the file should be written
  */
 export function getGslothFilePath(filename: string): string {
-  const currentDir = getProjectDir();
+  const currentDir = getCurrentWorkDir();
 
   if (gslothDirExists()) {
     const gslothDirPath = resolve(currentDir, GSLOTH_DIR);
@@ -50,7 +50,7 @@ export function getGslothFilePath(filename: string): string {
  * @returns The resolved path where the configuration file should be written
  */
 export function getGslothConfigWritePath(filename: string): string {
-  const currentDir = getProjectDir();
+  const currentDir = getCurrentWorkDir();
 
   if (gslothDirExists()) {
     const gslothDirPath = resolve(currentDir, GSLOTH_DIR);
@@ -77,7 +77,7 @@ export function getGslothConfigReadPath(
   filename: string,
   identityProfileRaw: string | undefined
 ): string {
-  const projectDir = getProjectDir();
+  const projectDir = getCurrentWorkDir();
   const identityProfile = identityProfileRaw?.trim();
   if (gslothDirExists()) {
     const gslothDirPath = resolve(projectDir, GSLOTH_DIR);
@@ -101,7 +101,7 @@ export function getGslothConfigReadPath(
  * - If it's a bare filename, place it under .gsloth/ when present, otherwise project root.
  */
 export function resolveOutputPath(writeOutputToFile: string): string {
-  const currentDir = getProjectDir();
+  const currentDir = getCurrentWorkDir();
   const provided = String(writeOutputToFile).trim();
 
   // Detect if provided path contains path separators (cross-platform)
@@ -156,7 +156,7 @@ export function generateStandardFileName(command: string): string {
 }
 
 export function readFileFromProjectDir(fileName: string): string {
-  const currentDir = getProjectDir();
+  const currentDir = getCurrentWorkDir();
   const filePath = resolve(currentDir, fileName);
   displayInfo(`Reading file ${filePath}...`);
   return readFileSyncWithMessages(filePath);

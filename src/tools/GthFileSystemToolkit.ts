@@ -8,7 +8,7 @@ import { createTwoFilesPatch } from 'diff';
 import { minimatch } from 'minimatch';
 import { displayInfo } from '#src/utils/consoleUtils.js';
 import { shouldIgnoreFile } from '#src/utils/aiignoreUtils.js';
-import { getProjectDir } from '#src/utils/systemUtils.js';
+import { getCurrentWorkDir } from '#src/utils/systemUtils.js';
 import type { BinaryFormatConfig, BinaryFormatType } from '#src/config.js';
 import { getFormatForExtension, getMimeType, readBinaryFile } from '#src/tools/binaryUtils.js';
 
@@ -148,7 +148,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
 
   constructor(options: GthFileSystemToolkitOptions = {}) {
     super();
-    const allowedDirectories = options.allowedDirectories ?? [process.cwd()];
+    const allowedDirectories = options.allowedDirectories ?? [getCurrentWorkDir()];
     this.allowedDirectories = allowedDirectories.map((dir) =>
       this.normalizePath(path.resolve(this.expandHome(dir)))
     );
@@ -209,7 +209,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
     const expandedPath = this.expandHome(sanitizedPath);
     const absolute = path.isAbsolute(expandedPath)
       ? path.resolve(expandedPath)
-      : path.resolve(process.cwd(), expandedPath);
+      : path.resolve(getCurrentWorkDir(), expandedPath);
 
     const normalizedRequested = this.normalizePath(absolute);
 
@@ -325,7 +325,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
 
           const shouldIgnore = shouldIgnoreFile(
             fullPath,
-            getProjectDir(),
+            getCurrentWorkDir(),
             aiignoreConfig?.patterns,
             aiignoreConfig?.enabled
           );
@@ -562,7 +562,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
         const aiignoreConfig = this.aiignoreConfig;
         const shouldIgnore = shouldIgnoreFile(
           validPath,
-          getProjectDir(),
+          getCurrentWorkDir(),
           aiignoreConfig?.patterns,
           aiignoreConfig?.enabled
         );
@@ -755,7 +755,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
             const fullPath = path.join(validPath, entry.name);
             return !shouldIgnoreFile(
               fullPath,
-              getProjectDir(),
+              getCurrentWorkDir(),
               aiignoreConfig?.patterns,
               aiignoreConfig?.enabled
             );
@@ -786,7 +786,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
             const fullPath = path.join(validPath, entry.name);
             return !shouldIgnoreFile(
               fullPath,
-              getProjectDir(),
+              getCurrentWorkDir(),
               aiignoreConfig?.patterns,
               aiignoreConfig?.enabled
             );
@@ -885,7 +885,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
               const fullPath = path.join(currentPath, entry.name);
               const shouldIgnore = shouldIgnoreFile(
                 fullPath,
-                getProjectDir(),
+                getCurrentWorkDir(),
                 aiignoreConfig?.patterns,
                 aiignoreConfig?.enabled
               );

@@ -6,7 +6,7 @@ import GthFileSystemToolkit from '#src/tools/GthFileSystemToolkit.js';
 import { StructuredToolInterface } from '@langchain/core/tools';
 import { GthDevToolsConfig, GthConfig, CustomToolsConfig } from '#src/config.js';
 import { displayWarning } from '#src/utils/consoleUtils.js';
-import { getProjectDir } from '#src/utils/systemUtils.js';
+import { getCurrentWorkDir } from '#src/utils/systemUtils.js';
 import { GthCommand } from '#src/core/types.js';
 import GthDevToolkit from '#src/tools/GthDevToolkit.js';
 import GthCustomToolkit from '#src/tools/GthCustomToolkit.js';
@@ -106,7 +106,7 @@ function filterFilesystemTools(
   binaryFormats?: GthConfig['binaryFormats']
 ): StructuredToolInterface[] {
   const toolkit = new GthFileSystemToolkit({
-    allowedDirectories: [getProjectDir()],
+    allowedDirectories: [getCurrentWorkDir()],
     aiignoreConfig,
     binaryFormats,
   });

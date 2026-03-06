@@ -17,6 +17,7 @@ const globalIgnores = [
   '**/node_modules/**',
   '**/dist/**',
   'integration-tests/workdir',
+  'integration-tests/workdir-with-profiles',
   'docs-generated/**',
   'readonly/**',
   'coverage/**',

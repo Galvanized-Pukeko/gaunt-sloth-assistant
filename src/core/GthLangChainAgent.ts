@@ -14,7 +14,7 @@ import { displayInfo } from '#src/utils/consoleUtils.js';
 import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
-import { stopWaitingForEscape, waitForEscape } from '#src/utils/systemUtils.js';
+import { stopWaitingForEscape, waitForEscape, getCurrentWorkDir } from '#src/utils/systemUtils.js';
 import { AIMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
@@ -52,6 +52,8 @@ export class GthLangChainAgent implements GthAgentInterface {
       streamOutput: this.config.streamOutput,
       debugLog: this.config.debugLog,
     });
+
+    this.statusUpdate(StatusLevel.INFO, `Workdir: ${getCurrentWorkDir()}`);
 
     if (this.config.modelDisplayName) {
       this.statusUpdate(StatusLevel.INFO, `Model: ${this.config.modelDisplayName}`);
@@ -299,20 +301,15 @@ export class GthLangChainAgent implements GthAgentInterface {
       this.statusUpdate(StatusLevel.WARNING, 'Model does not seem to support tools.');
       debugLog('Warning: Model does not support tools');
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cmdConfig = (command && config.commands?.[command]) as any;
     return {
       ...config,
-      filesystem:
-        command && config.commands?.[command]?.filesystem !== undefined
-          ? config.commands[command].filesystem!
-          : config.filesystem,
+      filesystem: cmdConfig?.filesystem !== undefined ? cmdConfig.filesystem : config.filesystem,
       builtInTools:
-        command && config.commands?.[command]?.builtInTools !== undefined
-          ? config.commands[command].builtInTools!
-          : config.builtInTools,
+        cmdConfig?.builtInTools !== undefined ? cmdConfig.builtInTools : config.builtInTools,
       binaryFormats:
-        command && config.commands?.[command]?.binaryFormats !== undefined
-          ? config.commands[command].binaryFormats!
-          : config.binaryFormats,
+        cmdConfig?.binaryFormats !== undefined ? cmdConfig.binaryFormats : config.binaryFormats,
     };
   }
 

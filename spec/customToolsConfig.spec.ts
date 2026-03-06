@@ -21,7 +21,7 @@ const systemUtilsMock = {
   stdout: {
     write: vi.fn(),
   },
-  getProjectDir: vi.fn(() => '/test/project'),
+  getCurrentWorkDir: vi.fn(() => '/test/project'),
 };
 vi.mock('#src/utils/systemUtils.js', () => systemUtilsMock);
 

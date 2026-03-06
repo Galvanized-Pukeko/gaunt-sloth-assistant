@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { debugLog } from '#src/utils/debugUtils.js';
 import { truncateString } from '#src/utils/stringUtils.js';
 import { GthConfig } from '#src/config.js';
+import { SystemMessage } from '@langchain/core/messages';
 
 /**
  * Creates new runnable config.
@@ -105,6 +106,18 @@ export function readChatPrompt(
   config: Pick<GthConfig, 'identityProfile' | 'noDefaultPrompts'>
 ): string {
   return readPromptFile(GSLOTH_CHAT_PROMPT, config.identityProfile, config.noDefaultPrompts);
+}
+
+export function buildSystemMessages(
+  config: GthConfig,
+  modePrompt?: string | null
+): SystemMessage[] {
+  const parts = [readBackstory(config), readGuidelines(config)];
+  if (modePrompt) parts.push(modePrompt);
+  const systemPrompt = readSystemPrompt(config);
+  if (systemPrompt) parts.push(systemPrompt);
+  const content = parts.filter(Boolean).join('\n');
+  return content.trim() ? [new SystemMessage(content)] : [];
 }
 
 export function readCodePrompt(
