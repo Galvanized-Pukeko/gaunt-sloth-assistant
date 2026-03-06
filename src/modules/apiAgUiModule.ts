@@ -55,7 +55,9 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
     next();
   });
 
-  // Initialize agent
+  // Initialize agent.
+  // Note this would need a refactoring if it is to be used for a public web server,
+  // For connecting local WEB to local CLI agent, this is absolutely OK, since one thread is OK.
   const checkpointSaver = new MemorySaver();
   const agent = new GthLangChainAgent(defaultStatusCallback);
   await agent.init('api', config, checkpointSaver);
