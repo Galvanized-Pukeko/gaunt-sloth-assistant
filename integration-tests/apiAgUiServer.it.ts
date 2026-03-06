@@ -1,8 +1,7 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { spawn } from 'child_process';
 import path from 'path';
 import type { ChildProcess } from 'node:child_process';
-import { platform } from 'node:os';
+import { startChildProcess } from './support/commandRunner.ts';
 
 const SERVER_PORT = 3099; // Dedicated port to avoid conflicts
 const HEALTH_URL = `http://localhost:${SERVER_PORT}/health`;
@@ -10,9 +9,13 @@ const RUN_URL = `http://localhost:${SERVER_PORT}/agents/default/run`;
 const READY_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 500;
 const WORKDIR = path.resolve('./integration-tests/workdir');
-const CLI = path.resolve('./cli.js');
 
-async function waitForHealth(timeoutMs = READY_TIMEOUT_MS): Promise<void> {
+async function waitForHealth(proc: ChildProcess, timeoutMs = READY_TIMEOUT_MS): Promise<void> {
+  let stdout = '';
+  let stderr = '';
+  proc.stdout?.on('data', (d) => (stdout += d));
+  proc.stderr?.on('data', (d) => (stderr += d));
+
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -23,16 +26,9 @@ async function waitForHealth(timeoutMs = READY_TIMEOUT_MS): Promise<void> {
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  throw new Error(`AG-UI server did not become ready within ${timeoutMs}ms`);
-}
-
-function startServer(): ChildProcess {
-  return spawn('node', [CLI, 'api', 'ag-ui', '--port', String(SERVER_PORT)], {
-    cwd: WORKDIR,
-    env: { ...process.env },
-    shell: platform().includes('win') && !platform().includes('darwin'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  throw new Error(
+    `AG-UI server did not become ready within ${timeoutMs}ms\nstdout: ${stdout}\nstderr: ${stderr}`
+  );
 }
 
 async function postRun(
@@ -76,9 +72,14 @@ describe('AG-UI Server Integration Tests', () => {
   });
 
   it('should start, respond to health check, and accept a run request', async () => {
-    serverProc = startServer();
+    serverProc = startChildProcess(
+      'npx',
+      ['gth', 'api', 'ag-ui', '--port', String(SERVER_PORT)],
+      'ignore',
+      WORKDIR
+    );
 
-    await waitForHealth();
+    await waitForHealth(serverProc!);
 
     const healthRes = await fetch(HEALTH_URL);
     expect(healthRes.ok).toBe(true);
@@ -103,8 +104,13 @@ describe('AG-UI Server Integration Tests', () => {
   });
 
   it('should include text content in the response', async () => {
-    serverProc = startServer();
-    await waitForHealth();
+    serverProc = startChildProcess(
+      'npx',
+      ['gth', 'api', 'ag-ui', '--port', String(SERVER_PORT)],
+      'ignore',
+      WORKDIR
+    );
+    await waitForHealth(serverProc!);
 
     const { events } = await postRun({
       threadId: 'it-thread-2',
@@ -117,8 +123,13 @@ describe('AG-UI Server Integration Tests', () => {
   });
 
   it('should use system prompt on first request and not on second for same thread', async () => {
-    serverProc = startServer();
-    await waitForHealth();
+    serverProc = startChildProcess(
+      'npx',
+      ['gth', 'api', 'ag-ui', '--port', String(SERVER_PORT)],
+      'ignore',
+      WORKDIR
+    );
+    await waitForHealth(serverProc!);
 
     const threadId = 'it-thread-identity';
 
