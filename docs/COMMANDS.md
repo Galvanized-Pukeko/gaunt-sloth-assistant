@@ -209,6 +209,83 @@ gsloth code
 gsloth code "Help me refactor the authentication module"
 ```
 
+## api ag-ui
+
+Start an [AG-UI](https://github.com/ag-ui-protocol/ag-ui) compatible HTTP server that exposes the Gaunt Sloth agent over the standard AG-UI protocol.
+
+> **Local use only.** The server has no authentication. Do not expose it to public networks.
+
+```bash
+gsloth api ag-ui [--port <port>]
+```
+
+### Options
+- `--port <port>` – Port to listen on (default: `3000`, or the value of `commands.api.port` in config)
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/agents/:agentId/run` | Run the agent; streams AG-UI SSE events |
+| `GET`  | `/health`              | Health check — returns `{ "status": "ok" }` |
+
+### AG-UI Event Sequence
+
+A successful run emits events in this order:
+
+```
+RUN_STARTED
+TEXT_MESSAGE_START
+TEXT_MESSAGE_CONTENT  (one per streamed chunk)
+...
+TEXT_MESSAGE_END
+RUN_FINISHED
+```
+
+On error, `RUN_ERROR` is emitted instead of the message/finished events.
+
+### Thread Management
+
+The server maintains per-thread state using LangGraph checkpointing. Pass the same `threadId` across multiple requests to continue a conversation. System prompts (backstory, guidelines, mode prompt) are injected only on the first request for each thread.
+
+### Request Body
+
+```json
+{
+  "threadId": "optional-string",
+  "runId": "optional-string",
+  "messages": [
+    { "role": "user", "content": "Hello", "id": "msg-1" }
+  ]
+}
+```
+
+Both `threadId` and `runId` are auto-generated (UUID) when omitted.
+
+### Examples
+
+```bash
+# Start on default port 3000
+gsloth api ag-ui
+
+# Start on a custom port
+gsloth api ag-ui --port 4000
+
+# Use a project-specific config
+gth -c ./my-project/.gsloth.config.json api ag-ui --port 3000
+```
+
+```bash
+# Test the health endpoint
+curl http://localhost:3000/health
+
+# Send a run request
+curl -X POST http://localhost:3000/agents/default/run \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: text/event-stream' \
+  -d '{"threadId":"t1","messages":[{"role":"user","content":"Hello","id":"1"}]}'
+```
+
 ## Command-Specific Configuration
 
 Commands can be configured individually in your configuration file. See [CONFIGURATION.md](./CONFIGURATION.md) for detailed configuration options.

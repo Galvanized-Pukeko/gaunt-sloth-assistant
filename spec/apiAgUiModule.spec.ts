@@ -56,8 +56,15 @@ vi.mock('express', () => ({
   default: expressMock,
 }));
 
+// Shared encoder instance — replaced in beforeEach
+let mockEncoderInstance: {
+  getContentType: ReturnType<typeof vi.fn>;
+  encode: ReturnType<typeof vi.fn>;
+};
+
+const EventEncoderMock = vi.fn();
 vi.mock('@ag-ui/encoder', () => ({
-  EventEncoder: vi.fn(),
+  EventEncoder: EventEncoderMock,
 }));
 
 vi.mock('@ag-ui/core', () => ({
@@ -71,20 +78,71 @@ vi.mock('@ag-ui/core', () => ({
   },
 }));
 
+// Regular functions required — arrow functions cannot be used with `new`
 vi.mock('@langchain/core/messages', () => ({
-  HumanMessage: vi.fn((content: string) => ({ role: 'user', content })),
-  AIMessage: vi.fn((content: string) => ({ role: 'assistant', content })),
-  SystemMessage: vi.fn((content: string) => ({ role: 'system', content })),
+  HumanMessage: vi.fn(function (this: Record<string, unknown>, content: string) {
+    this.role = 'user';
+    this.content = content;
+  }),
+  AIMessage: vi.fn(function (this: Record<string, unknown>, content: string) {
+    this.role = 'assistant';
+    this.content = content;
+  }),
+  SystemMessage: vi.fn(function (this: Record<string, unknown>, content: string) {
+    this.role = 'system';
+    this.content = content;
+  }),
 }));
+
+const baseConfig = {
+  commands: { api: { port: 3000 } },
+} as Partial<GthConfig> as GthConfig;
+
+function makeMockRes() {
+  return {
+    setHeader: vi.fn(),
+    write: vi.fn(),
+    end: vi.fn(),
+    json: vi.fn(),
+    status: vi.fn().mockReturnThis(),
+  };
+}
+
+function makeRunReq(overrides: Record<string, unknown> = {}) {
+  return {
+    body: { threadId: 'thread-1', runId: 'run-1', messages: [], ...overrides },
+    headers: { accept: 'text/event-stream' },
+    method: 'POST',
+  };
+}
+
+function emptyStream() {
+  return (async function* () {})();
+}
 
 describe('apiAgUiModule', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    // clearAllMocks keeps implementations intact (e.g. HumanMessage/AIMessage constructor mocks).
+    // resetAllMocks would strip them, breaking `new HumanMessage()` calls inside the handler.
+    vi.clearAllMocks();
     gthLangChainAgentInitMock.mockResolvedValue(undefined);
     mockListenFn.mockImplementation((_port: number, cb: () => void) => {
       cb();
     });
+    mockEncoderInstance = {
+      getContentType: vi.fn().mockReturnValue('text/event-stream'),
+      encode: vi.fn((event) => JSON.stringify(event)),
+    };
+    // Must be a regular function (not arrow) — arrow functions cannot be called with `new`
+    EventEncoderMock.mockImplementation(function () {
+      return mockEncoderInstance;
+    });
+    gthLangChainAgentStreamMock.mockReturnValue(emptyStream());
+    // Reset to default so tests that override it don't bleed into the next test
+    llmUtilsMock.buildSystemMessages.mockReturnValue([]);
   });
+
+  // ─── CORS ──────────────────────────────────────────────────────────────────
 
   it('should use CORS values from config', async () => {
     const config = {
@@ -107,11 +165,7 @@ describe('apiAgUiModule', () => {
     expect(mockUseFn).toHaveBeenCalledTimes(2);
 
     const corsMiddleware = mockUseFn.mock.calls[1][0];
-    const mockRes = {
-      setHeader: vi.fn(),
-      status: vi.fn().mockReturnThis(),
-      end: vi.fn(),
-    };
+    const mockRes = makeMockRes();
     const mockNext = vi.fn();
 
     // Test non-OPTIONS request
@@ -127,23 +181,11 @@ describe('apiAgUiModule', () => {
   });
 
   it('should use default CORS values when config does not specify cors', async () => {
-    const config = {
-      commands: {
-        api: {
-          port: 3000,
-        },
-      },
-    } as Partial<GthConfig> as GthConfig;
-
     const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
-    await startAgUiServer(config, 3000);
+    await startAgUiServer(baseConfig, 3000);
 
     const corsMiddleware = mockUseFn.mock.calls[1][0];
-    const mockRes = {
-      setHeader: vi.fn(),
-      status: vi.fn().mockReturnThis(),
-      end: vi.fn(),
-    };
+    const mockRes = makeMockRes();
     const mockNext = vi.fn();
 
     corsMiddleware({ method: 'GET' }, mockRes, mockNext);
@@ -181,11 +223,7 @@ describe('apiAgUiModule', () => {
     await startAgUiServer(config, 3000);
 
     const corsMiddleware = mockUseFn.mock.calls[1][0];
-    const mockRes = {
-      setHeader: vi.fn(),
-      status: vi.fn().mockReturnThis(),
-      end: vi.fn(),
-    };
+    const mockRes = makeMockRes();
     const mockNext = vi.fn();
 
     corsMiddleware({ method: 'OPTIONS' }, mockRes, mockNext);
@@ -193,5 +231,229 @@ describe('apiAgUiModule', () => {
     expect(mockRes.status).toHaveBeenCalledWith(204);
     expect(mockRes.end).toHaveBeenCalled();
     expect(mockNext).not.toHaveBeenCalled();
+  });
+
+  it('should display local-only warning on startup', async () => {
+    const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+    await startAgUiServer(baseConfig, 3000);
+
+    expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+      expect.stringContaining('local clients only')
+    );
+  });
+
+  // ─── /agents/:agentId/run endpoint ─────────────────────────────────────────
+
+  describe('/agents/:agentId/run', () => {
+    async function getRunHandler() {
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000);
+      // app.post('/agents/:agentId/run', handler) — first post() call
+      return mockPostFn.mock.calls[0][1] as (_req: unknown, _res: unknown) => Promise<void>;
+    }
+
+    it('should emit RUN_STARTED, message events, and RUN_FINISHED for a successful run', async () => {
+      gthLangChainAgentStreamMock.mockReturnValue(
+        (async function* () {
+          yield 'Hello';
+          yield ' world';
+        })()
+      );
+
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'run-success', runId: 'run-id-1' });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      const events = mockEncoderInstance.encode.mock.calls.map((c) => c[0]);
+
+      expect(events[0]).toMatchObject({ type: 'RUN_STARTED', threadId: 'run-success' });
+      expect(events[1]).toMatchObject({ type: 'TEXT_MESSAGE_START', role: 'assistant' });
+      expect(events[2]).toMatchObject({ type: 'TEXT_MESSAGE_CONTENT', delta: 'Hello' });
+      expect(events[3]).toMatchObject({ type: 'TEXT_MESSAGE_CONTENT', delta: ' world' });
+      expect(events[4]).toMatchObject({ type: 'TEXT_MESSAGE_END' });
+      expect(events[5]).toMatchObject({ type: 'RUN_FINISHED', threadId: 'run-success' });
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('should set SSE headers on the response', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'headers-thread' });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
+      expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-cache');
+      expect(res.setHeader).toHaveBeenCalledWith('Connection', 'keep-alive');
+    });
+
+    it('should use provided runId and threadId in events', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'my-thread', runId: 'my-run' });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      const events = mockEncoderInstance.encode.mock.calls.map((c) => c[0]);
+      expect(events[0]).toMatchObject({ threadId: 'my-thread', runId: 'my-run' });
+      expect(events[events.length - 1]).toMatchObject({ threadId: 'my-thread', runId: 'my-run' });
+    });
+
+    it('should generate UUIDs when threadId and runId are not provided', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: undefined, runId: undefined });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      const runStarted = mockEncoderInstance.encode.mock.calls[0][0];
+      expect(runStarted.threadId).toBeTruthy();
+      expect(runStarted.runId).toBeTruthy();
+    });
+
+    it('should emit RUN_ERROR and end response when stream throws', async () => {
+      gthLangChainAgentStreamMock.mockImplementation(() => {
+        throw new Error('Stream failed');
+      });
+
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'error-thread' });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      const events = mockEncoderInstance.encode.mock.calls.map((c) => c[0]);
+      const errorEvent = events.find((e) => e.type === 'RUN_ERROR');
+      expect(errorEvent).toBeDefined();
+      expect(errorEvent!.message).toBe('Stream failed');
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('should emit RUN_ERROR with string message for non-Error throws', async () => {
+      gthLangChainAgentStreamMock.mockImplementation(() => {
+        throw 'something went wrong';
+      });
+
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'error-string-thread' });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      const events = mockEncoderInstance.encode.mock.calls.map((c) => c[0]);
+      const errorEvent = events.find((e) => e.type === 'RUN_ERROR');
+      expect(errorEvent!.message).toBe('something went wrong');
+    });
+
+    it('should skip empty chunks in the stream', async () => {
+      gthLangChainAgentStreamMock.mockReturnValue(
+        (async function* () {
+          yield 'real';
+          yield '';
+          yield null;
+          yield 'content';
+        })()
+      );
+
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'skip-empty-thread' });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      const contentEvents = mockEncoderInstance.encode.mock.calls
+        .map((c) => c[0])
+        .filter((e) => e.type === 'TEXT_MESSAGE_CONTENT');
+
+      expect(contentEvents).toHaveLength(2);
+      expect(contentEvents[0].delta).toBe('real');
+      expect(contentEvents[1].delta).toBe('content');
+    });
+
+    it('should convert incoming messages to LangChain types', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({
+        threadId: 'convert-msg-thread',
+        messages: [
+          { role: 'user', content: 'Hello', id: '1' },
+          { role: 'assistant', content: 'Hi', id: '2' },
+        ],
+      });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      const [passedMessages] = gthLangChainAgentStreamMock.mock.calls[0];
+      const roles = passedMessages.map((m: { role: string }) => m.role);
+      expect(roles).toContain('user');
+      expect(roles).toContain('assistant');
+    });
+
+    // ─── Thread management ─────────────────────────────────────────────────
+
+    it('should prepend system messages on first request for a new thread', async () => {
+      const systemMsg = { role: 'system', content: 'You are Gaunt Sloth.' };
+      llmUtilsMock.buildSystemMessages.mockReturnValue([systemMsg]);
+
+      const handler = await getRunHandler();
+      const req = makeRunReq({
+        threadId: 'fresh-thread-abc',
+        messages: [{ role: 'user', content: 'Hey', id: '1' }],
+      });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      const [passedMessages] = gthLangChainAgentStreamMock.mock.calls[0];
+      expect(passedMessages[0]).toMatchObject({ role: 'system' });
+      expect(llmUtilsMock.buildSystemMessages).toHaveBeenCalledOnce();
+    });
+
+    it('should NOT prepend system messages on subsequent requests for the same thread', async () => {
+      const systemMsg = { role: 'system', content: 'You are Gaunt Sloth.' };
+      llmUtilsMock.buildSystemMessages.mockReturnValue([systemMsg]);
+
+      const handler = await getRunHandler();
+      const threadId = 'repeat-thread-xyz';
+
+      // First request — system messages should be injected
+      const req1 = makeRunReq({ threadId, messages: [{ role: 'user', content: 'Hi', id: '1' }] });
+      await handler(req1, makeMockRes());
+
+      // Reset call tracking for the second request
+      gthLangChainAgentStreamMock.mockClear();
+      llmUtilsMock.buildSystemMessages.mockClear();
+      gthLangChainAgentStreamMock.mockReturnValue(emptyStream());
+
+      // Second request — system messages must NOT be injected again
+      const req2 = makeRunReq({
+        threadId,
+        messages: [{ role: 'user', content: 'Follow-up', id: '2' }],
+      });
+      await handler(req2, makeMockRes());
+
+      expect(llmUtilsMock.buildSystemMessages).not.toHaveBeenCalled();
+      const [passedMessages] = gthLangChainAgentStreamMock.mock.calls[0];
+      expect(passedMessages[0]).toMatchObject({ role: 'user' });
+    });
+  });
+
+  // ─── /health endpoint ──────────────────────────────────────────────────────
+
+  describe('/health', () => {
+    it('should respond with { status: ok }', async () => {
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000);
+
+      // app.get('/health', handler) — first get() call
+      const getHandler = mockGetFn.mock.calls[0][1] as (_req: unknown, _res: unknown) => void;
+      const res = makeMockRes();
+
+      getHandler({}, res);
+
+      expect(res.json).toHaveBeenCalledWith({ status: 'ok' });
+    });
   });
 });

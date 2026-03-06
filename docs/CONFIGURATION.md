@@ -83,6 +83,40 @@ Set `writeOutputToFile` in your config to:
 
 Override the setting per run with `-w/--write-output-to-file true|false|<filename>`. Shortcuts `-wn` or `-w0` map to `false`.
 
+## AG-UI Server Configuration
+
+The `api ag-ui` command reads its settings from `commands.api` in your config file.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `commands.api.port` | `number` | `3000` | Port the AG-UI server listens on |
+| `commands.api.cors.allowOrigin` | `string` | `"http://localhost:3000"` | `Access-Control-Allow-Origin` header value |
+| `commands.api.cors.allowMethods` | `string` | `"POST, GET, OPTIONS"` | `Access-Control-Allow-Methods` header value |
+| `commands.api.cors.allowHeaders` | `string` | `"Content-Type, Accept"` | `Access-Control-Allow-Headers` header value |
+
+**Example config for the Galvanized Pukeko web client on port 5555:**
+
+```json
+{
+  "llm": {
+    "type": "anthropic",
+    "model": "claude-sonnet-4-5"
+  },
+  "commands": {
+    "api": {
+      "port": 3000,
+      "cors": {
+        "allowOrigin": "http://localhost:5555",
+        "allowMethods": "POST, GET, OPTIONS",
+        "allowHeaders": "Content-Type, Accept"
+      }
+    }
+  }
+}
+```
+
+> **Note:** The port flag `--port` on the CLI overrides `commands.api.port`.
+
 ## AI Ignore (.aiignore)
 
 Gaunt Sloth can hide files and directories from filesystem tools using a `.aiignore` file in your project root.
