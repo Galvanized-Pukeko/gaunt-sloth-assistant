@@ -22,7 +22,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm i gaunt-sloth-assistant@1.0.4 -g && gth --version
+        run: npm i gaunt-sloth-assistant@1.2.3 -g && gth --version
 
       - name: Extract issue number from PR title
         id: extract_issue
@@ -56,6 +56,7 @@ jobs:
 
             // Define a unique identifier for AI review comments
             const AI_REVIEW_IDENTIFIER = '<!-- AI-PR-REVIEW-BOT -->';
+            const PREVIOUS_AI_REVIEW_SUMMARY = '<summary>🤖 Previous AI Review (Click to expand)</summary>';
 
             // Get all comments on this PR
             const comments = await github.rest.issues.listComments({
@@ -68,13 +69,14 @@ jobs:
             // Find and hide older AI review comments
             const aiComments = comments.data.filter(comment =>
               comment.user.login === 'github-actions[bot]' &&
-              comment.body.includes(AI_REVIEW_IDENTIFIER)
+              comment.body.includes(AI_REVIEW_IDENTIFIER) &&
+              !comment.body.includes(PREVIOUS_AI_REVIEW_SUMMARY)
             );
 
             // Hide older comments by wrapping them in a collapsible section
             for (const comment of aiComments) {
               const hiddenBody = `<details>
-            <summary>🤖 Previous AI Review (Click to expand)</summary>
+            ${PREVIOUS_AI_REVIEW_SUMMARY}
 
             ${comment.body}
             </details>`;
