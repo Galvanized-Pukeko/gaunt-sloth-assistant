@@ -140,7 +140,7 @@ npm install -g ./
 
 ## Release Notes
 
-Release notes are stored in `assets/release-notes/` and follow a consistent format.
+Release notes are stored in `release-notes/` and follow a consistent format.
 
 ### Writing Release Notes
 

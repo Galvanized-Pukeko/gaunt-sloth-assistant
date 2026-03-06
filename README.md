@@ -115,7 +115,7 @@ gsloth ask "What does this function do?" -f utils.js
 
 **Write release notes:**
 ```bash
-git --no-pager diff v0.8.3..HEAD | gth ask "inspect existing release notes in assets/release-notes/v0_8_2.md; inspect provided diff and write release notes to v0_8_4.md"
+git --no-pager diff v0.8.3..HEAD | gth ask "inspect existing release notes in release-notes/v0_8_2.md; inspect provided diff and write release notes to v0_8_4.md"
 ```
 
 To write this to filesystem, you'd need to add filesystem access to the *ask* command in `.gsloth.config.json`.
