@@ -39,11 +39,15 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
     'WARNING: AG-UI server is intended for local clients only. Do not expose to public networks.'
   );
 
-  // CORS — wide open, local use only
+  // CORS — configured via commands.api.cors in config
+  const corsOrigin = config.commands?.api?.cors?.allowOrigin ?? 'http://localhost:3000';
+  const corsMethods = config.commands?.api?.cors?.allowMethods ?? 'POST, GET, OPTIONS';
+  const corsHeaders = config.commands?.api?.cors?.allowHeaders ?? 'Content-Type, Accept';
+
   app.use((_req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    res.setHeader('Access-Control-Allow-Methods', corsMethods);
+    res.setHeader('Access-Control-Allow-Headers', corsHeaders);
     if (_req.method === 'OPTIONS') {
       res.status(204).end();
       return;

@@ -151,6 +151,14 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          api: {
+            port: 3000,
+            cors: {
+              allowOrigin: 'http://localhost:3000',
+              allowMethods: 'POST, GET, OPTIONS',
+              allowHeaders: 'Content-Type, Accept',
+            },
+          },
         },
         includeCurrentDateAfterGuidelines: false,
         modelDisplayName: undefined,
@@ -235,6 +243,14 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          api: {
+            port: 3000,
+            cors: {
+              allowOrigin: 'http://localhost:3000',
+              allowMethods: 'POST, GET, OPTIONS',
+              allowHeaders: 'Content-Type, Accept',
+            },
+          },
         },
         includeCurrentDateAfterGuidelines: false,
       });
@@ -352,6 +368,14 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          api: {
+            port: 3000,
+            cors: {
+              allowOrigin: 'http://localhost:3000',
+              allowMethods: 'POST, GET, OPTIONS',
+              allowHeaders: 'Content-Type, Accept',
+            },
+          },
         },
         includeCurrentDateAfterGuidelines: false,
       });
@@ -814,6 +838,14 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          api: {
+            port: 3000,
+            cors: {
+              allowOrigin: 'http://localhost:3000',
+              allowMethods: 'POST, GET, OPTIONS',
+              allowHeaders: 'Content-Type, Accept',
+            },
+          },
         },
         includeCurrentDateAfterGuidelines: false,
       });
@@ -1141,6 +1173,14 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          api: {
+            port: 3000,
+            cors: {
+              allowOrigin: 'http://localhost:3000',
+              allowMethods: 'POST, GET, OPTIONS',
+              allowHeaders: 'Content-Type, Accept',
+            },
+          },
         },
         includeCurrentDateAfterGuidelines: false,
       });
@@ -1209,6 +1249,14 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          api: {
+            port: 3000,
+            cors: {
+              allowOrigin: 'http://localhost:3000',
+              allowMethods: 'POST, GET, OPTIONS',
+              allowHeaders: 'Content-Type, Accept',
+            },
+          },
         },
         includeCurrentDateAfterGuidelines: false,
       });
@@ -1277,6 +1325,14 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          api: {
+            port: 3000,
+            cors: {
+              allowOrigin: 'http://localhost:3000',
+              allowMethods: 'POST, GET, OPTIONS',
+              allowHeaders: 'Content-Type, Accept',
+            },
+          },
         },
         includeCurrentDateAfterGuidelines: false,
       });
