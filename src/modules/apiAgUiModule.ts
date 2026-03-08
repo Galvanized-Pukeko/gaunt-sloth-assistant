@@ -16,18 +16,30 @@ const initializedThreads = new Set<string>();
 /**
  * Convert AG-UI message format to LangChain BaseMessage
  */
-function convertMessage(msg: { role: string; content?: string; id: string }): BaseMessage {
+function convertMessage(msg: { role: string; content?: string; id: string; toolCalls?: Array<{id: string; type: string; function: {name: string; arguments: string}}>; toolCallId?: string }): BaseMessage {
   const content = typeof msg.content === 'string' ? msg.content : '';
   switch (msg.role) {
     case 'user':
       return new HumanMessage(content);
-    case 'assistant':
+    case 'assistant': {
+      if (msg.toolCalls && msg.toolCalls.length > 0) {
+        return new AIMessage({
+          content: content,
+          tool_calls: msg.toolCalls.map(tc => ({
+            id: tc.id,
+            name: tc.function.name,
+            args: JSON.parse(tc.function.arguments || '{}'),
+            type: 'tool_call' as const,
+          })),
+        });
+      }
       return new AIMessage(content);
+    }
     case 'system':
     case 'developer':
       return new SystemMessage(content);
     case 'tool':
-      return new ToolMessage({ content, tool_call_id: msg.id });
+      return new ToolMessage({ content, tool_call_id: msg.toolCallId || msg.id });
     default:
       return new HumanMessage(content);
   }
