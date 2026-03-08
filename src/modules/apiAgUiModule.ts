@@ -7,7 +7,7 @@ import { GthLangChainAgent } from '#src/core/GthLangChainAgent.js';
 import { defaultStatusCallback } from '#src/utils/consoleUtils.js';
 import { displayInfo } from '#src/utils/consoleUtils.js';
 import { getNewRunnableConfig, buildSystemMessages, readChatPrompt } from '#src/utils/llmUtils.js';
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import type { BaseMessage } from '@langchain/core/messages';
 
@@ -26,6 +26,8 @@ function convertMessage(msg: { role: string; content?: string; id: string }): Ba
     case 'system':
     case 'developer':
       return new SystemMessage(content);
+    case 'tool':
+      return new ToolMessage({ content, tool_call_id: msg.id });
     default:
       return new HumanMessage(content);
   }
@@ -95,43 +97,91 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
 
       const messageId = randomUUID();
 
-      // TEXT_MESSAGE_START
-      res.write(
-        encoder.encode({
-          type: EventType.TEXT_MESSAGE_START,
-          messageId,
-          role: 'assistant',
-        })
-      );
-
       // Get runnable config with thread_id for checkpointing
       const runConfig = {
         ...getNewRunnableConfig(),
         configurable: { thread_id: effectiveThreadId },
       };
 
-      // Stream the response
-      const stream = await agent.stream(langChainMessages, runConfig);
+      // Stream the response with typed events
+      let textMessageStarted = false;
 
-      for await (const chunk of stream) {
-        if (chunk) {
-          res.write(
-            encoder.encode({
-              type: EventType.TEXT_MESSAGE_CONTENT,
-              messageId,
-              delta: chunk,
-            })
-          );
+      for await (const event of agent.streamWithEvents(langChainMessages, runConfig)) {
+        switch (event.type) {
+          case 'text': {
+            if (!textMessageStarted) {
+              res.write(
+                encoder.encode({
+                  type: EventType.TEXT_MESSAGE_START,
+                  messageId,
+                  role: 'assistant',
+                })
+              );
+              textMessageStarted = true;
+            }
+            res.write(
+              encoder.encode({
+                type: EventType.TEXT_MESSAGE_CONTENT,
+                messageId,
+                delta: event.delta,
+              })
+            );
+            break;
+          }
+          case 'tool_start': {
+            res.write(
+              encoder.encode({
+                type: EventType.TOOL_CALL_START,
+                toolCallId: event.id,
+                toolCallName: event.name,
+                parentMessageId: messageId,
+              })
+            );
+            break;
+          }
+          case 'tool_args': {
+            res.write(
+              encoder.encode({
+                type: EventType.TOOL_CALL_ARGS,
+                toolCallId: event.id,
+                delta: event.delta,
+              })
+            );
+            break;
+          }
+          case 'tool_end': {
+            res.write(
+              encoder.encode({
+                type: EventType.TOOL_CALL_END,
+                toolCallId: event.id,
+              })
+            );
+            break;
+          }
+          case 'tool_result': {
+            res.write(
+              encoder.encode({
+                type: EventType.TOOL_CALL_RESULT,
+                toolCallId: event.id,
+                content: event.content,
+                role: 'tool',
+                messageId: randomUUID(),
+              })
+            );
+            break;
+          }
         }
       }
 
-      // TEXT_MESSAGE_END
-      res.write(
-        encoder.encode({
-          type: EventType.TEXT_MESSAGE_END,
-          messageId,
-        })
-      );
+      // TEXT_MESSAGE_END (only if a text message was started)
+      if (textMessageStarted) {
+        res.write(
+          encoder.encode({
+            type: EventType.TEXT_MESSAGE_END,
+            messageId,
+          })
+        );
+      }
 
       // RUN_FINISHED
       res.write(

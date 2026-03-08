@@ -15,7 +15,7 @@ import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.j
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape, getCurrentWorkDir } from '#src/utils/systemUtils.js';
-import { AIMessage } from '@langchain/core/messages';
+import { AIMessage, ToolMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
@@ -24,6 +24,13 @@ import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
 import { createAgent, createMiddleware } from 'langchain';
 import { prepareMcpTools } from '#src/utils/mcpUtils.js';
+
+export type AgentStreamEvent =
+  | { type: 'text'; delta: string }
+  | { type: 'tool_start'; id: string; name: string }
+  | { type: 'tool_args'; id: string; delta: string }
+  | { type: 'tool_end'; id: string }
+  | { type: 'tool_result'; id: string; content: string };
 
 export class GthLangChainAgent implements GthAgentInterface {
   private statusUpdate: StatusUpdateCallback;
@@ -275,6 +282,47 @@ export class GthLangChainAgent implements GthAgentInterface {
         }
       },
     });
+  }
+
+  /**
+   * Stream agent events as typed AgentStreamEvent objects.
+   * Yields text deltas, tool call lifecycle events, and tool results.
+   */
+  async *streamWithEvents(
+    messages: Message[],
+    runConfig: RunnableConfig
+  ): AsyncGenerator<AgentStreamEvent> {
+    if (!this.agent || !this.config) {
+      throw new Error('Agent not initialized. Call init() first.');
+    }
+
+    debugLog('=== Starting streamWithEvents ===');
+    debugLogObject('LLM Input Messages', messages);
+
+    const stream = await this.agent.stream(
+      { messages },
+      { ...runConfig, streamMode: 'messages' }
+    );
+
+    for await (const [chunk, _metadata] of stream) {
+      debugLogObject('streamWithEvents chunk', { chunk, _metadata });
+
+      if (AIMessage.isInstance(chunk) && chunk.tool_calls && chunk.tool_calls.length > 0) {
+        for (const tool_call of chunk.tool_calls) {
+          yield { type: 'tool_start', id: tool_call.id as string, name: tool_call.name };
+          yield { type: 'tool_args', id: tool_call.id as string, delta: JSON.stringify(tool_call.args) };
+          yield { type: 'tool_end', id: tool_call.id as string };
+        }
+      } else if (AIMessage.isInstance(chunk) && chunk.text) {
+        yield { type: 'text', delta: chunk.text as string };
+      }
+
+      if (chunk instanceof ToolMessage) {
+        const content =
+          typeof chunk.content === 'string' ? chunk.content : JSON.stringify(chunk.content);
+        yield { type: 'tool_result', id: chunk.tool_call_id as string, content };
+      }
+    }
   }
 
   // noinspection JSUnusedGlobalSymbols

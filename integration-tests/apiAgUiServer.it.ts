@@ -122,6 +122,26 @@ describe('AG-UI Server Integration Tests', () => {
     expect(fullText.length).toBeGreaterThan(0);
   });
 
+  it('should emit tool call events when tools are used', async () => {
+    serverProc = startChildProcess(
+      'npx',
+      ['gth', 'api', 'ag-ui', '--port', String(SERVER_PORT)],
+      'ignore',
+      WORKDIR
+    );
+    await waitForHealth(serverProc!);
+
+    const { events } = await postRun({
+      threadId: 'it-thread-tools',
+      messages: [{ role: 'user', content: 'List the files in the current directory using your tools.', id: '1' }],
+    });
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain('TOOL_CALL_START');
+    expect(types).toContain('TOOL_CALL_END');
+    expect(types).toContain('RUN_FINISHED');
+  });
+
   it('should use system prompt on first request and not on second for same thread', async () => {
     serverProc = startChildProcess(
       'npx',
