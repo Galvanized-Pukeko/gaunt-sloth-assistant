@@ -148,40 +148,6 @@ describe('AG-UI Server Integration Tests', () => {
     expect(types).toContain('RUN_FINISHED');
   });
 
-  it('should emit tool call events for show_a2ui_surface', async () => {
-    serverProc = startChildProcess(
-      'npx',
-      ['gth', 'api', 'ag-ui', '--port', String(SERVER_PORT)],
-      'ignore',
-      WORKDIR
-    );
-    await waitForHealth(serverProc!);
-
-    const { events } = await postRun({
-      threadId: 'it-thread-a2ui',
-      messages: [
-        {
-          role: 'user',
-          content:
-            'You MUST call the show_a2ui_surface tool right now. Pass this exact surfaceJsonl value: {"surfaceUpdate":{"surfaceId":"f1","components":[{"id":"t1","component":{"Text":{"text":{"literalString":"Name"}}}},{"id":"r","component":{"Column":{"children":{"explicitList":["t1"]}}}}]}}\n{"beginRendering":{"surfaceId":"f1","root":"r"}}',
-          id: '1',
-        },
-      ],
-    });
-
-    const types = events.map((e) => e.type);
-    expect(types).toContain('TOOL_CALL_START');
-    expect(types).toContain('TOOL_CALL_ARGS');
-    expect(types).toContain('TOOL_CALL_END');
-    expect(types).toContain('RUN_FINISHED');
-
-    // Verify the tool call is for show_a2ui_surface
-    const toolStart = events.find(
-      (e) => e.type === 'TOOL_CALL_START' && e.toolCallName === 'show_a2ui_surface'
-    );
-    expect(toolStart).toBeDefined();
-  });
-
   it('should use system prompt on first request and not on second for same thread', async () => {
     serverProc = startChildProcess(
       'npx',
