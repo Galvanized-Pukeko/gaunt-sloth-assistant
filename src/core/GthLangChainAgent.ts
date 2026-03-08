@@ -299,10 +299,7 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLog('=== Starting streamWithEvents ===');
     debugLogObject('LLM Input Messages', messages);
 
-    const stream = await this.agent.stream(
-      { messages },
-      { ...runConfig, streamMode: 'messages' }
-    );
+    const stream = await this.agent.stream({ messages }, { ...runConfig, streamMode: 'messages' });
 
     for await (const [chunk, _metadata] of stream) {
       debugLogObject('streamWithEvents chunk', { chunk, _metadata });
@@ -310,7 +307,11 @@ export class GthLangChainAgent implements GthAgentInterface {
       if (AIMessage.isInstance(chunk) && chunk.tool_calls && chunk.tool_calls.length > 0) {
         for (const tool_call of chunk.tool_calls) {
           yield { type: 'tool_start', id: tool_call.id as string, name: tool_call.name };
-          yield { type: 'tool_args', id: tool_call.id as string, delta: JSON.stringify(tool_call.args) };
+          yield {
+            type: 'tool_args',
+            id: tool_call.id as string,
+            delta: JSON.stringify(tool_call.args),
+          };
           yield { type: 'tool_end', id: tool_call.id as string };
         }
       } else if (AIMessage.isInstance(chunk) && chunk.text) {

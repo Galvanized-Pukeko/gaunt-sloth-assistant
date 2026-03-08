@@ -133,7 +133,13 @@ describe('AG-UI Server Integration Tests', () => {
 
     const { events } = await postRun({
       threadId: 'it-thread-tools',
-      messages: [{ role: 'user', content: 'List the files in the current directory using your tools.', id: '1' }],
+      messages: [
+        {
+          role: 'user',
+          content: 'List the files in the current directory using your tools.',
+          id: '1',
+        },
+      ],
     });
 
     const types = events.map((e) => e.type);
