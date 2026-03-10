@@ -72,6 +72,7 @@ These apply to every command:
 ### Available Commands:
 
 - **`init`** - Initialize Gaunt Sloth in your project (auto-detects API keys when called without arguments)
+- **`get`** - Inspect the effective prompt or provider-backed input used by another command
 - **`pr`** - ⚠️ This feature requires GitHub CLI to be installed. Review pull requests with optional requirement integration (GitHub issues or Jira).
 - **`review`** - Review any diff or content from various sources
 - **`ask`** - Ask questions about code or programming topics
@@ -89,6 +90,13 @@ gsloth init anthropic    # Or specify provider directly
 **Review PR with requirements:**
 ```bash
 gsloth pr 42 23  # Review PR #42 with GitHub issue #23
+```
+
+**Inspect command inputs:**
+```bash
+gsloth get pr prompt
+gsloth get pr content 42
+gsloth get review requirements PROJ-123
 ```
 
 **Review local changes:**

@@ -26,6 +26,7 @@
     "build": "tsc -b -clean && tsc",
     "test": "npm run build && npx tsc -p spec/tsconfig.json --noEmit && vitest run",
     "it": "npm run build && node it.js",
+    "it-verbose": "npm run build && GSLOTH_IT_VERBOSE=1 node it.js",
     "lint": "eslint . --ext .js,.ts",
     "lint-n-fix": "eslint . --ext .js,.ts --fix",
     "format": "prettier --write 'src/**/*.{js,ts}'",

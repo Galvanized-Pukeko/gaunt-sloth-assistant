@@ -14,9 +14,10 @@ export interface JiraLegacyConfig extends ProviderConfig {
 
 export interface JiraConfig extends ProviderConfig {
   cloudId: string;
-  username: string;
+  username?: string;
   displayUrl?: string;
-  token: string;
+  token?: string;
+  fullBase64Token?: string;
 }
 
 /**

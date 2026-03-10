@@ -2,22 +2,16 @@ import { Command, Option } from 'commander';
 import { displayError } from '#src/utils/consoleUtils.js';
 import { setExitCode } from '#src/utils/systemUtils.js';
 import {
-  type ContentProviderType,
-  getContentFromProvider,
-  getRequirementsFromProvider,
-  REQUIREMENTS_PROVIDERS,
-  type RequirementsProviderType,
-} from './commandUtils.js';
+  getCommandProviderInput,
+  getEffectiveContentProvider,
+  getEffectiveRequirementsProvider,
+  getReviewSystemPrompt,
+} from '#src/commands/commandIntrospection.js';
+import { REQUIREMENTS_PROVIDERS, type RequirementsProviderType } from './commandUtils.js';
 import jiraLogWork from '#src/helpers/jira/jiraLogWork.js';
 import { JiraConfig } from '#src/providers/types.js';
 import { CommandLineConfigOverrides } from '#src/config.js';
-import {
-  readBackstory,
-  readGuidelines,
-  readReviewInstructions,
-  readSystemPrompt,
-  wrapContent,
-} from '#src/utils/llmUtils.js';
+import { wrapContent } from '#src/utils/llmUtils.js';
 
 import { readMultipleFilesFromProjectDir } from '#src/utils/fileUtils.js';
 
@@ -57,36 +51,25 @@ export function prCommand(
     .action(async (prId: string, requirementsId: string | undefined, options: PrCommandOptions) => {
       const { initConfig } = await import('#src/config.js');
       const config = await initConfig(commandLineConfigOverrides); // Initialize and get config
-
-      const systemPrompt = readSystemPrompt(config);
-      const systemMessage = [
-        readBackstory(config),
-        readGuidelines(config),
-        readReviewInstructions(config),
-      ];
-      if (systemPrompt) {
-        systemMessage.push(systemPrompt);
-      }
       const content: string[] = [];
-      const requirementsProvider =
-        options.requirementsProvider ??
-        (config?.commands?.pr?.requirementsProvider as RequirementsProviderType | undefined) ??
-        (config?.requirementsProvider as RequirementsProviderType | undefined);
-
-      const contentProvider =
-        (config?.commands?.pr?.contentProvider as ContentProviderType | undefined) ??
-        (config?.contentProvider as ContentProviderType | undefined) ??
-        'github';
+      const requirementsProvider = getEffectiveRequirementsProvider(
+        'pr',
+        config,
+        options.requirementsProvider
+      );
+      const contentProvider = getEffectiveContentProvider('pr', config);
 
       if (options.file) {
         content.push(readMultipleFilesFromProjectDir(options.file));
       }
 
       // Handle requirements
-      const requirements = await getRequirementsFromProvider(
-        requirementsProvider,
+      const requirements = await getCommandProviderInput(
+        'pr',
+        'requirements',
         requirementsId,
-        config
+        config,
+        requirementsProvider
       );
 
       if (requirements) {
@@ -95,7 +78,7 @@ export function prCommand(
 
       // Get PR diff using the provider
       try {
-        content.push(await getContentFromProvider(contentProvider, prId, config));
+        content.push(await getCommandProviderInput('pr', 'content', prId, config, contentProvider));
       } catch (error) {
         displayError(error instanceof Error ? error.message : String(error));
         setExitCode(1);
@@ -109,7 +92,7 @@ export function prCommand(
       const { review } = await import('#src/modules/reviewModule.js');
       // TODO consider including requirements id
       // TODO sanitize prId
-      await review(`PR-${prId}`, systemMessage.join('\n'), content.join('\n'), config, 'pr');
+      await review(`PR-${prId}`, getReviewSystemPrompt(config), content.join('\n'), config, 'pr');
 
       if (
         requirementsId &&

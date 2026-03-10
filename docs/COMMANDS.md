@@ -40,6 +40,37 @@ gsloth init anthropic
 gsloth init groq
 ```
 
+## get
+
+Inspect the effective system prompt or provider-backed input used by other commands.
+
+```bash
+gsloth get <command> prompt
+gsloth get <review|pr> <content|requirements> <id>
+```
+
+### Arguments
+- `<command>` - Command to inspect. Supported prompt targets: `ask`, `review`, `pr`, `chat`, `code`
+- `<content|requirements>` - Provider-backed input type for `review` or `pr`
+- `<id>` - Provider-backed content identifier, such as a PR number or issue key
+
+### Description
+Use this command to inspect what Gaunt Sloth would send before running a command:
+- `gsloth get <command> prompt` prints the combined system prompt for that command
+- `gsloth get review ...` and `gsloth get pr ...` print the wrapped provider payload exactly as it would be injected into the LLM input
+
+### Examples
+```bash
+# Print the effective system prompt for review
+gsloth get review prompt
+
+# Print the wrapped PR diff that `gsloth pr 42` would use
+gsloth get pr content 42
+
+# Print the wrapped Jira requirements payload for a review
+gsloth get review requirements PROJ-123
+```
+
 ## pr
 
 Review a Pull Request in the current directory.

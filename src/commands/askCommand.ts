@@ -1,12 +1,8 @@
 import { Command } from 'commander';
 import { CommandLineConfigOverrides, initConfig } from '#src/config.js';
+import { getAskSystemPrompt } from '#src/commands/commandIntrospection.js';
 import { getStringFromStdin } from '#src/utils/systemUtils.js';
-import {
-  readBackstory,
-  readGuidelines,
-  readSystemPrompt,
-  wrapContent,
-} from '#src/utils/llmUtils.js';
+import { wrapContent } from '#src/utils/llmUtils.js';
 
 import { readMultipleFilesFromProjectDir } from '#src/utils/fileUtils.js';
 
@@ -33,11 +29,6 @@ export function askCommand(
     )
     .action(async (message: string, options: AskCommandOptions) => {
       const config = await initConfig(commandLineConfigOverrides);
-      const systemPrompt = readSystemPrompt(config);
-      const preamble = [readBackstory(config), readGuidelines(config)];
-      if (systemPrompt) {
-        preamble.push(systemPrompt);
-      }
       const content = [];
       if (options.file) {
         content.push(readMultipleFilesFromProjectDir(options.file));
@@ -56,6 +47,6 @@ export function askCommand(
       }
 
       const { askQuestion } = await import('#src/modules/questionAnsweringModule.js');
-      await askQuestion('ASK', preamble.join('\n'), content.join('\n'), config);
+      await askQuestion('ASK', getAskSystemPrompt(config), content.join('\n'), config);
     });
 }

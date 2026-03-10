@@ -887,8 +887,9 @@ Refer to JIRA API documentation for more details [https://developer.atlassian.co
 
 **Environment Variables Support:**
 
-For better security, you can set the JIRA username, token, and cloud ID using environment variables instead of placing them in the configuration file:
+For better security, you can set Jira credentials using environment variables instead of placing them in the configuration file:
 
+- `JIRA_FULL_BASE64_TOKEN`: Full pre-encoded Basic auth payload. When present, Gaunt Sloth uses it as-is and does not require `JIRA_USERNAME` or `JIRA_API_PAT_TOKEN`.
 - `JIRA_USERNAME`: Your JIRA username (e.g., `user@yourcompany.com`).
 - `JIRA_API_PAT_TOKEN`: Your JIRA Personal Access Token with scopes.
 - `JIRA_CLOUD_ID`: Your Atlassian Cloud ID.
@@ -924,6 +925,23 @@ Optionally displayUrl can be defined to have a clickable link in the output:
   }
 }
 ```
+
+If your environment already contains a full Base64-encoded Basic token, you can configure only the Cloud ID and optional display URL:
+
+```json
+{
+  "llm": { "type": "vertexai", "model": "gemini-2.5-pro" },
+  "requirementsProvider": "jira",
+  "requirementsProviderConfig": {
+    "jira": {
+      "cloudId": "YOUR_ATLASSIAN_CLOUD_ID",
+      "displayUrl": "https://yourcompany.atlassian.net/browse/"
+    }
+  }
+}
+```
+
+With this setup, export `JIRA_FULL_BASE64_TOKEN` in the environment and Gaunt Sloth will send `Authorization: Basic <token>` directly.
 
 JavaScript:
 

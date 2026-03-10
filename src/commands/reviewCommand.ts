@@ -1,21 +1,19 @@
 import { Command, Option } from 'commander';
 import { getStringFromStdin } from '#src/utils/systemUtils.js';
 import {
+  getCommandProviderInput,
+  getEffectiveContentProvider,
+  getEffectiveRequirementsProvider,
+  getReviewSystemPrompt,
+} from '#src/commands/commandIntrospection.js';
+import {
   REQUIREMENTS_PROVIDERS,
   CONTENT_PROVIDERS,
   type RequirementsProviderType,
   type ContentProviderType,
-  getRequirementsFromProvider,
-  getContentFromProvider,
 } from '#src/commands/commandUtils.js';
 import { CommandLineConfigOverrides } from '#src/config.js';
-import {
-  readBackstory,
-  readGuidelines,
-  readReviewInstructions,
-  readSystemPrompt,
-  wrapContent,
-} from '#src/utils/llmUtils.js';
+import { wrapContent } from '#src/utils/llmUtils.js';
 
 import { readMultipleFilesFromProjectDir } from '#src/utils/fileUtils.js';
 
@@ -61,37 +59,38 @@ export function reviewCommand(
     .action(async (contentId: string | undefined, options: ReviewCommandOptions) => {
       const { initConfig } = await import('#src/config.js');
       const config = await initConfig(cliConfigOverrides); // Initialize and get config
-      const systemPrompt = readSystemPrompt(config);
-      const systemMessage = [
-        readBackstory(config),
-        readGuidelines(config),
-        readReviewInstructions(config),
-      ];
-      if (systemPrompt) {
-        systemMessage.push(systemPrompt);
-      }
       const content: string[] = [];
       const requirementsId = options.requirements;
-      const requirementsProvider =
-        options.requirementsProvider ??
-        (config?.commands?.review?.requirementsProvider as RequirementsProviderType | undefined) ??
-        (config?.requirementsProvider as RequirementsProviderType | undefined);
-      const contentProvider =
-        options.contentProvider ??
-        (config?.commands?.review?.contentProvider as ContentProviderType | undefined) ??
-        (config?.contentProvider as ContentProviderType | undefined);
+      const requirementsProvider = getEffectiveRequirementsProvider(
+        'review',
+        config,
+        options.requirementsProvider
+      );
+      const contentProvider = getEffectiveContentProvider(
+        'review',
+        config,
+        options.contentProvider
+      );
 
       // TODO consider calling these in parallel
-      const requirements = await getRequirementsFromProvider(
-        requirementsProvider,
+      const requirements = await getCommandProviderInput(
+        'review',
+        'requirements',
         requirementsId,
-        config
+        config,
+        requirementsProvider
       );
       if (requirements) {
         content.push(requirements);
       }
 
-      const providedContent = await getContentFromProvider(contentProvider, contentId, config);
+      const providedContent = await getCommandProviderInput(
+        'review',
+        'content',
+        contentId,
+        config,
+        contentProvider
+      );
       if (providedContent) {
         content.push(providedContent);
       }
@@ -107,6 +106,6 @@ export function reviewCommand(
         content.push(wrapContent(options.message, 'message', 'user message'));
       }
       const { review } = await import('#src/modules/reviewModule.js');
-      await review('REVIEW', systemMessage.join('\n'), content.join('\n'), config);
+      await review('REVIEW', getReviewSystemPrompt(config), content.join('\n'), config);
     });
 }

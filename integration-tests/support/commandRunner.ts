@@ -3,6 +3,17 @@ import path from 'path';
 import { platform } from 'node:os';
 import type { ChildProcess } from 'node:child_process';
 
+function isVerboseCommandRunnerEnabled(): boolean {
+  const value = process.env.GSLOTH_IT_VERBOSE?.trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes' || value === 'on';
+}
+
+function writeVerboseOutput(stream: NodeJS.WriteStream, data: Buffer): void {
+  if (isVerboseCommandRunnerEnabled()) {
+    stream.write(data);
+  }
+}
+
 /**
  * Runs a command in the integration-tests directory using spawn
  * This prevents stdin from being treated as a pipe
@@ -35,6 +46,7 @@ export async function runCommandWithArgs(
     const childProcess = spawn(command, args, conf);
 
     childProcess.stdout.on('data', (data) => {
+      writeVerboseOutput(process.stdout, data);
       stdout += data.toString();
       if (endOutput && data.toString().includes(endOutput)) {
         childProcess.kill();
@@ -44,6 +56,7 @@ export async function runCommandWithArgs(
     });
 
     childProcess.stderr.on('data', (data) => {
+      writeVerboseOutput(process.stderr, data);
       stderr += data.toString();
     });
 
@@ -86,10 +99,12 @@ export async function runCommandExpectingExitCode(
     });
 
     childProcess.stdout.on('data', (data) => {
+      writeVerboseOutput(process.stdout, data);
       stdout += data.toString();
     });
 
     childProcess.stderr.on('data', (data) => {
+      writeVerboseOutput(process.stderr, data);
       stderr += data.toString();
     });
 
@@ -123,6 +138,15 @@ export function startChildProcess(
     // Explicitly ignore stdin, otherwise the app switches to pipe mode
     stdio: [stdin, 'pipe', 'pipe'],
   });
+
+  childProcess.stdout.on('data', (data) => {
+    writeVerboseOutput(process.stdout, data);
+  });
+
+  childProcess.stderr.on('data', (data) => {
+    writeVerboseOutput(process.stderr, data);
+  });
+
   return childProcess;
 }
 

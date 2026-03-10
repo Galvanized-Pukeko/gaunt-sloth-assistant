@@ -3,9 +3,33 @@ import type { JiraConfig } from '#src/providers/types.js';
 
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
-export function getJiraCredentials(config: Partial<JiraConfig> | null): JiraConfig {
+export interface ResolvedJiraCredentials {
+  cloudId: string;
+  username?: string;
+  token?: string;
+  fullBase64Token?: string;
+  displayUrl?: string;
+}
+
+export function getJiraCredentials(config: Partial<JiraConfig> | null): ResolvedJiraCredentials {
   if (!config) {
     throw new Error('No Jira config provided');
+  }
+
+  const cloudId = env.JIRA_CLOUD_ID || config.cloudId;
+  if (!cloudId) {
+    throw new Error(
+      'Missing JIRA Cloud ID. The Cloud ID can be defined as JIRA_CLOUD_ID environment variable or as "cloudId" in config.'
+    );
+  }
+
+  const fullBase64Token = env.JIRA_FULL_BASE64_TOKEN || config.fullBase64Token;
+  if (fullBase64Token) {
+    return {
+      cloudId,
+      fullBase64Token,
+      displayUrl: config.displayUrl,
+    };
   }
 
   const username = env.JIRA_USERNAME || config.username;
@@ -22,25 +46,18 @@ export function getJiraCredentials(config: Partial<JiraConfig> | null): JiraConf
     );
   }
 
-  const cloudId = env.JIRA_CLOUD_ID || config.cloudId;
-  if (!cloudId) {
-    throw new Error(
-      'Missing JIRA Cloud ID. The Cloud ID can be defined as JIRA_CLOUD_ID environment variable or as "cloudId" in config.'
-    );
-  }
-
   return {
+    cloudId,
     username,
     token,
-    cloudId,
     displayUrl: config.displayUrl,
   };
 }
 
-export function getJiraHeaders(config: JiraConfig): Record<string, string> {
-  const credentials = `${config.username}:${config.token}`;
-  const encodedCredentials = Buffer.from(credentials).toString('base64');
-  const authHeader = `Basic ${encodedCredentials}`;
+export function getJiraHeaders(config: ResolvedJiraCredentials): Record<string, string> {
+  const authHeader = config.fullBase64Token
+    ? `Basic ${config.fullBase64Token}`
+    : `Basic ${Buffer.from(`${config.username}:${config.token}`).toString('base64')}`;
 
   return {
     Authorization: authHeader,
@@ -51,7 +68,7 @@ export function getJiraHeaders(config: JiraConfig): Record<string, string> {
 }
 
 export async function jiraRequest<T>(
-  config: JiraConfig,
+  config: ResolvedJiraCredentials,
   endpoint: string,
   options: RequestInit = {},
   showProgress = true

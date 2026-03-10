@@ -1,6 +1,10 @@
 import { display, displayError, displayWarning } from '#src/utils/consoleUtils.js';
 import type { JiraConfig } from './types.js';
-import { getJiraCredentials, jiraRequest } from '#src/helpers/jira/jiraClient.js';
+import {
+  getJiraCredentials,
+  jiraRequest,
+  type ResolvedJiraCredentials,
+} from '#src/helpers/jira/jiraClient.js';
 
 interface JiraIssueResponse {
   fields: {
@@ -65,7 +69,7 @@ export async function get(
  * @returns Jira issue response
  */
 async function getJiraIssue(
-  credentials: { username: string; token: string; cloudId: string; displayUrl?: string },
+  credentials: ResolvedJiraCredentials,
   jiraKey: string
 ): Promise<JiraIssueResponse> {
   // Jira Cloud ID can be found by authenticated user at https://company.atlassian.net/_edge/tenant_info
