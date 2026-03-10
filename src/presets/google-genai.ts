@@ -15,7 +15,7 @@ export async function processJsonConfig(
   const configFields = {
     ...llmConfig,
     apiKey: googleApiKey,
-    model: llmConfig.model || 'gemini-3-pro-preview',
+    model: llmConfig.model || 'gemini-2.5-pro',
     platformType: 'gai' as const,
   };
   delete configFields.type;
@@ -26,7 +26,7 @@ export async function processJsonConfig(
 const jsonContent = `{
   "llm": {
     "type": "google-genai",
-    "model": "gemini-3-pro-preview"
+    "model": "gemini-2.5-pro"
   }
 }`;
 
