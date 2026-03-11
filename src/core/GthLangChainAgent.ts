@@ -301,28 +301,45 @@ export class GthLangChainAgent implements GthAgentInterface {
 
     const stream = await this.agent.stream({ messages }, { ...runConfig, streamMode: 'messages' });
 
+    // Buffer tool calls across chunks so we use final (complete) args
+    const pendingToolCalls = new Map<string, { id: string; name: string; args: unknown }>();
+
     for await (const [chunk, _metadata] of stream) {
       debugLogObject('streamWithEvents chunk', { chunk, _metadata });
 
       if (AIMessage.isInstance(chunk) && chunk.tool_calls && chunk.tool_calls.length > 0) {
         for (const tool_call of chunk.tool_calls) {
-          yield { type: 'tool_start', id: tool_call.id as string, name: tool_call.name };
-          yield {
-            type: 'tool_args',
+          // Keep updating with latest args as LLM streams them across chunks
+          pendingToolCalls.set(tool_call.id as string, {
             id: tool_call.id as string,
-            delta: JSON.stringify(tool_call.args),
-          };
-          yield { type: 'tool_end', id: tool_call.id as string };
+            name: tool_call.name,
+            args: tool_call.args,
+          });
         }
       } else if (AIMessage.isInstance(chunk) && chunk.text) {
         yield { type: 'text', delta: chunk.text as string };
       }
 
       if (chunk instanceof ToolMessage) {
+        // Flush buffered tool calls with their final args before the tool result
+        for (const tc of pendingToolCalls.values()) {
+          yield { type: 'tool_start', id: tc.id, name: tc.name };
+          yield { type: 'tool_args', id: tc.id, delta: JSON.stringify(tc.args ?? {}) };
+          yield { type: 'tool_end', id: tc.id };
+        }
+        pendingToolCalls.clear();
+
         const content =
           typeof chunk.content === 'string' ? chunk.content : JSON.stringify(chunk.content);
         yield { type: 'tool_result', id: chunk.tool_call_id as string, content };
       }
+    }
+
+    // Flush any tool calls not followed by a ToolMessage (e.g. terminal tool calls)
+    for (const tc of pendingToolCalls.values()) {
+      yield { type: 'tool_start', id: tc.id, name: tc.name };
+      yield { type: 'tool_args', id: tc.id, delta: JSON.stringify(tc.args ?? {}) };
+      yield { type: 'tool_end', id: tc.id };
     }
   }
 
