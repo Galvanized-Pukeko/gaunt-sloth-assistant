@@ -6,6 +6,10 @@ on:
 jobs:
   ai-code-review:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     if: ${{ !startsWith(github.head_ref, 'dependabot') }}
 
     steps:
