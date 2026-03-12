@@ -1,11 +1,7 @@
 name: AI PR Review
 
-# The pull_request_target is an important feature. It is running on files from `main`.
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-    branches:
-      - 'main'
+  workflow_dispatch:
 
 jobs:
   ai-code-review:

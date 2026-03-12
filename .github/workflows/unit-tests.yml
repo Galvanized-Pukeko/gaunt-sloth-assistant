@@ -1,12 +1,7 @@
 name: Tests and Lint
 
-# I think it should instead run on pull_request_target and checkout the PR instead
-
 on:
-  push:
-    branches: [ "main" ]
-  pull_request_target:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   test-and-lint:

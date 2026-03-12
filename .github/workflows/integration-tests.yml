@@ -1,10 +1,6 @@
 name: Integration tests
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request_target:
-    branches: [ "main" ]
   workflow_dispatch:
     inputs:
       pr_number:
