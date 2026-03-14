@@ -147,6 +147,11 @@ export interface GthConfig {
    */
   writeOutputToFile: boolean | string;
   /**
+   * Whether binary model outputs should be written to files instead of printed inline.
+   * When enabled, supported binary content blocks are materialized as `gth_*.<ext>` files.
+   */
+  writeBinaryOutputsToFile: boolean;
+  /**
    * Use colour in output
    */
   useColour: boolean;
@@ -537,6 +542,7 @@ export const DEFAULT_CONFIG = {
   },
   streamOutput: true,
   writeOutputToFile: true,
+  writeBinaryOutputsToFile: true,
   useColour: true,
   streamSessionInferenceLog: true,
   canInterruptInferenceWithEsc: true,

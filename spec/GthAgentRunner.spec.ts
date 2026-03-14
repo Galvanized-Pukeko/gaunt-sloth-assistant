@@ -37,6 +37,7 @@ describe('GthAgentRunner', () => {
     | 'filesystem'
     | 'useColour'
     | 'writeOutputToFile'
+    | 'writeBinaryOutputsToFile'
     | 'streamSessionInferenceLog'
     | 'canInterruptInferenceWithEsc'
     | 'includeCurrentDateAfterGuidelines'
@@ -49,6 +50,7 @@ describe('GthAgentRunner', () => {
     filesystem: 'none',
     useColour: false,
     writeOutputToFile: true,
+    writeBinaryOutputsToFile: true,
     streamSessionInferenceLog: true,
     canInterruptInferenceWithEsc: true,
     includeCurrentDateAfterGuidelines: true,

@@ -120,6 +120,7 @@ describe('config', async () => {
         projectReviewInstructions: '.gsloth.review.md',
         streamOutput: true,
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
         useColour: true,
         filesystem: 'read',
         aiignore: {
@@ -212,6 +213,7 @@ describe('config', async () => {
         projectReviewInstructions: '.gsloth.review.md',
         streamOutput: true,
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
         useColour: true,
         filesystem: 'read',
         aiignore: {
@@ -337,6 +339,7 @@ describe('config', async () => {
         projectReviewInstructions: '.gsloth.review.md',
         streamOutput: true,
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
         useColour: true,
         filesystem: 'read',
         aiignore: {
@@ -496,6 +499,7 @@ describe('config', async () => {
           model: 'test-model',
         },
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
       } as Partial<RawGthConfig>;
 
       // Set up fs mocks for this specific test
@@ -574,6 +578,7 @@ describe('config', async () => {
           model: 'test-model',
         },
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
       } as Partial<RawGthConfig>;
 
       // Set up fs mocks for this specific test
@@ -613,6 +618,7 @@ describe('config', async () => {
           model: 'test-model',
         },
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
       } as Partial<RawGthConfig>;
 
       // Set up fs mocks
@@ -653,6 +659,7 @@ describe('config', async () => {
           model: 'test-model',
         },
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
       } as Partial<RawGthConfig>;
 
       fsMock.existsSync.mockImplementation((path: string) => {
@@ -679,6 +686,70 @@ describe('config', async () => {
 
       const c2 = await initConfig({ writeOutputToFile: 'out/rev.md' });
       expect(c2.writeOutputToFile).toBe('out/rev.md');
+    });
+  });
+
+  describe('writeBinaryOutputsToFile configuration', () => {
+    it('Should set writeBinaryOutputsToFile to true by default in config', async () => {
+      const jsonConfig = {
+        llm: {
+          type: 'vertexai',
+        },
+      } as RawGthConfig;
+
+      fsMock.existsSync.mockImplementation((path: string) => {
+        return path && path.includes('.gsloth.config.json');
+      });
+      fsMock.readFileSync.mockImplementation((path: string) => {
+        if (path && path.includes('.gsloth.config.json')) return JSON.stringify(jsonConfig);
+        return '';
+      });
+
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+        return `/mock/read/${filename}`;
+      });
+
+      vi.doMock('#src/presets/vertexai.js', () => ({
+        processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
+        postProcessJsonConfig: undefined,
+      }));
+
+      const { initConfig } = await import('#src/config.js');
+      const config = await initConfig({});
+
+      expect(config.writeBinaryOutputsToFile).toBe(true);
+    });
+
+    it('Should respect writeBinaryOutputsToFile when explicitly set to false', async () => {
+      const jsonConfig = {
+        llm: {
+          type: 'vertexai',
+          model: 'test-model',
+        },
+        writeBinaryOutputsToFile: false,
+      } as Partial<RawGthConfig>;
+
+      fsMock.existsSync.mockImplementation((path: string) => {
+        return path && path.includes('.gsloth.config.json');
+      });
+      fsMock.readFileSync.mockImplementation((path: string) => {
+        if (path && path.includes('.gsloth.config.json')) return JSON.stringify(jsonConfig);
+        return '';
+      });
+
+      fileUtilsMock.getGslothConfigReadPath.mockImplementation((filename: string) => {
+        return `/mock/read/${filename}`;
+      });
+
+      vi.doMock('#src/presets/vertexai.js', () => ({
+        processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
+        postProcessJsonConfig: undefined,
+      }));
+
+      const { initConfig } = await import('#src/config.js');
+      const config = await initConfig({});
+
+      expect(config.writeBinaryOutputsToFile).toBe(false);
     });
   });
 
@@ -809,6 +880,7 @@ describe('config', async () => {
         streamOutput: true,
         streamSessionInferenceLog: true,
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
         useColour: true,
         filesystem: 'read',
         aiignore: {
@@ -1136,6 +1208,7 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         llm: { type: 'vertexai' },
+        modelDisplayName: undefined,
         contentProvider: 'file',
         requirementsProvider: 'file',
         projectGuidelines: '.gsloth.guidelines.md',
@@ -1143,6 +1216,7 @@ describe('config', async () => {
         streamOutput: true,
         streamSessionInferenceLog: true,
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
         useColour: true,
         filesystem: 'read',
         aiignore: {
@@ -1219,6 +1293,7 @@ describe('config', async () => {
         streamOutput: true,
         streamSessionInferenceLog: true,
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
         useColour: true,
         filesystem: 'read',
         aiignore: {
@@ -1295,6 +1370,7 @@ describe('config', async () => {
         streamOutput: true,
         streamSessionInferenceLog: true,
         writeOutputToFile: true,
+        writeBinaryOutputsToFile: true,
         useColour: true,
         filesystem: 'read',
         aiignore: {

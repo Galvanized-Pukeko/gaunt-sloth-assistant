@@ -24,6 +24,11 @@ import type { Connection } from '@langchain/mcp-adapters';
 import { MultiServerMCPClient, StreamableHTTPConnection } from '@langchain/mcp-adapters';
 import { createAgent, createMiddleware } from 'langchain';
 import { prepareMcpTools } from '#src/utils/mcpUtils.js';
+import {
+  extractInlineBinaryBlocks,
+  materializeBinaryOutputs,
+  renderAssistantContent,
+} from '#src/utils/binaryOutputUtils.js';
 
 export type AgentStreamEvent =
   | { type: 'text'; delta: string }
@@ -37,6 +42,7 @@ export class GthLangChainAgent implements GthAgentInterface {
   private mcpClient: MultiServerMCPClient | null = null;
   private agent: ReturnType<typeof createAgent> | null = null;
   private config: GthConfig | null = null;
+  private command: GthCommand | undefined = undefined;
 
   constructor(statusUpdate: StatusUpdateCallback) {
     this.statusUpdate = (level: StatusLevel, message: string) => {
@@ -49,6 +55,7 @@ export class GthLangChainAgent implements GthAgentInterface {
     configIn: GthConfig,
     checkpointer?: BaseCheckpointSaver | undefined
   ): Promise<void> {
+    this.command = command;
     debugLog(`GthLangChainAgent.init called with command: ${command || 'default'}`);
 
     // Merge command-specific filesystem config if provided
@@ -164,9 +171,25 @@ export class GthLangChainAgent implements GthAgentInterface {
       try {
         debugLog('Calling agent.invoke...');
         const response = await this.agent.invoke({ messages }, runConfig);
-        const aiMessage = response.messages[response.messages.length - 1].content as string;
-        this.statusUpdate(StatusLevel.DISPLAY, aiMessage);
-        return aiMessage;
+        const finalMessage = response.messages[response.messages.length - 1];
+        const finalContent = finalMessage?.content;
+        const processedContent =
+          this.config.writeBinaryOutputsToFile === false
+            ? {
+                renderedContent: renderAssistantContent(finalContent),
+                successMessages: [],
+              }
+            : materializeBinaryOutputs(finalContent, this.command);
+
+        if (processedContent.renderedContent.trim().length > 0) {
+          this.statusUpdate(StatusLevel.DISPLAY, processedContent.renderedContent);
+        }
+        for (const successMessage of processedContent.successMessages) {
+          this.statusUpdate(StatusLevel.SUCCESS, successMessage);
+        }
+        return [processedContent.renderedContent, ...processedContent.successMessages]
+          .filter((part) => part.trim().length > 0)
+          .join('\n');
       } catch (e) {
         debugLogError('invoke inner', e);
         if (e instanceof Error && e?.name === 'ToolException') {
@@ -209,6 +232,8 @@ export class GthLangChainAgent implements GthAgentInterface {
     this.statusUpdate(StatusLevel.INFO, '\nThinking...\n');
 
     const statusUpdate = this.statusUpdate;
+    const config = this.config;
+    const command = this.command;
     const interruptState = { escape: false, messageShown: false };
     const abortController = new AbortController();
     const showInterruptMessage = () => {
@@ -235,6 +260,8 @@ export class GthLangChainAgent implements GthAgentInterface {
         try {
           debugLog('Starting stream processing...');
           let totalChunks = 0;
+          const seenBinaryBlocks = new Set<string>();
+          const binaryBlocks: Array<{ mimeType: string; data: string }> = [];
 
           for await (const [chunk, _metadata] of stream) {
             debugLogObject('Stream chunk', { chunk, _metadata });
@@ -242,14 +269,39 @@ export class GthLangChainAgent implements GthAgentInterface {
               const text = chunk.text as string;
               totalChunks++;
 
-              statusUpdate(StatusLevel.STREAM, text);
-              controller.enqueue(text);
+              if (text.length > 0) {
+                statusUpdate(StatusLevel.STREAM, text);
+                controller.enqueue(text);
+              }
+
+              if (config?.writeBinaryOutputsToFile !== false) {
+                for (const block of extractInlineBinaryBlocks(chunk.content)) {
+                  const binaryKey = `${block.mimeType}:${block.data.slice(0, 64)}:${block.data.length}`;
+                  if (seenBinaryBlocks.has(binaryKey)) {
+                    continue;
+                  }
+                  seenBinaryBlocks.add(binaryKey);
+                  binaryBlocks.push({ mimeType: block.mimeType, data: block.data });
+                }
+              }
             }
             if (interruptState.escape) {
               if (typeof stream.cancel === 'function') {
                 await stream.cancel();
               }
               break;
+            }
+          }
+          if (config?.writeBinaryOutputsToFile !== false && binaryBlocks.length > 0) {
+            const processedContent = materializeBinaryOutputs(
+              binaryBlocks.map((block) => ({
+                type: 'inlineData',
+                inlineData: block,
+              })),
+              command
+            );
+            for (const successMessage of processedContent.successMessages) {
+              statusUpdate(StatusLevel.SUCCESS, successMessage);
             }
           }
           debugLog(`Stream completed. Total chunks: ${totalChunks}`);
@@ -357,6 +409,7 @@ export class GthLangChainAgent implements GthAgentInterface {
     }
     this.agent = null;
     this.config = null;
+    this.command = undefined;
     debugLog('GthLangChainAgent cleanup complete');
   }
 

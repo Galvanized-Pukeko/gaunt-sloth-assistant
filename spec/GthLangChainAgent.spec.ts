@@ -53,6 +53,13 @@ const consoleUtilsMock = {
 };
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
+const binaryOutputUtilsMock = {
+  extractInlineBinaryBlocks: vi.fn(),
+  materializeBinaryOutputs: vi.fn(),
+  renderAssistantContent: vi.fn(),
+};
+vi.mock('#src/utils/binaryOutputUtils.js', () => binaryOutputUtilsMock);
+
 // Mock createAgent from langchain
 const createAgentMock = vi.fn();
 const toolStrategyMock = vi.fn();
@@ -94,6 +101,17 @@ describe('GthLangChainAgent', () => {
     ProgressIndicatorMock.mockClear();
     ProgressIndicatorInstanceMock.stop.mockReset();
     ProgressIndicatorInstanceMock.indicate.mockReset();
+    binaryOutputUtilsMock.extractInlineBinaryBlocks.mockReset();
+    binaryOutputUtilsMock.materializeBinaryOutputs.mockReset();
+    binaryOutputUtilsMock.renderAssistantContent.mockReset();
+    binaryOutputUtilsMock.extractInlineBinaryBlocks.mockReturnValue([]);
+    binaryOutputUtilsMock.materializeBinaryOutputs.mockImplementation((content: unknown) => ({
+      renderedContent: typeof content === 'string' ? content : JSON.stringify(content),
+      successMessages: [],
+    }));
+    binaryOutputUtilsMock.renderAssistantContent.mockImplementation((content: unknown) =>
+      typeof content === 'string' ? content : JSON.stringify(content)
+    );
 
     // Setup middleware mock
     resolveMiddlewareMock.mockResolvedValue([]);
@@ -125,6 +143,7 @@ describe('GthLangChainAgent', () => {
       filesystem: 'none',
       useColour: false,
       writeOutputToFile: true,
+      writeBinaryOutputsToFile: true,
       streamSessionInferenceLog: true,
       canInterruptInferenceWithEsc: true,
       includeCurrentDateAfterGuidelines: true,
@@ -541,6 +560,48 @@ describe('GthLangChainAgent', () => {
       }
       expect(result).toBe('test response');
     });
+
+    it('should materialize binary outputs in non-streaming mode', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+
+      agentMock.invoke.mockResolvedValue({
+        messages: [
+          new AIMessage({
+            content: [{ type: 'inlineData', inlineData: { mimeType: 'image/png', data: 'abc' } }],
+          }),
+        ],
+      });
+      binaryOutputUtilsMock.materializeBinaryOutputs.mockReturnValue({
+        renderedContent: '[Binary model output saved: image/png -> /tmp/gth_test_ASK.png]',
+        successMessages: ['Wrote model output (image/png) to /tmp/gth_test_ASK.png'],
+      });
+
+      const fakeListChatModel = new FakeListChatModel({
+        responses: ['binary response'],
+      });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+
+      await agent.init('ask', { ...mockConfig, llm: fakeListChatModel });
+
+      const result = await agent.invoke([new HumanMessage('test message')], {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'test-thread-id' },
+      });
+
+      expect(binaryOutputUtilsMock.materializeBinaryOutputs).toHaveBeenCalledWith(
+        [{ type: 'inlineData', inlineData: { mimeType: 'image/png', data: 'abc' } }],
+        'ask'
+      );
+      expect(statusUpdateCallback).toHaveBeenCalledWith(
+        StatusLevel.DISPLAY,
+        '[Binary model output saved: image/png -> /tmp/gth_test_ASK.png]'
+      );
+      expect(statusUpdateCallback).toHaveBeenCalledWith(
+        StatusLevel.SUCCESS,
+        'Wrote model output (image/png) to /tmp/gth_test_ASK.png'
+      );
+      expect(result).toContain('/tmp/gth_test_ASK.png');
+    });
   });
 
   describe('stream', () => {
@@ -600,6 +661,66 @@ describe('GthLangChainAgent', () => {
       }
 
       expect(chunks).toEqual(['chunk1', 'chunk2']);
+    });
+
+    it('should materialize binary outputs after streaming completes', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const mockStreamChunks = [
+        [new AIMessageChunk({ content: 'hello' }), {}],
+        [
+          new AIMessageChunk({
+            content: [{ type: 'inlineData', inlineData: { mimeType: 'image/png', data: 'abc' } }],
+          }),
+          {},
+        ],
+      ];
+
+      async function* mockStreamGenerator() {
+        for (const chunk of mockStreamChunks) {
+          yield chunk;
+        }
+      }
+
+      agentMock.stream.mockResolvedValue(mockStreamGenerator());
+      binaryOutputUtilsMock.extractInlineBinaryBlocks.mockReturnValue([
+        { index: 0, mimeType: 'image/png', data: 'abc' },
+      ]);
+      binaryOutputUtilsMock.materializeBinaryOutputs.mockReturnValue({
+        renderedContent: '[Binary model output saved: image/png -> /tmp/gth_test_ASK.png]',
+        successMessages: ['Wrote model output (image/png) to /tmp/gth_test_ASK.png'],
+      });
+
+      const fakeStreamingChatModel = new FakeStreamingChatModel({
+        chunks: [
+          new AIMessageChunk({ content: 'hello' }),
+          new AIMessageChunk({
+            content: [{ type: 'inlineData', inlineData: { mimeType: 'image/png', data: 'abc' } }],
+          }),
+        ],
+      });
+      fakeStreamingChatModel.bindTools = vi.fn().mockReturnValue(fakeStreamingChatModel);
+
+      await agent.init('ask', { ...mockConfig, llm: fakeStreamingChatModel, streamOutput: true });
+
+      const stream = await agent.stream([new HumanMessage('test message')], {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'test-thread-id' },
+      });
+
+      const chunks: string[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(['hello']);
+      expect(binaryOutputUtilsMock.materializeBinaryOutputs).toHaveBeenCalledWith(
+        [{ type: 'inlineData', inlineData: { mimeType: 'image/png', data: 'abc' } }],
+        'ask'
+      );
+      expect(statusUpdateCallback).toHaveBeenCalledWith(
+        StatusLevel.SUCCESS,
+        'Wrote model output (image/png) to /tmp/gth_test_ASK.png'
+      );
     });
   });
 
