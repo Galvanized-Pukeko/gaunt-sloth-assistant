@@ -33,8 +33,10 @@ jobs:
 
       - name: Extract issue number from PR title
         id: extract_issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_TITLE=$(gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title --jq '.title')
           ISSUE_NUMBER=$(echo "$PR_TITLE" | grep -oE '^[0-9]{2,5} ' | tr -d ' ' || true)
           echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
 
