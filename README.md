@@ -25,21 +25,33 @@ The promise of Gaunt Sloth:
 - **Easy installation via NPM**.
 - **All prompts are editable** via markdown files. 
 
-## What GSloth does:
+## What GSloth does
 
-- Reviews code;
-  - Suggests bug fixes;
-  - Explains provided code
-- Reviews Diffs provided with pipe (|);
-  - You can ask GSloth to review your own code before committing (`git --no-pager diff | gsloth review`).
-- Reviews Pull Requests (PRs) (`gsloth pr 42`);
-  - Fetches descriptions (requirements) from Github issue or Jira (`gsloth pr 42 12`);;
-- Answers questions about provided code;
-- Writes code;
-- Connects to MCP server (including remote MCP with OAuth);
-- Executes custom shell commands (deployments, migrations, tests, etc.) with security validation;
-- Saves all responses in timestamped `.md` files (override with `-w/--write-output-to-file`);
-- Anything else you need, when combined with other command line tools.
+Unlike autonomous coding agents or hosted review services, GSloth is a **configuration-driven CLI tool** that you wire into your own workflows and pipelines. You choose the model, the provider, the prompts, and the tools — GSloth orchestrates them.
+
+**Controlled automation**
+- Define custom shell tools (deployments, migrations, test runs) in JSON config with parameter validation
+- Connect to MCP servers, including remote servers with OAuth
+- Communicate with external AI agents via the A2A protocol
+
+**Model experimentation**
+- Swap models and providers through config — no code changes needed
+- Works with Anthropic, Google (Vertex AI, AI Studio), OpenAI, Groq, DeepSeek, xAI, OpenRouter, local models (LM Studio, Ollama), and any LangChain-compatible provider
+- Customizable middleware pipeline (prompt caching, summarization, or your own)
+- All system prompts are editable markdown files
+
+**Code reviews and PR workflows**
+- Review PRs with requirement context pulled from GitHub issues or Jira (`gsloth pr 42 12`)
+- Review local diffs before committing (`git --no-pager diff | gsloth review`)
+- Run automated reviews in CI/CD — post results as PR comments via GitHub Actions
+
+**Q&A, chat, and coding sessions**
+- Ask questions about specific files (`gsloth ask "explain this" -f utils.js`)
+- Interactive chat and coding sessions with filesystem access
+
+**Output handling**
+- Saves all responses to timestamped files (override with `-w/--write-output-to-file`)
+- Materializes binary model outputs (e.g. generated images) as local files
 
 ### To make GSloth work, you need an **API key** from some AI provider, such as:
 
