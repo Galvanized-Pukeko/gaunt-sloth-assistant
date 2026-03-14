@@ -60,12 +60,13 @@ function getBinaryOutputFilePath(command: GthCommand | undefined, extension: str
   }
 
   const suffixBase = initialPath.slice(0, -(normalizedExtension.length + 1));
-  for (let suffix = 2; ; suffix++) {
+  for (let suffix = 2; suffix < 1000; suffix++) {
     const candidate = `${suffixBase}_${suffix}.${normalizedExtension}`;
     if (!existsSync(candidate)) {
       return candidate;
     }
   }
+  return `${suffixBase}_${Date.now()}.${normalizedExtension}`;
 }
 
 export function extractInlineBinaryBlocks(content: unknown): InlineBinaryBlock[] {
@@ -113,7 +114,7 @@ export function renderAssistantContent(
   }
 
   if (!Array.isArray(content)) {
-    return JSON.stringify(content) ?? '';
+    return String(content);
   }
 
   return content
@@ -154,11 +155,15 @@ export function materializeBinaryOutputs(
   for (const binaryBlock of binaryBlocks) {
     const extension = getMimeExtension(binaryBlock.mimeType);
     const filePath = getBinaryOutputFilePath(command, extension);
-    writeFileSync(filePath, Buffer.from(binaryBlock.data, 'base64'));
-
-    const placeholder = `[Binary model output saved: ${binaryBlock.mimeType} -> ${filePath}]`;
-    placeholderMap.set(binaryBlock.index, placeholder);
-    successMessages.push(`Wrote model output (${binaryBlock.mimeType}) to ${filePath}`);
+    try {
+      writeFileSync(filePath, Buffer.from(binaryBlock.data, 'base64'));
+      const placeholder = `[Binary model output saved: ${binaryBlock.mimeType} -> ${filePath}]`;
+      placeholderMap.set(binaryBlock.index, placeholder);
+      successMessages.push(`Wrote model output (${binaryBlock.mimeType}) to ${filePath}`);
+    } catch {
+      const errorPlaceholder = `[Failed to save binary output: ${binaryBlock.mimeType}]`;
+      placeholderMap.set(binaryBlock.index, errorPlaceholder);
+    }
   }
 
   return {

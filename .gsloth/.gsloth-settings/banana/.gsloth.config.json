@@ -3,5 +3,9 @@
     "type": "vertexai",
     "model": "gemini-3.1-flash-image-preview",
     "location": "global"
-  }
+  },
+  "binaryFormats": [
+    { "type": "image", "extensions": ["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"] },
+    { "type": "file", "extensions": ["pdf"] }
+  ]
 }

@@ -266,7 +266,7 @@ export class GthLangChainAgent implements GthAgentInterface {
           for await (const [chunk, _metadata] of stream) {
             debugLogObject('Stream chunk', { chunk, _metadata });
             if (AIMessage.isInstance(chunk)) {
-              const text = chunk.text as string;
+              const text = (chunk.text as string) ?? '';
               totalChunks++;
 
               if (text.length > 0) {
