@@ -71,6 +71,7 @@ describe('Custom Tools Configuration', () => {
     filesystem: 'none',
     streamOutput: true,
     writeOutputToFile: false,
+    writeBinaryOutputsToFile: true,
     useColour: true,
     streamSessionInferenceLog: false,
     canInterruptInferenceWithEsc: true,

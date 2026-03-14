@@ -246,6 +246,7 @@ describe('reviewModule', () => {
       ...BASE_GTH_CONFIG,
       streamOutput: true, // Different from default mockConfig
       llm: {} as BaseChatModel, // Model shoudn't matter here, because agent runner is mocked
+      writeBinaryOutputsToFile: true,
     };
 
     // Set a different response for this specific test
