@@ -173,13 +173,12 @@ export class GthLangChainAgent implements GthAgentInterface {
         const response = await this.agent.invoke({ messages }, runConfig);
         const finalMessage = response.messages[response.messages.length - 1];
         const finalContent = finalMessage?.content;
-        const processedContent =
-          this.config.writeBinaryOutputsToFile === false
-            ? {
-                renderedContent: renderAssistantContent(finalContent),
-                successMessages: [],
-              }
-            : materializeBinaryOutputs(finalContent, this.command);
+        const processedContent = !this.config.writeBinaryOutputsToFile
+          ? {
+              renderedContent: renderAssistantContent(finalContent),
+              successMessages: [],
+            }
+          : materializeBinaryOutputs(finalContent, this.command);
 
         if (processedContent.renderedContent.trim().length > 0) {
           this.statusUpdate(StatusLevel.DISPLAY, processedContent.renderedContent);
@@ -274,9 +273,9 @@ export class GthLangChainAgent implements GthAgentInterface {
                 controller.enqueue(text);
               }
 
-              if (config?.writeBinaryOutputsToFile !== false) {
+              if (config?.writeBinaryOutputsToFile) {
                 for (const block of extractInlineBinaryBlocks(chunk.content)) {
-                  const binaryKey = `${block.mimeType}:${block.data.slice(0, 64)}:${block.data.length}`;
+                  const binaryKey = `${block.mimeType}:${block.data.length}:${block.data}`;
                   if (seenBinaryBlocks.has(binaryKey)) {
                     continue;
                   }
@@ -292,7 +291,7 @@ export class GthLangChainAgent implements GthAgentInterface {
               break;
             }
           }
-          if (config?.writeBinaryOutputsToFile !== false && binaryBlocks.length > 0) {
+          if (config?.writeBinaryOutputsToFile && binaryBlocks.length > 0) {
             const processedContent = materializeBinaryOutputs(
               binaryBlocks.map((block) => ({
                 type: 'inlineData',
