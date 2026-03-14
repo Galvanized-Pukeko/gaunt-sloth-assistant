@@ -44,6 +44,4 @@ jobs:
       env:
         BIG_TEST_PROVIDER: ${{ vars.BIG_TEST_PROVIDER }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
