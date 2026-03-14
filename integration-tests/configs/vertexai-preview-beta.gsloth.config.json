@@ -1,8 +1,9 @@
 {
   "llm": {
     "type": "vertexai",
-    "model": "gemini-2.5-pro",
+    "model": "gemini-3.1-pro-preview",
     "location": "global",
+    "apiVersion": "v1beta1",
     "temperature": 0
   },
   "builtInTools": ["show_a2ui_surface"],

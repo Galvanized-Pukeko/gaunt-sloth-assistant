@@ -11,6 +11,8 @@ const validConfigs = [
   'groq',
   'anthropic',
   'vertexai',
+  'vertexai-preview',
+  'vertexai-preview-beta',
   'deepseek',
   'openai',
   'inception',

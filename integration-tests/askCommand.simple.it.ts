@@ -26,6 +26,18 @@ describe('Ask Command Integration Tests', () => {
     expect(checkOutputForExpectedContent(output, 'prime')).toBe(true);
   });
 
+  it('should use multiple tools', async () => {
+    const output = await runCommandWithArgs('npx', [
+      'gth',
+      'ask',
+      '"list current dir and present list of files; read file filewithgoodcode.js"',
+    ]);
+
+    // Check for expected content in the response
+    expect(checkOutputForExpectedContent(output, 'file.pdf')).toBe(true);
+    expect(checkOutputForExpectedContent(output, 'prime')).toBe(true);
+  });
+
   it('--verbose should set LangChain to verbose mode in llmUtils invoke', async () => {
     const output = await runCommandWithArgs('npx', ['gth', '--verbose', 'ask', '"ping"']);
 
