@@ -142,7 +142,7 @@ Running `gsloth` with no subcommand also drops you into `chat`.
 
 ## Installation
 
-Tested with Node 22 LTS.
+Tested with Node 24 LTS.
 
 ### NPM
 ```bash
@@ -338,11 +338,9 @@ rm -r ./.gsloth*
 ```
 
 ## Contributing
-Contributors are needed! Feel free to create a PR.
-If you are not sure where to start, look for issues with a "good first issue" label.
-
-## Building from repo
-See [DEVELOPMENT.md](./docs/DEVELOPMENT.md)
+Contributions are welcome through GitHub Issues and pull requests.
+For contributor workflow, local setup, testing expectations, and PR guidance, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+Project participation is also covered by the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## License
 License is [MIT](https://opensource.org/license/mit). See [LICENSE](LICENSE)

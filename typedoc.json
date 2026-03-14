@@ -5,7 +5,7 @@
   "entryPointStrategy": "expand",
   "categorizeByGroup": false,
   "out": "./docs-generated",
-  "projectDocuments": ["docs/COMMANDS.md", "docs/CONFIGURATION.md", "docs/DEVELOPMENT.md"],
+  "projectDocuments": ["docs/COMMANDS.md", "docs/CONFIGURATION.md", "CONTRIBUTING.md"],
   "sourceLinkExternal": true,
   "includeVersion": true,
   "navigationLinks": {
