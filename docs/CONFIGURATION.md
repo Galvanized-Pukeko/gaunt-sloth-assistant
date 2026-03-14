@@ -83,6 +83,24 @@ Set `writeOutputToFile` in your config to:
 
 Override the setting per run with `-w/--write-output-to-file true|false|<filename>`. Shortcuts `-wn` or `-w0` map to `false`.
 
+### Binary Model Outputs (Image Generation)
+
+Some models (e.g. Gemini with image generation) return inline binary content such as images. By default, Gaunt Sloth saves these as local files instead of printing raw base64 to the terminal.
+
+Output files are named `gth_<timestamp>_<COMMAND>.<ext>` and placed in the same location as text output files. The extension is derived from the MIME type (e.g. `image/png` → `.png`).
+
+Set `writeBinaryOutputsToFile` in your config to control this behavior:
+
+- `true` (default) — binary outputs are saved to files and a confirmation message is displayed
+- `false` — binary content is not saved; raw content blocks are printed as JSON
+
+```json
+{
+  "llm": {"type": "vertexai", "model": "gemini-3.1-flash-image-preview", "location": "global"},
+  "writeBinaryOutputsToFile": true
+}
+```
+
 ## AG-UI Server Configuration
 
 The `api ag-ui` command reads its settings from `commands.api` in your config file.
