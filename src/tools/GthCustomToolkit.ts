@@ -1,1 +1,1 @@
-export { default } from "@gaunt-sloth/review/tools/GthCustomToolkit.js";
+export { default } from '@gaunt-sloth/review/tools/GthCustomToolkit.js';

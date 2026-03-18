@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/review/modules/questionAnsweringModule.js";
+export * from '@gaunt-sloth/review/modules/questionAnsweringModule.js';

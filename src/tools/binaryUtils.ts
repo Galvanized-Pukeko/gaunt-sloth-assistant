@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/review/tools/binaryUtils.js";
+export * from '@gaunt-sloth/review/tools/binaryUtils.js';

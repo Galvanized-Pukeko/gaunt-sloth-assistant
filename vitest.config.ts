@@ -14,7 +14,7 @@ function resolveWorkspaceImports() {
   return {
     name: 'resolve-workspace-imports',
     enforce: 'pre' as const,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     resolveId(id: string, _importer: string | undefined): any {
       // Handle #src/ imports -> find the actual source in packages
       if (id.startsWith('#src/')) {

@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/review/providers/ghIssueProvider.js";
+export * from '@gaunt-sloth/review/providers/ghIssueProvider.js';

@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/core/utils/globalConfigUtils.js";
+export * from '@gaunt-sloth/core/utils/globalConfigUtils.js';

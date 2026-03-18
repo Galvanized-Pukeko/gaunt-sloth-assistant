@@ -19,6 +19,8 @@ gaunt-sloth-assistant.iml
 .gsloth/.gsloth-settings/jira/
 .gsloth/gth_*
 /gaunt-sloth.log
+test-session.log
+test.log
 /vitest-it.config.d.ts
 /vitest-it.config.js
 /vitest-it.config.js.map

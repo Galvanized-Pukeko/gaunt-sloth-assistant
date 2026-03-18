@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/review/middleware/registry.js";
+export * from '@gaunt-sloth/review/middleware/registry.js';

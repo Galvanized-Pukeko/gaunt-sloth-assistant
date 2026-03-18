@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/core/utils/ProgressIndicator.js";
+export * from '@gaunt-sloth/core/utils/ProgressIndicator.js';

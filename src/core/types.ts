@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/review/core/types.js";
+export * from '@gaunt-sloth/review/core/types.js';

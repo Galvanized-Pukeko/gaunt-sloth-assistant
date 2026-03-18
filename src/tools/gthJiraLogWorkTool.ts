@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/review/tools/gthJiraLogWorkTool.js";
+export * from '@gaunt-sloth/review/tools/gthJiraLogWorkTool.js';

@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/core/constants.js";
+export * from '@gaunt-sloth/core/constants.js';

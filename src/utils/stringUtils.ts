@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/core/utils/stringUtils.js";
+export * from '@gaunt-sloth/core/utils/stringUtils.js';

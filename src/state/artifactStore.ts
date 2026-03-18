@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/review/state/artifactStore.js";
+export * from '@gaunt-sloth/review/state/artifactStore.js';

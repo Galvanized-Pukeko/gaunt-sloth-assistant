@@ -1,1 +1,1 @@
-export * from "@gaunt-sloth/review/modules/interactiveSessionModule.js";
+export * from '@gaunt-sloth/review/modules/interactiveSessionModule.js';
