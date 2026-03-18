@@ -945,7 +945,9 @@ describe('config', async () => {
 
       // It is easier to debug if messages checked first
       expect(consoleUtilsMock.displayDebug).not.toHaveBeenCalled();
-      expect(consoleUtilsMock.displayError).toHaveBeenCalled();
+      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
+        expect.stringContaining('not supported')
+      );
       expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
       expect(consoleUtilsMock.display).not.toHaveBeenCalled();
       expect(consoleUtilsMock.displayInfo).not.toHaveBeenCalled();
@@ -974,7 +976,9 @@ describe('config', async () => {
 
       // It is easier to debug if messages checked first
       expect(consoleUtilsMock.displayDebug).not.toHaveBeenCalled();
-      expect(consoleUtilsMock.displayError).toHaveBeenCalled();
+      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
+        expect.stringContaining('not supported')
+      );
       expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
       expect(consoleUtilsMock.display).not.toHaveBeenCalled();
       expect(consoleUtilsMock.displayInfo).not.toHaveBeenCalled();
