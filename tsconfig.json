@@ -20,5 +20,5 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "spec", "integration-tests"]
+  "exclude": ["node_modules", "dist", "spec", "integration-tests", "packages"]
 }

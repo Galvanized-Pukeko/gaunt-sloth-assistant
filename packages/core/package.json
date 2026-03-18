@@ -1,0 +1,26 @@
+{
+  "name": "@gaunt-sloth/core",
+  "version": "1.4.0",
+  "description": "Core utilities and types for Gaunt Sloth",
+  "license": "MIT",
+  "author": "Andrew Kondratev",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./*.js": "./dist/*.js"
+  },
+  "imports": {
+    "#src/*.js": "./dist/*.js"
+  },
+  "dependencies": {
+    "minimatch": "^10.2.4"
+  },
+  "files": [
+    "./dist/*"
+  ]
+}

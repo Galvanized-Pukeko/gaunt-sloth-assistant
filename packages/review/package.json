@@ -1,0 +1,71 @@
+{
+  "name": "@gaunt-sloth/review",
+  "version": "1.4.0",
+  "description": "Review functionality for Gaunt Sloth",
+  "license": "MIT",
+  "author": "Andrew Kondratev",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "gaunt-sloth-review": "cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./*.js": "./dist/*.js"
+  },
+  "imports": {
+    "#src/*.js": "./dist/*.js"
+  },
+  "dependencies": {
+    "@gaunt-sloth/core": "*",
+    "@langchain/core": "^1.1.32",
+    "@langchain/langgraph": "^1.2.2",
+    "diff": "^8.0.3",
+    "langchain": "^1.2.32",
+    "minimatch": "^10.2.4"
+  },
+  "peerDependencies": {
+    "@langchain/anthropic": "^1.3.23",
+    "@langchain/deepseek": "^1.0.17",
+    "@langchain/google": "^0.1.6",
+    "@langchain/groq": "^1.1.5",
+    "@langchain/mcp-adapters": "^1.1.3",
+    "@langchain/openai": "^1.2.0",
+    "@langchain/xai": "^1.3.9",
+    "@modelcontextprotocol/sdk": "^1.27.1"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/anthropic": {
+      "optional": true
+    },
+    "@langchain/deepseek": {
+      "optional": true
+    },
+    "@langchain/google": {
+      "optional": true
+    },
+    "@langchain/groq": {
+      "optional": true
+    },
+    "@langchain/mcp-adapters": {
+      "optional": true
+    },
+    "@langchain/openai": {
+      "optional": true
+    },
+    "@langchain/xai": {
+      "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
+  },
+  "files": [
+    "./dist/*",
+    "cli.js"
+  ],
+  "scripts": {
+    "build": "tsc"
+  }
+}

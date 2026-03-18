@@ -1,0 +1,34 @@
+{
+  "name": "@gaunt-sloth/api",
+  "version": "1.4.0",
+  "description": "API server for Gaunt Sloth",
+  "license": "MIT",
+  "author": "Andrew Kondratev",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "gaunt-sloth-api": "cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./*.js": "./dist/*.js"
+  },
+  "imports": {
+    "#src/*.js": "./dist/*.js"
+  },
+  "dependencies": {
+    "@gaunt-sloth/core": "*",
+    "@gaunt-sloth/review": "*",
+    "@ag-ui/core": "^0.0.47",
+    "@ag-ui/encoder": "^0.0.47",
+    "express": "^5.2.1"
+  },
+  "files": [
+    "./dist/*",
+    "cli.js"
+  ],
+  "scripts": {
+    "build": "tsc"
+  }
+}
