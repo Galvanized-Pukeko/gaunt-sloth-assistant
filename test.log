@@ -1,0 +1,26 @@
+Test error message
+Test error message
+Test warning message
+Test success message
+Test info message
+Test plain message
+Test debug message
+Error: Test error
+    at test.js:1:1
+Test debug message
+Info message
+Warning message
+Error message
+Test error message
+Test error message
+Test warning message
+Test success message
+Test info message
+Test plain message
+Test debug message
+Error: Test error
+    at test.js:1:1
+Test debug message
+Info message
+Warning message
+Error message

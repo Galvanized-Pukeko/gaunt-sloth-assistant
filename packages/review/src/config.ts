@@ -690,7 +690,7 @@ export async function tryJsonConfig(
         llmConfig.verbose = commandLineConfigOverrides.verbose;
       }
       // Import the appropriate config module
-      const configModule = await import(`./presets/${llmType}.js`);
+      const configModule = await import(`#src/presets/${llmType}.js`);
       if (configModule.processJsonConfig) {
         const llm = (await configModule.processJsonConfig(llmConfig)) as BaseChatModel;
         const mergedConfig = mergeRawConfig(jsonConfig, llm, commandLineConfigOverrides);
@@ -736,7 +736,7 @@ export async function createProjectConfig(configType: string): Promise<void> {
   displayWarning(`Make sure you add as much detail as possible to your ${PROJECT_GUIDELINES}.\n`);
 
   displayInfo(`Creating project config for ${configType}`);
-  const vendorConfig = await import(`./presets/${configType}.js`);
+  const vendorConfig = await import(`#src/presets/${configType}.js`);
   vendorConfig.init(getGslothConfigWritePath(USER_PROJECT_CONFIG_JSON));
 }
 

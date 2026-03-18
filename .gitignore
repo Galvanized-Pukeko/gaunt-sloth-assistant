@@ -2,6 +2,7 @@
 /dist/
 /packages/*/dist/
 /packages/*/node_modules/
+/packages/*/tsconfig.tsbuildinfo
 /req/
 /gth_*
 /integration-tests/workdir/gth_*
