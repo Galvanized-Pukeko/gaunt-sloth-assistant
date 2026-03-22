@@ -1,5 +1,6 @@
 import type { ConfigType } from '#src/config.js';
-import { availableDefaultConfigs, createProjectConfig } from '#src/config.js';
+import { availableDefaultConfigs } from '#src/config.js';
+import { createProjectConfig } from '#src/commands/configSetup.js';
 import { displayInfo, displayWarning } from '#src/utils/consoleUtils.js';
 import { createInterface, env, stdin, stdout } from '#src/utils/systemUtils.js';
 import { Argument, Command } from 'commander';

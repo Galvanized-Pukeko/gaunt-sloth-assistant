@@ -6,7 +6,6 @@
 
 import { AIIGNORE_FILE } from '#src/constants.js';
 import { existsSync, readFileSync } from 'node:fs';
-import { minimatch } from 'minimatch';
 import path from 'node:path';
 import { debugLog } from '#src/utils/debugUtils.js';
 
@@ -71,7 +70,7 @@ export function shouldIgnoreFile(
   // Check if any pattern matches
   for (const pattern of patterns) {
     try {
-      if (minimatch(relativePath, pattern, { dot: true })) {
+      if (path.matchesGlob(relativePath, pattern)) {
         debugLog(`File ignored by pattern '${pattern}': ${relativePath}`);
         return true;
       }

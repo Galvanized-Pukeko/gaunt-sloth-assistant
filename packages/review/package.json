@@ -18,22 +18,13 @@
     "#src/*.js": "./dist/*.js"
   },
   "dependencies": {
-    "@gaunt-sloth/api": "*",
     "@gaunt-sloth/core": "*"
   },
   "peerDependencies": {
-    "@gaunt-sloth/tools": "*",
-    "@langchain/mcp-adapters": "^1.1.3",
-    "@modelcontextprotocol/sdk": "^1.27.1"
+    "@gaunt-sloth/tools": "*"
   },
   "peerDependenciesMeta": {
     "@gaunt-sloth/tools": {
-      "optional": true
-    },
-    "@langchain/mcp-adapters": {
-      "optional": true
-    },
-    "@modelcontextprotocol/sdk": {
       "optional": true
     }
   },

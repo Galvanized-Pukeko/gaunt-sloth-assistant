@@ -1512,7 +1512,7 @@ describe('config', async () => {
         (filename: string) => `/mock/write/${filename}`
       );
 
-      const { createProjectConfig } = await import('@gaunt-sloth/review/config.js');
+      const { createProjectConfig } = await import('#src/commands/configSetup.js');
 
       await createProjectConfig(configType);
 
@@ -1566,7 +1566,7 @@ describe('config', async () => {
         return false;
       });
 
-      const { createProjectConfig } = await import('@gaunt-sloth/review/config.js');
+      const { createProjectConfig } = await import('#src/commands/configSetup.js');
 
       await createProjectConfig(configType);
 
@@ -1578,7 +1578,7 @@ describe('config', async () => {
     it('Should handle invalid config type', async () => {
       const configType = 'invalid-config';
 
-      const { createProjectConfig } = await import('@gaunt-sloth/review/config.js');
+      const { createProjectConfig } = await import('#src/commands/configSetup.js');
 
       try {
         await createProjectConfig(configType);
@@ -1608,7 +1608,7 @@ describe('config', async () => {
         (filename: string) => `/mock/write/${filename}`
       );
 
-      const { createProjectConfig } = await import('@gaunt-sloth/review/config.js');
+      const { createProjectConfig } = await import('#src/commands/configSetup.js');
 
       await createProjectConfig(configType);
 
@@ -1632,7 +1632,7 @@ describe('config', async () => {
         (filename: string) => `/mock/write/${filename}`
       );
 
-      const { createProjectConfig } = await import('@gaunt-sloth/review/config.js');
+      const { createProjectConfig } = await import('#src/commands/configSetup.js');
 
       await createProjectConfig(configType);
 
@@ -1654,7 +1654,7 @@ describe('config', async () => {
         (filename: string) => `/mock/write/${filename}`
       );
 
-      const { createProjectConfig } = await import('@gaunt-sloth/review/config.js');
+      const { createProjectConfig } = await import('#src/commands/configSetup.js');
 
       await createProjectConfig(configType);
 
@@ -1678,7 +1678,7 @@ describe('config', async () => {
         (filename: string) => `/mock/write/${filename}`
       );
 
-      const { createProjectConfig } = await import('@gaunt-sloth/review/config.js');
+      const { createProjectConfig } = await import('#src/commands/configSetup.js');
 
       await createProjectConfig(configType);
 

@@ -4,9 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Define mock at top level
 const createProjectConfig = vi.fn();
 
+// Mock the configSetup module (createProjectConfig lives here now)
+vi.mock('#src/commands/configSetup.js', () => ({
+  createProjectConfig,
+}));
+
 // Mock the config module
 vi.mock('#src/config.js', () => ({
-  createProjectConfig,
   availableDefaultConfigs: ['vertexai', 'anthropic', 'groq', 'openrouter'],
   GSLOTH_BACKSTORY: '.gsloth.backstory.md',
   USER_PROJECT_REVIEW_PREAMBLE: '.gsloth.guidelines.md',
