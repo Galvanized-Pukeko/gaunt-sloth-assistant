@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "clean": "tsc -b -clean",
-    "build": "npm run build -w @gaunt-sloth/core && npm run build -w @gaunt-sloth/review && npm run build -w @gaunt-sloth/api && tsc",
+    "build": "npm run build -w @gaunt-sloth/core && npm run build -w @gaunt-sloth/tools && npm run build -w @gaunt-sloth/review && npm run build -w @gaunt-sloth/api && tsc",
     "unit": "vitest run",
     "test": "npm run build && npx tsc -p spec/tsconfig.json --noEmit && vitest run",
     "it": "npm run build && node it.js",
@@ -51,6 +51,7 @@
     "@gaunt-sloth/api": "*",
     "@gaunt-sloth/core": "*",
     "@gaunt-sloth/review": "*",
+    "@gaunt-sloth/tools": "*",
     "@langchain/anthropic": "^1.3.23",
     "@langchain/core": "^1.1.32",
     "@langchain/deepseek": "^1.0.17",

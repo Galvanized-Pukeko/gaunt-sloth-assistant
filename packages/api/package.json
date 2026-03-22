@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@gaunt-sloth/core": "*",
-    "@gaunt-sloth/review": "*",
+    "@gaunt-sloth/tools": "*",
     "@ag-ui/core": "^0.0.47",
     "@ag-ui/encoder": "^0.0.47",
     "express": "^5.2.1"
