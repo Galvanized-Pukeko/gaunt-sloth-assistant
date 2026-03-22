@@ -5,7 +5,6 @@ import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import os from 'os';
 import { createTwoFilesPatch } from 'diff';
-import { minimatch } from 'minimatch';
 import { displayInfo } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import { shouldIgnoreFile } from '#src/utils/aiignoreUtils.js';
 import { getCurrentWorkDir } from '@gaunt-sloth/core/utils/systemUtils.js';
@@ -316,7 +315,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
           const relativePath = path.relative(rootPath, fullPath);
           const shouldExclude = excludePatterns.some((pattern) => {
             const globPattern = pattern.includes('*') ? pattern : `**/${pattern}/**`;
-            return minimatch(relativePath, globPattern, { dot: true });
+            return path.matchesGlob(relativePath, globPattern);
           });
 
           if (shouldExclude) {

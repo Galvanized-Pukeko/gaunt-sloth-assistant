@@ -10,14 +10,7 @@
  */
 
 import type { GthConfig } from '@gaunt-sloth/core/config.js';
-import type {
-  GthCommand,
-  ToolsResolver,
-  ToolsCleanup,
-  MiddlewareResolver,
-  MiddlewareCleanup,
-  AgentResolvers,
-} from '@gaunt-sloth/core/core/types.js';
+import type { GthCommand, AgentResolvers } from '@gaunt-sloth/core/core/types.js';
 import type { StructuredToolInterface } from '@langchain/core/tools';
 import { debugLog } from '@gaunt-sloth/core/utils/debugUtils.js';
 import { displayInfo } from '@gaunt-sloth/core/utils/consoleUtils.js';
@@ -27,97 +20,106 @@ import { createAuthProviderAndAuthenticate } from '#src/mcp/OAuthClientProviderI
 import { MultiServerMCPClient, type StreamableHTTPConnection } from '@langchain/mcp-adapters';
 import type { StatusLevel, StatusUpdateCallback } from '@gaunt-sloth/core/core/types.js';
 
-// Module-level MCP client instance for cleanup
-let mcpClientInstance: MultiServerMCPClient | null = null;
-
-/**
- * Resolve all tools: built-in (from @gaunt-sloth/tools), MCP, and A2A.
- */
-export const resolveTools: ToolsResolver = async (
-  config: GthConfig,
-  command?: GthCommand
-): Promise<StructuredToolInterface[]> => {
-  const tools: StructuredToolInterface[] = [];
-
-  // 1. Get built-in tools from @gaunt-sloth/tools (filesystem, devTools, customTools, etc.)
-  try {
-    const { getDefaultTools } = await import('@gaunt-sloth/tools/builtInToolsConfig.js');
-    const defaultTools = await getDefaultTools(config, command);
-    debugLog(`Default tools loaded: ${defaultTools.length}`);
-    tools.push(...defaultTools);
-  } catch (error) {
-    debugLog(`@gaunt-sloth/tools not available: ${error}`);
-  }
-
-  // 2. Get MCP tools
-  try {
-    mcpClientInstance = await getMcpClient(config);
-    if (mcpClientInstance) {
-      const rawMcpTools = await mcpClientInstance.getTools();
-      // Use a simple status callback for prepareMcpTools
-      const statusCallback: StatusUpdateCallback = (level: StatusLevel, message: string) => {
-        displayInfo(message);
-      };
-      const mcpTools = prepareMcpTools(statusCallback, config, rawMcpTools) ?? [];
-      debugLog(`MCP tools loaded: ${mcpTools.length}`);
-      tools.push(...(mcpTools as StructuredToolInterface[]));
-    }
-  } catch (error) {
-    debugLog(`MCP tools error: ${error}`);
-  }
-
-  // 3. Get A2A tools
-  const a2aTools = getA2ATools(config);
-  debugLog(`A2A tools loaded: ${a2aTools.length}`);
-  tools.push(...a2aTools);
-
-  return tools;
-};
-
-/**
- * Cleanup tools (close MCP client).
- */
-export const cleanupTools: ToolsCleanup = async (): Promise<void> => {
-  if (mcpClientInstance) {
-    try {
-      await mcpClientInstance.close();
-    } catch {
-      // Ignore cleanup errors
-    }
-    mcpClientInstance = null;
-  }
-};
-
-/**
- * Resolve middleware by delegating to @gaunt-sloth/tools registry.
- */
-export const resolveMiddleware: MiddlewareResolver = async (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  middleware: any[] | undefined,
-  config: GthConfig
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any[]> => {
-  try {
-    const { resolveMiddleware: resolve } =
-      await import('@gaunt-sloth/tools/middleware/registry.js');
-    return await resolve(middleware, config);
-  } catch (error) {
-    debugLog(`Middleware resolution error: ${error}`);
-    return [];
-  }
-};
-
-/**
- * Cleanup middleware (currently a no-op).
- */
-export const cleanupMiddleware: MiddlewareCleanup = async (): Promise<void> => {
-  // No cleanup needed for middleware currently
-};
-
 /**
  * Create a full set of resolvers for the GthLangChainAgent.
+ *
+ * Each call returns a fresh set of resolvers with their own MCP client
+ * instance, avoiding shared module-level state and race conditions.
  */
 export function createResolvers(): AgentResolvers {
+  let mcpClientInstance: MultiServerMCPClient | null = null;
+
+  const resolveTools = async (
+    config: GthConfig,
+    command?: GthCommand
+  ): Promise<StructuredToolInterface[]> => {
+    const tools: StructuredToolInterface[] = [];
+
+    // 1. Get built-in tools from @gaunt-sloth/tools (filesystem, devTools, customTools, etc.)
+    try {
+      const { getDefaultTools } = await import('@gaunt-sloth/tools/builtInToolsConfig.js');
+      const defaultTools = await getDefaultTools(config, command);
+      debugLog(`Default tools loaded: ${defaultTools.length}`);
+      tools.push(...defaultTools);
+    } catch (error) {
+      debugLog(`@gaunt-sloth/tools not available: ${error}`);
+    }
+
+    // 2. Get MCP tools
+    try {
+      mcpClientInstance = await getMcpClient(config);
+      if (mcpClientInstance) {
+        const rawMcpTools = await mcpClientInstance.getTools();
+        // Use a simple status callback for prepareMcpTools
+        const statusCallback: StatusUpdateCallback = (level: StatusLevel, message: string) => {
+          displayInfo(message);
+        };
+        const mcpTools = prepareMcpTools(statusCallback, config, rawMcpTools) ?? [];
+        debugLog(`MCP tools loaded: ${mcpTools.length}`);
+        tools.push(...(mcpTools as StructuredToolInterface[]));
+      }
+    } catch (error) {
+      debugLog(`MCP tools error: ${error}`);
+    }
+
+    // 3. Get A2A tools
+    const a2aTools = getA2ATools(config);
+    debugLog(`A2A tools loaded: ${a2aTools.length}`);
+    tools.push(...a2aTools);
+
+    // 4. Add API-specific built-in tools if configured
+    const apiBuiltInTools: Record<string, string> = {
+      show_a2ui_surface: '#src/tools/showA2UISurfaceTool.js',
+    };
+
+    if (config.builtInTools) {
+      for (const toolName of config.builtInTools) {
+        if (toolName in apiBuiltInTools) {
+          try {
+            const toolModule = await import(apiBuiltInTools[toolName]);
+            tools.push(toolModule.get(config));
+            debugLog(`${toolName} tool loaded`);
+          } catch (error) {
+            debugLog(`Failed to load ${toolName} tool: ${error}`);
+          }
+        }
+      }
+    }
+
+    return tools;
+  };
+
+  const cleanupTools = async (): Promise<void> => {
+    if (mcpClientInstance) {
+      try {
+        await mcpClientInstance.close();
+      } catch {
+        // Ignore cleanup errors
+      }
+      mcpClientInstance = null;
+    }
+  };
+
+  const resolveMiddleware = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    middleware: any[] | undefined,
+    config: GthConfig
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Promise<any[]> => {
+    try {
+      const { resolveMiddleware: resolve } =
+        await import('@gaunt-sloth/tools/middleware/registry.js');
+      return await resolve(middleware, config);
+    } catch (error) {
+      debugLog(`Middleware resolution error: ${error}`);
+      return [];
+    }
+  };
+
+  const cleanupMiddleware = async (): Promise<void> => {
+    // No cleanup needed for middleware currently
+  };
+
   return {
     resolveTools,
     cleanupTools,

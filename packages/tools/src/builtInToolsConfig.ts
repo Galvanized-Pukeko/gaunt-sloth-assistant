@@ -22,18 +22,9 @@ export const AVAILABLE_BUILT_IN_TOOLS = {
    */
   gth_status_update: '#src/tools/gthStatusUpdateTool.js',
   /**
-   * Tool allowing to log work against a specific Jira issue.
-   * Needs JIRA_CLOUD_ID, JIRA_USERNAME and JIRA_API_PAT_TOKEN environment variables
-   */
-  gth_jira_log_work: '#src/tools/gthJiraLogWorkTool.js',
-  /**
    * Web fetch tool.
    */
   gth_web_fetch: '#src/tools/gthWebFetchTool.js',
-  /**
-   * A2UI Surface Tool. Allows the LLM to return A2UI JSONL payloads streamed as TOOL_CALL_ARGS events.
-   */
-  show_a2ui_surface: '#src/tools/showA2UISurfaceTool.js',
 } as const;
 
 /**
