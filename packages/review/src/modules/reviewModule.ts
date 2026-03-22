@@ -21,13 +21,15 @@ import {
 } from '#src/middleware/reviewRateMiddleware.js';
 import { deleteArtifact, getArtifact } from '#src/state/artifactStore.js';
 import { setExitCode } from '#src/utils/systemUtils.js';
+import type { AgentResolvers } from '#src/core/types.js';
 
 export async function review(
   source: string,
   preamble: string,
   diff: string,
   config: GthConfig,
-  command: 'pr' | 'review' = 'review'
+  command: 'pr' | 'review' = 'review',
+  resolvers?: AgentResolvers
 ): Promise<void> {
   const progressIndicator = config.streamOutput ? undefined : new ProgressIndicator('Reviewing.');
   const messages = [new SystemMessage(preamble), new HumanMessage(diff)];

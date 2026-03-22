@@ -13,6 +13,7 @@ import {
 import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import type { BaseMessage } from '@langchain/core/messages';
+import { createResolvers } from '#src/resolvers.js';
 
 const initializedThreads = new Set<string>();
 
@@ -82,7 +83,7 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
   // Note this would need a refactoring if it is to be used for a public web server,
   // For connecting local WEB to local CLI agent, this is absolutely OK, since one thread is OK.
   const checkpointSaver = new MemorySaver();
-  const agent = new GthLangChainAgent(defaultStatusCallback);
+  const agent = new GthLangChainAgent(defaultStatusCallback, createResolvers());
   await agent.init('api', config, checkpointSaver);
 
   displayInfo(`AG-UI agent initialized`);
