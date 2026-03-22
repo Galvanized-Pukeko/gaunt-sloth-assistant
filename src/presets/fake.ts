@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/fake.js';
+export * from '@gaunt-sloth/core/providers/fake.js';

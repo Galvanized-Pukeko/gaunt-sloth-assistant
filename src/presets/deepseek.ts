@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/deepseek.js';
+export * from '@gaunt-sloth/core/providers/deepseek.js';

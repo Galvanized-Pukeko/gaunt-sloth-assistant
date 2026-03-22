@@ -98,9 +98,8 @@ export const resolveMiddleware: MiddlewareResolver = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any[]> => {
   try {
-    const { resolveMiddleware: resolve } = await import(
-      '@gaunt-sloth/tools/middleware/registry.js'
-    );
+    const { resolveMiddleware: resolve } =
+      await import('@gaunt-sloth/tools/middleware/registry.js');
     return await resolve(middleware, config);
   } catch (error) {
     debugLog(`Middleware resolution error: ${error}`);

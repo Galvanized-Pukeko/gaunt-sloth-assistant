@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/google-genai.js';
+export * from '@gaunt-sloth/core/providers/google-genai.js';

@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/openai.js';
+export * from '@gaunt-sloth/core/providers/openai.js';

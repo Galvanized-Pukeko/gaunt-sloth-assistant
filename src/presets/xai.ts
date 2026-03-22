@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/xai.js';
+export * from '@gaunt-sloth/core/providers/xai.js';

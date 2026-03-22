@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/vertexai.js';
+export * from '@gaunt-sloth/core/providers/vertexai.js';

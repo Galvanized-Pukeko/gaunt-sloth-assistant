@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/anthropic.js';
+export * from '@gaunt-sloth/core/providers/anthropic.js';

@@ -44,8 +44,11 @@ export type ToolsResolver = (
   command?: GthCommand
 ) => Promise<StructuredToolInterface[]>;
 export type ToolsCleanup = () => Promise<void>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type MiddlewareResolver = (middleware: any[] | undefined, config: GthConfig) => Promise<any[]>;
+
+export type MiddlewareResolver = (
+  middleware: any[] | undefined,
+  config: GthConfig
+) => Promise<any[]>;
 export type MiddlewareCleanup = () => Promise<void>;
 
 export interface AgentResolvers {

@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/openrouter.js';
+export * from '@gaunt-sloth/core/providers/openrouter.js';

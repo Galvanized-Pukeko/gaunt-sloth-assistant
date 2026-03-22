@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/presets/groq.js';
+export * from '@gaunt-sloth/core/providers/groq.js';
