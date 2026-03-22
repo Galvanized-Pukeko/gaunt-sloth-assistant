@@ -31,6 +31,8 @@ describe('GthAgentRunner', () => {
     GthConfig,
     | 'projectGuidelines'
     | 'streamOutput'
+    | 'contentSource'
+    | 'requirementSource'
     | 'contentProvider'
     | 'requirementsProvider'
     | 'projectReviewInstructions'
@@ -44,6 +46,8 @@ describe('GthAgentRunner', () => {
   > = {
     projectGuidelines: 'test guidelines',
     streamOutput: false,
+    contentSource: 'file',
+    requirementSource: 'file',
     contentProvider: 'file',
     requirementsProvider: 'file',
     projectReviewInstructions: '.gsloth.review.md',

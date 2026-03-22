@@ -8,7 +8,7 @@ import type {
 import express from 'express';
 import * as crypto from 'node:crypto';
 import { platform } from 'node:os';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { AddressInfo } from 'net';
 import { displayInfo } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import { StreamableHTTPConnection } from '@langchain/mcp-adapters';
@@ -174,14 +174,14 @@ export class OAuthClientProviderImpl implements OAuthClientProvider {
       // Handle different platforms
       const platformName = platform();
       if (platformName === 'win32') {
-        // Windows
-        execSync(`start "" "${url}"`);
+        // Windows - 'start' is a cmd.exe built-in, so we must invoke it via cmd
+        spawnSync('cmd', ['/c', 'start', '', url], { stdio: 'ignore' });
       } else if (platformName === 'darwin') {
         // macOS
-        execSync(`open "${url}"`);
+        spawnSync('open', [url], { stdio: 'ignore' });
       } else {
         // Linux and others
-        execSync(`xdg-open "${url}"`);
+        spawnSync('xdg-open', [url], { stdio: 'ignore' });
       }
     } catch (error) {
       displayInfo(`Failed to open browser: ${error}`);

@@ -63,6 +63,8 @@ describe('Custom Tools Configuration', () => {
 
   const createMockConfig = (overrides: Partial<GthConfig> = {}): GthConfig => ({
     llm: {} as BaseChatModel,
+    contentSource: 'github',
+    requirementSource: 'github',
     contentProvider: 'github',
     requirementsProvider: 'github',
     projectGuidelines: '.gsloth.guidelines.md',

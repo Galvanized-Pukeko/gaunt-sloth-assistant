@@ -137,6 +137,8 @@ describe('GthLangChainAgent', () => {
         bindTools: vi.fn(),
       } as any,
       streamOutput: false,
+      contentSource: 'file',
+      requirementSource: 'file',
       contentProvider: 'file',
       requirementsProvider: 'file',
       projectReviewInstructions: '.gsloth.review.md',

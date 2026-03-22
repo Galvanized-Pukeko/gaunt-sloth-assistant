@@ -103,6 +103,8 @@ vi.mock('#src/utils/llmUtils.js', () => llmUtilsMock);
 // Create a complete mock config for prop drilling
 const BASE_GTH_CONFIG: Pick<
   GthConfig,
+  | 'contentSource'
+  | 'requirementSource'
   | 'contentProvider'
   | 'requirementsProvider'
   | 'projectGuidelines'
@@ -116,6 +118,8 @@ const BASE_GTH_CONFIG: Pick<
   | 'canInterruptInferenceWithEsc'
   | 'includeCurrentDateAfterGuidelines'
 > = {
+  contentSource: 'file',
+  requirementSource: 'file',
   contentProvider: 'file',
   requirementsProvider: 'file',
   projectGuidelines: '.gsloth.guidelines.md',
@@ -123,6 +127,8 @@ const BASE_GTH_CONFIG: Pick<
   streamOutput: false,
   commands: {
     pr: {
+      contentSource: 'github',
+      requirementSource: 'github',
       contentProvider: 'github',
       requirementsProvider: 'github',
     },
