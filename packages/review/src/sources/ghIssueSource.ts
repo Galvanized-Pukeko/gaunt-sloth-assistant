@@ -5,7 +5,7 @@ import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
 /**
  * Gets GitHub issue using GitHub CLI
- * @param _ config (unused in this provider)
+ * @param _ config (unused in this source)
  * @param issueId GitHub issue number
  * @returns GitHub issue content or null if not found
  */

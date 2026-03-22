@@ -46,7 +46,21 @@ export interface GthConfig {
    *
    * {@link DEFAULT_CONFIG#contentProvider}
    */
+  /**
+   * Content source type. Preferred name for contentProvider.
+   */
+  contentSource: string;
+  /**
+   * Requirement source type. Preferred name for requirementsProvider.
+   */
+  requirementSource: string;
+  /**
+   * @deprecated Use contentSource instead
+   */
   contentProvider: string;
+  /**
+   * @deprecated Use requirementSource instead
+   */
   requirementsProvider: string;
   /**
    * Path to project-specific guidelines.
@@ -166,7 +180,11 @@ export interface GthConfig {
    */
   consoleLevel?: StatusLevel;
   customTools?: CustomToolsConfig;
+  requirementSourceConfig?: Record<string, unknown>;
+  contentSourceConfig?: Record<string, unknown>;
+  /** @deprecated Use requirementSourceConfig instead */
   requirementsProviderConfig?: Record<string, unknown>;
+  /** @deprecated Use contentSourceConfig instead */
   contentProviderConfig?: Record<string, unknown>;
   /**
    * MCP (Model Context Protocol) server connections.
@@ -189,7 +207,11 @@ export interface GthConfig {
   };
   commands?: {
     pr?: {
+      contentSource?: string;
+      requirementSource?: string;
+      /** @deprecated Use contentSource instead */
       contentProvider?: string;
+      /** @deprecated Use requirementSource instead */
       requirementsProvider?: string;
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
@@ -199,7 +221,11 @@ export interface GthConfig {
       binaryFormats?: false | BinaryFormatConfig[];
     };
     review?: {
+      contentSource?: string;
+      requirementSource?: string;
+      /** @deprecated Use requirementSource instead */
       requirementsProvider?: string;
+      /** @deprecated Use contentSource instead */
       contentProvider?: string;
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
@@ -470,6 +496,8 @@ export interface CommandLineConfigOverrides {
  * Default config
  */
 export const DEFAULT_CONFIG = {
+  contentSource: 'file',
+  requirementSource: 'file',
   contentProvider: 'file',
   requirementsProvider: 'file',
   /**
@@ -483,7 +511,7 @@ export const DEFAULT_CONFIG = {
    */
   includeCurrentDateAfterGuidelines: false,
   projectReviewInstructions: PROJECT_REVIEW_INSTRUCTIONS,
-  filesystem: 'read',
+  filesystem: 'none',
   debugLog: false,
   consoleLevel: StatusLevel.INFO, // Default to INFO level, not debug
   /**
@@ -497,6 +525,8 @@ export const DEFAULT_CONFIG = {
    */
   commands: {
     pr: {
+      contentSource: 'github',
+      requirementSource: 'github',
       contentProvider: 'github',
       requirementsProvider: 'github',
       rating: {
@@ -761,6 +791,42 @@ async function mergeConfig(
   commandLineConfigOverrides: CommandLineConfigOverrides
 ): Promise<GthConfig> {
   const config = partialConfig as GthConfig;
+
+  // Migrate deprecated property names
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = config as any;
+  if (raw.contentProvider && !raw.contentSource) {
+    displayWarning('Config property "contentProvider" is deprecated. Use "contentSource" instead.');
+    config.contentSource = raw.contentProvider;
+  }
+  if (raw.requirementsProvider && !raw.requirementSource) {
+    displayWarning(
+      'Config property "requirementsProvider" is deprecated. Use "requirementSource" instead.'
+    );
+    config.requirementSource = raw.requirementsProvider;
+  }
+  // Keep both old and new in sync
+  if (config.contentSource) config.contentProvider = config.contentSource;
+  if (config.requirementSource) config.requirementsProvider = config.requirementSource;
+
+  // Migrate command-level deprecated properties
+  if (config.commands) {
+    for (const cmdName of ['pr', 'review'] as const) {
+      const cmd = config.commands[cmdName];
+      if (cmd) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cmdRaw = cmd as any;
+        if (cmdRaw.contentProvider && !cmdRaw.contentSource) {
+          cmd.contentSource = cmdRaw.contentProvider;
+        }
+        if (cmdRaw.requirementsProvider && !cmdRaw.requirementSource) {
+          cmd.requirementSource = cmdRaw.requirementsProvider;
+        }
+        if (cmd.contentSource) cmd.contentProvider = cmd.contentSource;
+        if (cmd.requirementSource) cmd.requirementsProvider = cmd.requirementSource;
+      }
+    }
+  }
 
   // Deep merge command configs while preserving defaults
   // Type complexity from DEFAULT_CONFIG.commands 'as const' requires any cast for deep merge result

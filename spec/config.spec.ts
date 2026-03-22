@@ -114,6 +114,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         llm: { type: 'vertexai' },
+        contentSource: 'file',
+        requirementSource: 'file',
         contentProvider: 'file',
         requirementsProvider: 'file',
         projectGuidelines: '.gsloth.guidelines.md',
@@ -122,7 +124,7 @@ describe('config', async () => {
         writeOutputToFile: true,
         writeBinaryOutputsToFile: true,
         useColour: true,
-        filesystem: 'read',
+        filesystem: 'none',
         aiignore: {
           enabled: true,
           patterns: undefined,
@@ -132,6 +134,8 @@ describe('config', async () => {
         streamSessionInferenceLog: true,
         commands: {
           pr: {
+            contentSource: 'github',
+            requirementSource: 'github',
             contentProvider: 'github',
             requirementsProvider: 'github',
             rating: {
@@ -207,6 +211,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         llm: { type: 'anthropic' },
+        contentSource: 'file',
+        requirementSource: 'file',
         contentProvider: 'file',
         requirementsProvider: 'file',
         projectGuidelines: '.gsloth.guidelines.md',
@@ -215,7 +221,7 @@ describe('config', async () => {
         writeOutputToFile: true,
         writeBinaryOutputsToFile: true,
         useColour: true,
-        filesystem: 'read',
+        filesystem: 'none',
         aiignore: {
           enabled: true,
           patterns: undefined,
@@ -225,6 +231,8 @@ describe('config', async () => {
         streamSessionInferenceLog: true,
         commands: {
           pr: {
+            contentSource: 'github',
+            requirementSource: 'github',
             contentProvider: 'github',
             requirementsProvider: 'github',
             rating: {
@@ -333,6 +341,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         llm: { type: 'groq' },
+        contentSource: 'file',
+        requirementSource: 'file',
         contentProvider: 'file',
         requirementsProvider: 'file',
         projectGuidelines: '.gsloth.guidelines.md',
@@ -341,7 +351,7 @@ describe('config', async () => {
         writeOutputToFile: true,
         writeBinaryOutputsToFile: true,
         useColour: true,
-        filesystem: 'read',
+        filesystem: 'none',
         aiignore: {
           enabled: true,
           patterns: undefined,
@@ -351,6 +361,8 @@ describe('config', async () => {
         streamSessionInferenceLog: true,
         commands: {
           pr: {
+            contentSource: 'github',
+            requirementSource: 'github',
             contentProvider: 'github',
             requirementsProvider: 'github',
             rating: {
@@ -872,6 +884,8 @@ describe('config', async () => {
         consoleLevel: StatusLevel.INFO,
         llm: mockLlm,
         modelDisplayName: 'test-model',
+        contentSource: 'file',
+        requirementSource: 'file',
         contentProvider: 'file',
         requirementsProvider: 'file',
         projectGuidelines: '.gsloth.guidelines.md',
@@ -882,7 +896,7 @@ describe('config', async () => {
         writeOutputToFile: true,
         writeBinaryOutputsToFile: true,
         useColour: true,
-        filesystem: 'read',
+        filesystem: 'none',
         aiignore: {
           enabled: true,
           patterns: undefined,
@@ -890,6 +904,8 @@ describe('config', async () => {
         debugLog: false,
         commands: {
           pr: {
+            contentSource: 'github',
+            requirementSource: 'github',
             contentProvider: 'github',
             requirementsProvider: 'github',
             rating: {
@@ -1201,6 +1217,8 @@ describe('config', async () => {
         consoleLevel: StatusLevel.INFO,
         llm: { type: 'vertexai' },
         modelDisplayName: undefined,
+        contentSource: 'file',
+        requirementSource: 'file',
         contentProvider: 'file',
         requirementsProvider: 'file',
         projectGuidelines: '.gsloth.guidelines.md',
@@ -1210,7 +1228,7 @@ describe('config', async () => {
         writeOutputToFile: true,
         writeBinaryOutputsToFile: true,
         useColour: true,
-        filesystem: 'read',
+        filesystem: 'none',
         aiignore: {
           enabled: true,
           patterns: undefined,
@@ -1219,6 +1237,8 @@ describe('config', async () => {
         canInterruptInferenceWithEsc: true,
         commands: {
           pr: {
+            contentSource: 'github',
+            requirementSource: 'github',
             contentProvider: 'github',
             requirementsProvider: 'github',
             rating: {
@@ -1278,6 +1298,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         llm: { type: 'anthropic' },
+        contentSource: 'file',
+        requirementSource: 'file',
         contentProvider: 'file',
         requirementsProvider: 'file',
         projectGuidelines: '.gsloth.guidelines.md',
@@ -1287,7 +1309,7 @@ describe('config', async () => {
         writeOutputToFile: true,
         writeBinaryOutputsToFile: true,
         useColour: true,
-        filesystem: 'read',
+        filesystem: 'none',
         aiignore: {
           enabled: true,
           patterns: undefined,
@@ -1296,6 +1318,8 @@ describe('config', async () => {
         canInterruptInferenceWithEsc: true,
         commands: {
           pr: {
+            contentSource: 'github',
+            requirementSource: 'github',
             contentProvider: 'github',
             requirementsProvider: 'github',
             rating: {
@@ -1355,6 +1379,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         llm: { type: 'groq' },
+        contentSource: 'file',
+        requirementSource: 'file',
         contentProvider: 'file',
         requirementsProvider: 'file',
         projectGuidelines: '.gsloth.guidelines.md',
@@ -1364,7 +1390,7 @@ describe('config', async () => {
         writeOutputToFile: true,
         writeBinaryOutputsToFile: true,
         useColour: true,
-        filesystem: 'read',
+        filesystem: 'none',
         aiignore: {
           enabled: true,
           patterns: undefined,
@@ -1373,6 +1399,8 @@ describe('config', async () => {
         canInterruptInferenceWithEsc: true,
         commands: {
           pr: {
+            contentSource: 'github',
+            requirementSource: 'github',
             contentProvider: 'github',
             requirementsProvider: 'github',
             rating: {

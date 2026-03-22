@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/providers/ghPrDiffProvider.js';
+export * from '@gaunt-sloth/review/sources/ghPrDiffSource.js';

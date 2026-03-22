@@ -4,32 +4,32 @@ import { displayError } from '#src/utils/consoleUtils.js';
 import { wrapContent } from '#src/utils/llmUtils.js';
 
 /**
- * Requirements providers. Expected to be in `.providers/` dir.
- * Aliases are mapped to actual providers in this file
+ * Requirements sources. Expected to be in `.sources/` dir.
+ * Aliases are mapped to actual sources in this file
  */
 export const REQUIREMENTS_PROVIDERS = {
-  'jira-legacy': 'jiraIssueLegacyProvider.js',
-  jira: 'jiraIssueProvider.js',
-  github: 'ghIssueProvider.js',
-  text: 'text.js',
-  file: 'file.js',
+  'jira-legacy': 'jiraIssueLegacySource.js',
+  jira: 'jiraIssueSource.js',
+  github: 'ghIssueSource.js',
+  text: 'textSource.js',
+  file: 'fileSource.js',
 } as const;
 
 export type RequirementsProviderType = keyof typeof REQUIREMENTS_PROVIDERS;
 
 /**
- * Content providers. Expected to be in `.providers/` dir.
- * Aliases are mapped to actual providers in this file
+ * Content sources. Expected to be in `.sources/` dir.
+ * Aliases are mapped to actual sources in this file
  */
 export const CONTENT_PROVIDERS = {
-  github: 'ghPrDiffProvider.js',
-  text: 'text.js',
-  file: 'file.js',
+  github: 'ghPrDiffSource.js',
+  text: 'textSource.js',
+  file: 'fileSource.js',
 } as const;
 
 export type ContentProviderType = keyof typeof CONTENT_PROVIDERS;
 
-export async function getRequirementsFromProvider(
+export async function getRequirementsFromSource(
   requirementsProvider: RequirementsProviderType | undefined,
   requirementsId: string | undefined,
   config: GthConfig
@@ -43,7 +43,7 @@ export async function getRequirementsFromProvider(
   return wrapContent(requirements, requirementsProvider, 'requirements');
 }
 
-export async function getContentFromProvider(
+export async function getContentFromSource(
   contentProvider: ContentProviderType | undefined,
   contentId: string | undefined,
   config: GthConfig
@@ -61,6 +61,16 @@ export async function getContentFromProvider(
   );
 }
 
+/**
+ * @deprecated Use getRequirementsFromSource instead
+ */
+export const getRequirementsFromProvider = getRequirementsFromSource;
+
+/**
+ * @deprecated Use getContentFromSource instead
+ */
+export const getContentFromProvider = getContentFromSource;
+
 async function getFromProvider(
   provider: RequirementsProviderType | ContentProviderType | undefined,
   id: string | undefined,
@@ -71,7 +81,7 @@ async function getFromProvider(
   if (typeof provider === 'string') {
     // Use one of the predefined providers
     if (legitPredefinedProviders[provider as keyof typeof legitPredefinedProviders]) {
-      const providerPath = `#src/providers/${legitPredefinedProviders[provider as keyof typeof legitPredefinedProviders]}`;
+      const providerPath = `#src/sources/${legitPredefinedProviders[provider as keyof typeof legitPredefinedProviders]}`;
       const { get } = await import(providerPath);
       return await get(config, id);
     } else {

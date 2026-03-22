@@ -119,7 +119,7 @@ describe('prCommand', () => {
 
     // Mock the gh provider
     const ghProvider = vi.fn().mockResolvedValue('PR Diff Content');
-    vi.doMock('#src/providers/ghPrDiffProvider.js', () => ({
+    vi.doMock('#src/sources/ghPrDiffSource.js', () => ({
       get: ghProvider,
     }));
 
@@ -160,13 +160,13 @@ describe('prCommand', () => {
 
     // Mock the gh provider
     const ghProvider = vi.fn().mockResolvedValue('PR Diff Content');
-    vi.doMock('#src/providers/ghPrDiffProvider.js', () => ({
+    vi.doMock('#src/sources/ghPrDiffSource.js', () => ({
       get: ghProvider,
     }));
 
     // Mock the text provider for requirements
     const textProvider = vi.fn().mockResolvedValue('Requirements content');
-    vi.doMock('#src/providers/text.js', () => ({
+    vi.doMock('#src/sources/textSource.js', () => ({
       get: textProvider,
     }));
 
@@ -279,7 +279,7 @@ describe('prCommand', () => {
 
     // Mock the gh provider
     const ghProvider = vi.fn().mockResolvedValue('PR Diff Content');
-    vi.doMock('#src/providers/ghPrDiffProvider.js', () => ({
+    vi.doMock('#src/sources/ghPrDiffSource.js', () => ({
       get: ghProvider,
     }));
 
@@ -327,13 +327,13 @@ describe('prCommand', () => {
 
     // Mock the gh provider
     const ghProvider = vi.fn().mockResolvedValue('PR Diff Content');
-    vi.doMock('#src/providers/ghPrDiffProvider.js', () => ({
+    vi.doMock('#src/sources/ghPrDiffSource.js', () => ({
       get: ghProvider,
     }));
 
     // Mock the text provider for requirements
     const textProvider = vi.fn().mockResolvedValue('Requirements content');
-    vi.doMock('#src/providers/text.js', () => ({
+    vi.doMock('#src/sources/textSource.js', () => ({
       get: textProvider,
     }));
 

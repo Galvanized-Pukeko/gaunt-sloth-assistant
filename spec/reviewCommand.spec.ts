@@ -196,7 +196,7 @@ describe('reviewCommand', () => {
 
     // Mock the jira provider
     const jiraProvider = vi.fn().mockResolvedValue('JIRA Requirements');
-    vi.doMock('#src/providers/jiraIssueLegacyProvider.js', () => ({
+    vi.doMock('#src/sources/jiraIssueLegacySource.js', () => ({
       get: jiraProvider,
     }));
 
@@ -240,7 +240,7 @@ describe('reviewCommand', () => {
 
     // Mock the gh provider
     const ghProvider = vi.fn().mockResolvedValue('PR Diff Content');
-    vi.doMock('#src/providers/ghPrDiffProvider.js', () => ({
+    vi.doMock('#src/sources/ghPrDiffSource.js', () => ({
       get: ghProvider,
     }));
 
@@ -303,7 +303,7 @@ describe('reviewCommand', () => {
 
     // Mock the gh provider
     const ghProvider = vi.fn().mockResolvedValue('PR Diff Content');
-    vi.doMock('#src/providers/ghPrDiffProvider.js', () => ({
+    vi.doMock('#src/sources/ghPrDiffSource.js', () => ({
       get: ghProvider,
     }));
 

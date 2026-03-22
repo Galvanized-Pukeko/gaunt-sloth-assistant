@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/providers/jiraIssueLegacyProvider.js';
+export * from '@gaunt-sloth/review/sources/jiraIssueLegacySource.js';

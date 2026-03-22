@@ -1,6 +1,6 @@
 import { display, displayError, displayWarning } from '#src/utils/consoleUtils.js';
 import { env } from '#src/utils/systemUtils.js';
-import type { JiraLegacyConfig } from '#src/providers/types.js';
+import type { JiraLegacyConfig } from '#src/sources/types.js';
 
 interface JiraIssueResponse {
   fields: {

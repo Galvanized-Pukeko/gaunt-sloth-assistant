@@ -4,7 +4,7 @@ import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 
 /**
  * Gets PR diff using GitHub CLI
- * @param _ config (unused in this provider)
+ * @param _ config (unused in this source)
  * @param prId GitHub PR number
  * @returns GitHub PR diff content or null if not found
  */

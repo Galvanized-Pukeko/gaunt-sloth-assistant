@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/providers/text.js';
+export * from '@gaunt-sloth/review/sources/textSource.js';

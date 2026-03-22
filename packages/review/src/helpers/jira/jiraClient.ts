@@ -1,5 +1,5 @@
 import { env } from '#src/utils/systemUtils.js';
-import type { JiraConfig } from '#src/providers/types.js';
+import type { JiraConfig } from '#src/sources/types.js';
 
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 

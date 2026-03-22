@@ -7,7 +7,7 @@ import { readFileSyncWithMessages } from '#src/utils/fileUtils.js';
 
 /**
  * Reads the text file from current dir
- * @param _ config (unused in this provider)
+ * @param _ config (unused in this source)
  * @param fileName
  * @returns file contents
  */
