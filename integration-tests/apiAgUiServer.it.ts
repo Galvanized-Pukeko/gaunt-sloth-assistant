@@ -170,7 +170,7 @@ describe('AG-UI Server Integration Tests', () => {
       .join('');
 
     // Gaunt Sloth's backstory names it "Gaunt Sloth"
-    expect(text1.toLowerCase()).toMatch(/gaunt sloth/i);
+    expect(text1.toLowerCase()).toMatch(/gaunt\s+sloth/i);
 
     // Second request on same thread — the server should not re-inject system messages
     const { events: events2 } = await postRun({
