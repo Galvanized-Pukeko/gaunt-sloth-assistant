@@ -134,7 +134,7 @@ export default class GthCustomToolkit extends BaseToolkit {
       for (const [name, value] of Object.entries(parameters)) {
         const allow = parameterConfig?.[name]?.allow || [];
         const validatedValue = this.validateParameterValue(value, name, allow);
-        const placeholder = `\${${name}}`;
+        const placeholder = '${' + name + '}';
         command = command.replace(
           new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
           validatedValue
@@ -299,7 +299,7 @@ export default class GthCustomToolkit extends BaseToolkit {
 
     if (hasPlaceholders) {
       for (const [name, value] of Object.entries(parameters)) {
-        const placeholder = `\${${name}}`;
+        const placeholder = '${' + name + '}';
         command = command.replace(
           new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
           value
