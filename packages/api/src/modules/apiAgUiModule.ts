@@ -2,14 +2,14 @@ import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { EventEncoder } from '@ag-ui/encoder';
 import { EventType } from '@ag-ui/core';
-import { GthConfig } from '@gaunt-sloth/review/config.js';
-import { GthLangChainAgent } from '@gaunt-sloth/review/core/GthLangChainAgent.js';
+import { GthConfig } from '@gaunt-sloth/core/config.js';
+import { GthLangChainAgent } from '@gaunt-sloth/core/core/GthLangChainAgent.js';
 import { defaultStatusCallback, displayInfo } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import {
   getNewRunnableConfig,
   buildSystemMessages,
   readChatPrompt,
-} from '@gaunt-sloth/review/utils/llmUtils.js';
+} from '@gaunt-sloth/core/utils/llmUtils.js';
 import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import type { BaseMessage } from '@langchain/core/messages';

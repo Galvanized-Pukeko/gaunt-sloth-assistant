@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "clean": "tsc -b -clean",
-    "build": "npm run build -w @gaunt-sloth/core && npm run build -w @gaunt-sloth/tools && npm run build -w @gaunt-sloth/review && npm run build -w @gaunt-sloth/api && tsc",
+    "build": "npm run build -w @gaunt-sloth/core && npm run build -w @gaunt-sloth/tools && npm run build -w @gaunt-sloth/api && npm run build -w @gaunt-sloth/review && tsc",
     "unit": "vitest run",
     "test": "npm run build && npx tsc -p spec/tsconfig.json --noEmit && vitest run",
     "it": "npm run build && node it.js",

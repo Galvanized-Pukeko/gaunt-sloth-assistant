@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/tools/gthStatusUpdateTool.js';
+export * from '@gaunt-sloth/tools/tools/gthStatusUpdateTool.js';

@@ -18,6 +18,7 @@
     "#src/*.js": "./dist/*.js"
   },
   "dependencies": {
+    "@gaunt-sloth/api": "*",
     "@gaunt-sloth/core": "*"
   },
   "peerDependencies": {

@@ -20,8 +20,11 @@
   "dependencies": {
     "@gaunt-sloth/core": "*",
     "@gaunt-sloth/tools": "*",
+    "@a2a-js/sdk": "^0.3.12",
     "@ag-ui/core": "^0.0.47",
     "@ag-ui/encoder": "^0.0.47",
+    "@langchain/mcp-adapters": "^1.1.3",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "express": "^5.2.1"
   },
   "files": [

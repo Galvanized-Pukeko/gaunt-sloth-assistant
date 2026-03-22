@@ -1,1 +1,1 @@
-export * from '@gaunt-sloth/review/core/GthLangChainAgent.js';
+export * from '@gaunt-sloth/core/core/GthLangChainAgent.js';
