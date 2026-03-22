@@ -7,7 +7,6 @@ import {
   StatusLevel,
   StatusUpdateCallback,
 } from '#src/core/types.js';
-import { displayInfo } from '#src/utils/consoleUtils.js';
 import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';

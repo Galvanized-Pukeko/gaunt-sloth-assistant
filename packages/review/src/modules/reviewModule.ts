@@ -55,7 +55,7 @@ export async function review(
     config.middleware = [...middlewareWithoutReviewRate, { name: 'review-rate', ...rateConfig }];
   }
 
-  const runner = new GthAgentRunner(defaultStatusCallback);
+  const runner = new GthAgentRunner(defaultStatusCallback, resolvers);
   try {
     await runner.init(command, config, new MemorySaver());
     await runner.processMessages(messages);
