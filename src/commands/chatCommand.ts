@@ -1,7 +1,10 @@
 import { Command } from 'commander';
-import { createInteractiveSession, SessionConfig } from '#src/modules/interactiveSessionModule.js';
-import { CommandLineConfigOverrides } from '#src/config.js';
-import { readChatPrompt } from '#src/utils/llmUtils.js';
+import {
+  createInteractiveSession,
+  SessionConfig,
+} from '@gaunt-sloth/api/modules/interactiveSessionModule.js';
+import { CommandLineConfigOverrides } from '@gaunt-sloth/core/config.js';
+import { readChatPrompt } from '@gaunt-sloth/core/utils/llmUtils.js';
 
 export function chatCommand(
   program: Command,

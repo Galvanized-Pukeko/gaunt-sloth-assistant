@@ -3,14 +3,14 @@ import {
   PROJECT_GUIDELINES,
   PROJECT_REVIEW_INSTRUCTIONS,
   USER_PROJECT_CONFIG_JSON,
-} from '#src/constants.js';
-import { availableDefaultConfigs, type ConfigType } from '#src/config.js';
-import { displayError, displayInfo, displayWarning } from '#src/utils/consoleUtils.js';
+} from '@gaunt-sloth/core/constants.js';
+import { availableDefaultConfigs, type ConfigType } from '@gaunt-sloth/core/config.js';
+import { displayError, displayInfo, displayWarning } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import {
   getGslothConfigWritePath,
   writeFileIfNotExistsWithMessages,
-} from '#src/utils/fileUtils.js';
-import { exit, getCurrentWorkDir } from '#src/utils/systemUtils.js';
+} from '@gaunt-sloth/review/utils/fileUtils.js';
+import { exit, getCurrentWorkDir } from '@gaunt-sloth/core/utils/systemUtils.js';
 import { existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -29,7 +29,7 @@ export async function createProjectConfig(configType: string): Promise<void> {
   displayWarning(`Make sure you add as much detail as possible to your ${PROJECT_GUIDELINES}.\n`);
 
   displayInfo(`Creating project config for ${configType}`);
-  const vendorConfig = await import(`#src/presets/${configType}.js`);
+  const vendorConfig = await import(`@gaunt-sloth/core/providers/${configType}.js`);
   vendorConfig.init(getGslothConfigWritePath(USER_PROJECT_CONFIG_JSON));
 }
 

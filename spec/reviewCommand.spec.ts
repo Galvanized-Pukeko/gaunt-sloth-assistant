@@ -40,7 +40,7 @@ const fileUtilsMock = {
   fileSafeLocalDate: vi.fn(),
   generateStandardFileName: vi.fn(),
 };
-vi.mock('#src/utils/fileUtils.js', () => fileUtilsMock);
+vi.mock('@gaunt-sloth/review/utils/fileUtils.js', () => fileUtilsMock);
 
 // Set up static mocks
 const mockConfig = {

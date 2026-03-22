@@ -1,30 +1,28 @@
-import type { GthConfig } from '#src/config.js';
-import { displayError } from '#src/utils/consoleUtils.js';
+import type { GthConfig } from '@gaunt-sloth/core/config.js';
+import { displayError } from '@gaunt-sloth/core/utils/consoleUtils.js';
 
-import { wrapContent } from '#src/utils/llmUtils.js';
+import { wrapContent } from '@gaunt-sloth/core/utils/llmUtils.js';
 
 /**
- * Requirements providers. Expected to be in `.providers/` dir.
- * Aliases are mapped to actual providers in this file
+ * Requirements providers. Aliases are mapped to actual package paths.
  */
 export const REQUIREMENTS_PROVIDERS = {
-  'jira-legacy': 'jiraIssueLegacyProvider.js',
-  jira: 'jiraIssueProvider.js',
-  github: 'ghIssueProvider.js',
-  text: 'text.js',
-  file: 'file.js',
+  'jira-legacy': '@gaunt-sloth/review/sources/jiraIssueLegacySource.js',
+  jira: '@gaunt-sloth/review/sources/jiraIssueSource.js',
+  github: '@gaunt-sloth/review/sources/ghIssueSource.js',
+  text: '@gaunt-sloth/review/sources/textSource.js',
+  file: '@gaunt-sloth/review/sources/fileSource.js',
 } as const;
 
 export type RequirementsProviderType = keyof typeof REQUIREMENTS_PROVIDERS;
 
 /**
- * Content providers. Expected to be in `.providers/` dir.
- * Aliases are mapped to actual providers in this file
+ * Content providers. Aliases are mapped to actual package paths.
  */
 export const CONTENT_PROVIDERS = {
-  github: 'ghPrDiffProvider.js',
-  text: 'text.js',
-  file: 'file.js',
+  github: '@gaunt-sloth/review/sources/ghPrDiffSource.js',
+  text: '@gaunt-sloth/review/sources/textSource.js',
+  file: '@gaunt-sloth/review/sources/fileSource.js',
 } as const;
 
 export type ContentProviderType = keyof typeof CONTENT_PROVIDERS;
@@ -71,7 +69,8 @@ async function getFromProvider(
   if (typeof provider === 'string') {
     // Use one of the predefined providers
     if (legitPredefinedProviders[provider as keyof typeof legitPredefinedProviders]) {
-      const providerPath = `#src/providers/${legitPredefinedProviders[provider as keyof typeof legitPredefinedProviders]}`;
+      const providerPath =
+        legitPredefinedProviders[provider as keyof typeof legitPredefinedProviders];
       const { get } = await import(providerPath);
       return await get(config, id);
     } else {

@@ -1,8 +1,8 @@
-import type { ConfigType } from '#src/config.js';
-import { availableDefaultConfigs } from '#src/config.js';
+import type { ConfigType } from '@gaunt-sloth/core/config.js';
+import { availableDefaultConfigs } from '@gaunt-sloth/core/config.js';
 import { createProjectConfig } from '#src/commands/configSetup.js';
-import { displayInfo, displayWarning } from '#src/utils/consoleUtils.js';
-import { createInterface, env, stdin, stdout } from '#src/utils/systemUtils.js';
+import { displayInfo, displayWarning } from '@gaunt-sloth/core/utils/consoleUtils.js';
+import { createInterface, env, stdin, stdout } from '@gaunt-sloth/core/utils/systemUtils.js';
 import { Argument, Command } from 'commander';
 
 /**

@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { CommandLineConfigOverrides, initConfig } from '#src/config.js';
+import { CommandLineConfigOverrides, initConfig } from '@gaunt-sloth/core/config.js';
 import {
   getCommandProviderInput,
   getCommandSystemPrompt,
@@ -7,8 +7,8 @@ import {
   type ProviderCommandType,
   type ProviderInputType,
 } from '#src/commands/commandIntrospection.js';
-import { display, displayError } from '#src/utils/consoleUtils.js';
-import { setExitCode } from '#src/utils/systemUtils.js';
+import { display, displayError } from '@gaunt-sloth/core/utils/consoleUtils.js';
+import { setExitCode } from '@gaunt-sloth/core/utils/systemUtils.js';
 
 const PROMPT_COMMANDS = ['ask', 'review', 'pr', 'chat', 'code'] as const;
 const PROVIDER_COMMANDS = ['review', 'pr'] as const;

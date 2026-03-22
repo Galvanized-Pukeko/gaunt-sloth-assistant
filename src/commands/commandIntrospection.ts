@@ -1,4 +1,4 @@
-import type { GthConfig } from '#src/config.js';
+import type { GthConfig } from '@gaunt-sloth/core/config.js';
 import {
   getContentFromProvider,
   getRequirementsFromProvider,
@@ -13,7 +13,7 @@ import {
   readGuidelines,
   readReviewInstructions,
   readSystemPrompt,
-} from '#src/utils/llmUtils.js';
+} from '@gaunt-sloth/core/utils/llmUtils.js';
 
 export type PromptCommandType = 'ask' | 'review' | 'pr' | 'chat' | 'code';
 export type ProviderCommandType = 'review' | 'pr';

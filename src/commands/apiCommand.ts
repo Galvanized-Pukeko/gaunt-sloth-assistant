@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import { CommandLineConfigOverrides, initConfig } from '#src/config.js';
-import { displayError } from '#src/utils/consoleUtils.js';
-import { setExitCode } from '#src/utils/systemUtils.js';
+import { CommandLineConfigOverrides, initConfig } from '@gaunt-sloth/core/config.js';
+import { displayError } from '@gaunt-sloth/core/utils/consoleUtils.js';
+import { setExitCode } from '@gaunt-sloth/core/utils/systemUtils.js';
 
 export function apiCommand(
   program: Command,
@@ -20,7 +20,7 @@ export function apiCommand(
           ? parseInt(options.port, 10)
           : (config.commands?.api?.port ?? 3000);
 
-        const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+        const { startAgUiServer } = await import('@gaunt-sloth/api/modules/apiAgUiModule.js');
         await startAgUiServer(config, port);
       } catch (error) {
         displayError(error instanceof Error ? error.message : String(error));

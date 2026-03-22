@@ -1,5 +1,5 @@
 import { Command, Option } from 'commander';
-import { getStringFromStdin } from '#src/utils/systemUtils.js';
+import { getStringFromStdin } from '@gaunt-sloth/core/utils/systemUtils.js';
 import {
   getCommandProviderInput,
   getEffectiveContentProvider,
@@ -12,10 +12,10 @@ import {
   type RequirementsProviderType,
   type ContentProviderType,
 } from '#src/commands/commandUtils.js';
-import { CommandLineConfigOverrides } from '#src/config.js';
-import { wrapContent } from '#src/utils/llmUtils.js';
+import { CommandLineConfigOverrides } from '@gaunt-sloth/core/config.js';
+import { wrapContent } from '@gaunt-sloth/core/utils/llmUtils.js';
 
-import { readMultipleFilesFromProjectDir } from '#src/utils/fileUtils.js';
+import { readMultipleFilesFromProjectDir } from '@gaunt-sloth/review/utils/fileUtils.js';
 
 interface ReviewCommandOptions {
   file?: string[];
@@ -57,7 +57,7 @@ export function reviewCommand(
     )
     .option('-m, --message <message>', 'Extra message to provide just before the content')
     .action(async (contentId: string | undefined, options: ReviewCommandOptions) => {
-      const { initConfig } = await import('#src/config.js');
+      const { initConfig } = await import('@gaunt-sloth/core/config.js');
       const config = await initConfig(cliConfigOverrides); // Initialize and get config
       const content: string[] = [];
       const requirementsId = options.requirements;
@@ -105,7 +105,7 @@ export function reviewCommand(
       if (options.message) {
         content.push(wrapContent(options.message, 'message', 'user message'));
       }
-      const { review } = await import('#src/modules/reviewModule.js');
+      const { review } = await import('@gaunt-sloth/review/modules/reviewModule.js');
       await review('REVIEW', getReviewSystemPrompt(config), content.join('\n'), config);
     });
 }

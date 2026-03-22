@@ -1,10 +1,10 @@
 import { Command } from 'commander';
-import { CommandLineConfigOverrides, initConfig } from '#src/config.js';
+import { CommandLineConfigOverrides, initConfig } from '@gaunt-sloth/core/config.js';
 import { getAskSystemPrompt } from '#src/commands/commandIntrospection.js';
-import { getStringFromStdin } from '#src/utils/systemUtils.js';
-import { wrapContent } from '#src/utils/llmUtils.js';
+import { getStringFromStdin } from '@gaunt-sloth/core/utils/systemUtils.js';
+import { wrapContent } from '@gaunt-sloth/core/utils/llmUtils.js';
 
-import { readMultipleFilesFromProjectDir } from '#src/utils/fileUtils.js';
+import { readMultipleFilesFromProjectDir } from '@gaunt-sloth/review/utils/fileUtils.js';
 
 interface AskCommandOptions {
   file?: string[];
@@ -46,7 +46,8 @@ export function askCommand(
         throw new Error('At least one of the following is required: file, stdin, or message');
       }
 
-      const { askQuestion } = await import('#src/modules/questionAnsweringModule.js');
+      const { askQuestion } =
+        await import('@gaunt-sloth/review/modules/questionAnsweringModule.js');
       await askQuestion('ASK', getAskSystemPrompt(config), content.join('\n'), config);
     });
 }

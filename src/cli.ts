@@ -7,10 +7,10 @@ import { chatCommand } from '#src/commands/chatCommand.js';
 import { codeCommand } from '#src/commands/codeCommand.js';
 import { apiCommand } from '#src/commands/apiCommand.js';
 import { getCommand } from '#src/commands/getCommand.js';
-import { argv, getSlothVersion, readStdin } from '#src/utils/systemUtils.js';
-import type { CommandLineConfigOverrides } from '#src/config.js';
+import { argv, getSlothVersion, readStdin } from '@gaunt-sloth/core/utils/systemUtils.js';
+import type { CommandLineConfigOverrides } from '@gaunt-sloth/core/config.js';
 
-import { coerceBooleanOrString } from '#src/utils/consoleUtils.js';
+import { coerceBooleanOrString } from '@gaunt-sloth/core/utils/consoleUtils.js';
 
 const program = new Command();
 
