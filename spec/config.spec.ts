@@ -92,7 +92,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module to process the config
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -278,7 +278,7 @@ describe('config', async () => {
         return `/mock/read/${filename}`;
       });
 
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -437,7 +437,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module to process the config
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -476,7 +476,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module to process the config
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -516,7 +516,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module to process the config
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -555,7 +555,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module to process the config
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -595,7 +595,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module to process the config
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -635,7 +635,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -674,7 +674,7 @@ describe('config', async () => {
         return `/mock/read/${filename}`;
       });
 
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -709,7 +709,7 @@ describe('config', async () => {
         return `/mock/read/${filename}`;
       });
 
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -741,7 +741,7 @@ describe('config', async () => {
         return `/mock/read/${filename}`;
       });
 
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -776,7 +776,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module to process the config
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -817,7 +817,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module to process the config
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -851,7 +851,7 @@ describe('config', async () => {
         type: 'vertexai',
         model: 'test-model',
       };
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue(mockLlm),
         postProcessJsonConfig: undefined,
       }));
@@ -997,7 +997,7 @@ describe('config', async () => {
       } as RawGthConfig;
 
       // Mock a config module without processJsonConfig
-      vi.doMock('#src/presets/badconfig.js', () => ({
+      vi.doMock('#src/providers/badconfig.js', () => ({
         processJsonConfig: undefined,
       }));
 
@@ -1060,7 +1060,7 @@ describe('config', async () => {
         builtInTools: ['jira', 'github'],
       } as Partial<RawGthConfig>;
 
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -1097,7 +1097,7 @@ describe('config', async () => {
         },
       } as RawGthConfig;
 
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -1153,7 +1153,7 @@ describe('config', async () => {
         model: 'test-model',
       };
 
-      vi.doMock('#src/presets/anthropic.js', () => ({
+      vi.doMock('#src/providers/anthropic.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue(mockLlm),
         postProcessJsonConfig: postProcessJsonConfigMock,
       }));
@@ -1187,7 +1187,7 @@ describe('config', async () => {
       });
 
       // Mock the vertexai config module
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         processJsonConfig: vi.fn().mockResolvedValue({ type: 'vertexai' }),
         postProcessJsonConfig: undefined,
       }));
@@ -1503,7 +1503,7 @@ describe('config', async () => {
       const mockInit = vi.fn();
 
       // Mock the vertexai config module
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         init: mockInit,
       }));
 
@@ -1552,7 +1552,7 @@ describe('config', async () => {
       const configType = 'vertexai';
       const mockInit = vi.fn();
 
-      vi.doMock('#src/presets/vertexai.js', () => ({
+      vi.doMock('#src/providers/vertexai.js', () => ({
         init: mockInit,
       }));
 
@@ -1599,7 +1599,7 @@ describe('config', async () => {
       const mockInit = vi.fn();
 
       // Mock the anthropic config module
-      vi.doMock('#src/presets/anthropic.js', () => ({
+      vi.doMock('#src/providers/anthropic.js', () => ({
         init: mockInit,
       }));
 
@@ -1623,7 +1623,7 @@ describe('config', async () => {
       const mockInit = vi.fn();
 
       // Mock the groq config module
-      vi.doMock('#src/presets/groq.js', () => ({
+      vi.doMock('#src/providers/groq.js', () => ({
         init: mockInit,
       }));
 
@@ -1645,7 +1645,7 @@ describe('config', async () => {
       const mockInit = vi.fn();
 
       // Mock the google-genai config module
-      vi.doMock('#src/presets/google-genai.js', () => ({
+      vi.doMock('#src/providers/google-genai.js', () => ({
         init: mockInit,
       }));
 
@@ -1669,7 +1669,7 @@ describe('config', async () => {
       const mockInit = vi.fn();
 
       // Mock the xai config module
-      vi.doMock('#src/presets/xai.js', () => ({
+      vi.doMock('#src/providers/xai.js', () => ({
         init: mockInit,
       }));
 

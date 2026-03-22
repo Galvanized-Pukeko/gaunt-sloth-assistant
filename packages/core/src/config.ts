@@ -678,7 +678,7 @@ export async function tryJsonConfig(
         llmConfig.verbose = commandLineConfigOverrides.verbose;
       }
       // Import the appropriate config module
-      const configModule = await import(`#src/presets/${llmType}.js`);
+      const configModule = await import(`#src/providers/${llmType}.js`);
       if (configModule.processJsonConfig) {
         const llm = (await configModule.processJsonConfig(llmConfig)) as BaseChatModel;
         const mergedConfig = mergeRawConfig(jsonConfig, llm, commandLineConfigOverrides);

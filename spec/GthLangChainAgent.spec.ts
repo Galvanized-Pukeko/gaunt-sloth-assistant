@@ -725,7 +725,7 @@ describe('GthLangChainAgent', () => {
   });
 
   describe('cleanup', () => {
-    it('should cleanup MCP client and reset state', async () => {
+    it('should cleanup and reset state', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
       const configWithMcp = {
         ...mockConfig,
@@ -737,13 +737,10 @@ describe('GthLangChainAgent', () => {
           },
         },
       } as GthConfig;
-      mcpClientInstanceMock.getTools.mockResolvedValue([]);
 
       await agent.init(undefined, configWithMcp);
       await agent.cleanup();
 
-      expect(mcpClientInstanceMock.close).toHaveBeenCalled();
-      expect(agent['mcpClient']).toBeNull();
       expect(agent['agent']).toBeNull();
       expect(agent['config']).toBeNull();
     });
@@ -753,77 +750,20 @@ describe('GthLangChainAgent', () => {
 
       await expect(agent.cleanup()).resolves.not.toThrow();
     });
-  });
 
-  describe('getMcpClient', () => {
-    it('should return null when no MCP servers configured', async () => {
-      const agent = new GthLangChainAgent(statusUpdateCallback);
-      const config = {
-        ...mockConfig,
-        filesystem: 'none',
-        mcpServers: undefined,
-      } as GthConfig;
-
-      const result = await agent['getMcpClient'](config);
-
-      expect(result).toBeNull();
-    });
-
-    it('should create MCP client with custom server', async () => {
-      const agent = new GthLangChainAgent(statusUpdateCallback);
-      const config = {
-        ...mockConfig,
-        filesystem: 'all' as const,
-        mcpServers: {
-          custom: {
-            transport: 'stdio' as const,
-            command: 'custom-server',
-            args: ['--arg'],
-          },
-        },
-      };
-
-      const result = await agent['getMcpClient'](config);
-
-      expect(multiServerMCPClientMock).toHaveBeenCalledWith({
-        throwOnLoadError: true,
-        prefixToolNameWithServerName: true,
-        additionalToolNamePrefix: 'mcp',
-        mcpServers: {
-          custom: {
-            transport: 'stdio',
-            command: 'custom-server',
-            args: ['--arg'],
-          },
-        },
+    it('should call resolver cleanup functions', async () => {
+      const cleanupTools = vi.fn().mockResolvedValue(undefined);
+      const cleanupMiddleware = vi.fn().mockResolvedValue(undefined);
+      const agent = new GthLangChainAgent(statusUpdateCallback, {
+        cleanupTools,
+        cleanupMiddleware,
       });
-      expect(result).toBe(mcpClientInstanceMock);
-    });
 
-    it('should handle OAuth authentication', async () => {
-      const agent = new GthLangChainAgent(statusUpdateCallback);
-      const mockAuthProvider = { token: 'test-token' };
-      createAuthProviderAndAuthenticateMock.mockResolvedValue(mockAuthProvider);
+      await agent.init(undefined, mockConfig);
+      await agent.cleanup();
 
-      const config = {
-        ...mockConfig,
-        mcpServers: {
-          oauth: {
-            url: 'https://example.com',
-            authProvider: 'OAuth',
-          },
-        },
-      } as any as GthConfig;
-
-      await agent['getMcpClient'](config);
-
-      expect(createAuthProviderAndAuthenticateMock).toHaveBeenCalledWith({
-        url: 'https://example.com',
-        authProvider: 'OAuth',
-      });
-      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
-        'Starting OAuth for for https://example.com'
-      );
+      expect(cleanupTools).toHaveBeenCalled();
+      expect(cleanupMiddleware).toHaveBeenCalled();
     });
   });
 

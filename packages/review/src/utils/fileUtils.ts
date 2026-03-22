@@ -1,6 +1,6 @@
 export * from '@gaunt-sloth/core/utils/fileUtils.js';
 import { readFileFromProjectDir } from '@gaunt-sloth/core/utils/fileUtils.js';
-import { wrapContent } from '#src/utils/llmUtils.js';
+import { wrapContent } from '@gaunt-sloth/core/utils/llmUtils.js';
 
 /**
  * Reads multiple files from the current directory and returns their contents
