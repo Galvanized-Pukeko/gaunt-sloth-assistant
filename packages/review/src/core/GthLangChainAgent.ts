@@ -9,6 +9,8 @@ import {
 import { createAuthProviderAndAuthenticate } from '#src/mcp/OAuthClientProviderImpl.js';
 import { createA2AAgentTool } from '#src/tools/A2AAgentTool.js';
 import { resolveMiddleware } from '#src/middleware/registry.js';
+import type { MiddlewareConfig } from '#src/middleware/types.js';
+import type { A2AConfig } from '#src/providers/types.js';
 import type { Message } from '#src/modules/types.js';
 import { displayInfo } from '#src/utils/consoleUtils.js';
 import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
@@ -110,7 +112,10 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLog('Creating React agent...');
 
     // Resolve middleware from config
-    const configuredMiddleware = await resolveMiddleware(this.config.middleware, this.config);
+    const configuredMiddleware = await resolveMiddleware(
+      this.config.middleware as MiddlewareConfig[] | undefined,
+      this.config
+    );
 
     // Add tool call status update middleware
     const toolCallStatusMiddleware = createMiddleware({
@@ -501,7 +506,7 @@ export class GthLangChainAgent implements GthAgentInterface {
 
     for (const [agentId, agentConfig] of Object.entries(a2aAgents)) {
       debugLog(`Adding A2A agent tool: ${agentId}`);
-      tools.push(createA2AAgentTool(agentConfig));
+      tools.push(createA2AAgentTool(agentConfig as A2AConfig));
     }
 
     return tools;
