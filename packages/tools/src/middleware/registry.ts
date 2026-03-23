@@ -61,6 +61,19 @@ const predefinedMiddlewareFactories = {
       settings as BinaryContentInjectionMiddlewareSettings,
       gthConfig
     ),
+  /**
+   * Review rate middleware.
+   * Runs a secondary LLM call to produce a structured rating after a code review.
+   */
+  'review-rate': async (
+    settings: Record<string, unknown>,
+    gthConfig: GthConfig
+  ): Promise<AgentMiddleware> => {
+    const { createReviewRateMiddleware } = await import(
+      '@gaunt-sloth/review/middleware/reviewRateMiddleware.js'
+    );
+    return createReviewRateMiddleware(settings, gthConfig);
+  },
 } satisfies Record<string, PredefinedMiddlewareFactory>;
 
 function isPredefinedMiddlewareName(
