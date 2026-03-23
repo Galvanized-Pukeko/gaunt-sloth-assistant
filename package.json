@@ -11,7 +11,7 @@
     "url": "git+https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant.git"
   },
   "engines": {
-    "node": ">=24.0.0",
+    "node": ">=22.0.0",
     "npm": ">=11.0.0"
   },
   "workspaces": [
@@ -34,7 +34,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
-    "@types/node": "^24.12.0",
+    "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
     "@typescript-eslint/parser": "^8.57.1",
     "eslint": "^10.1.0",

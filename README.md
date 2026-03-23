@@ -154,7 +154,7 @@ Running `gsloth` with no subcommand also drops you into `chat`.
 
 ## Installation
 
-Tested with Node 24 LTS.
+Tested with Node 22 LTS.
 
 ### NPM
 ```bash

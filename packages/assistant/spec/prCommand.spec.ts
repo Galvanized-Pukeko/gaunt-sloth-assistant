@@ -12,6 +12,11 @@ vi.mock('node:crypto', async () => {
 });
 
 // Define mocks at the top level
+const resolversMock = {
+  createResolvers: vi.fn(),
+};
+vi.mock('@gaunt-sloth/api/resolvers.js', () => resolversMock);
+
 const review = vi.fn();
 const prompt = {
   readBackstory: vi.fn(),
@@ -92,6 +97,8 @@ describe('prCommand', () => {
     prompt.readGuidelines.mockReturnValue('PROJECT GUIDELINES');
     prompt.readReviewInstructions.mockReturnValue('REVIEW INSTRUCTIONS');
     prompt.readSystemPrompt.mockReturnValue('');
+
+    resolversMock.createResolvers.mockReturnValue({ resolveTools: vi.fn(), cleanupTools: vi.fn() });
   });
 
   it('Should call pr command', async () => {
@@ -135,7 +142,8 @@ describe('prCommand', () => {
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
       }),
-      'pr'
+      'pr',
+      expect.any(Object)
     );
   });
 
@@ -181,7 +189,8 @@ describe('prCommand', () => {
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
       }),
-      'pr'
+      'pr',
+      expect.any(Object)
     );
   });
 
@@ -302,7 +311,8 @@ describe('prCommand', () => {
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
       }),
-      'pr'
+      'pr',
+      expect.any(Object)
     );
   });
 
@@ -348,7 +358,8 @@ describe('prCommand', () => {
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
       }),
-      'pr'
+      'pr',
+      expect.any(Object)
     );
   });
 });

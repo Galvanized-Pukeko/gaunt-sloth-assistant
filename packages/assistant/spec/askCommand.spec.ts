@@ -11,6 +11,11 @@ vi.mock('node:crypto', async () => {
 });
 
 // Define mocks at top level
+const resolversMock = {
+  createResolvers: vi.fn(),
+};
+vi.mock('@gaunt-sloth/api/resolvers.js', () => resolversMock);
+
 const askQuestion = vi.fn();
 const prompt = {
   readBackstory: vi.fn(),
@@ -101,6 +106,8 @@ describe('askCommand', () => {
     prompt.readGuidelines.mockReturnValue('PROJECT GUIDELINES');
     prompt.readSystemPrompt.mockReturnValue('');
 
+    resolversMock.createResolvers.mockReturnValue({ resolveTools: vi.fn(), cleanupTools: vi.fn() });
+
     const progressIndicator = {
       start: vi.fn(),
       stop: vi.fn(),
@@ -118,7 +125,8 @@ describe('askCommand', () => {
       'ASK',
       'INTERNAL PREAMBLE\nPROJECT GUIDELINES',
       '\nProvided user message follows within message-1234567 block\n<message-1234567>\ntest message\n</message-1234567>\n',
-      mockConfig
+      mockConfig,
+      expect.any(Object)
     );
   });
 
@@ -132,7 +140,8 @@ describe('askCommand', () => {
       'INTERNAL PREAMBLE\nPROJECT GUIDELINES',
       'test.file:\n```\nFILE CONTENT\n```\n' +
         '\nProvided user message follows within message-1234567 block\n<message-1234567>\ntest message\n</message-1234567>\n',
-      mockConfig
+      mockConfig,
+      expect.any(Object)
     );
   });
 
@@ -152,7 +161,8 @@ describe('askCommand', () => {
       'INTERNAL PREAMBLE\nPROJECT GUIDELINES',
       'test.file:\n```\nFILE CONTENT\n```\n\ntest2.file:\n```\nFILE2 CONTENT\n```\n' +
         '\nProvided user message follows within message-1234567 block\n<message-1234567>\ntest message\n</message-1234567>\n',
-      mockConfig
+      mockConfig,
+      expect.any(Object)
     );
   });
 
@@ -173,7 +183,8 @@ describe('askCommand', () => {
       'ASK',
       'INTERNAL PREAMBLE\nPROJECT GUIDELINES',
       'test.file:\n```\nFILE CONTENT\n```',
-      mockConfig
+      mockConfig,
+      expect.any(Object)
     );
   });
 
@@ -190,7 +201,8 @@ describe('askCommand', () => {
       'ASK',
       'INTERNAL PREAMBLE\nPROJECT GUIDELINES',
       '\nProvided content follows within stdin-content-1234567 block\n<stdin-content-1234567>\nSTDIN CONTENT\n</stdin-content-1234567>\n',
-      mockConfig
+      mockConfig,
+      expect.any(Object)
     );
   });
 
@@ -227,7 +239,8 @@ describe('askCommand', () => {
       'ASK',
       'INTERNAL PREAMBLE\nPROJECT GUIDELINES',
       '\nProvided user message follows within message-1234567 block\n<message-1234567>\nintegration test message\n</message-1234567>\n',
-      configWithWriteOutputDisabled
+      configWithWriteOutputDisabled,
+      expect.any(Object)
     );
 
     // Specifically verify the writeOutputToFile parameter was passed through

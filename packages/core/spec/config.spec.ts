@@ -156,6 +156,8 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          ask: { filesystem: 'read' },
+          chat: { filesystem: 'read' },
           api: {
             port: 3000,
             cors: {
@@ -253,6 +255,8 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          ask: { filesystem: 'read' },
+          chat: { filesystem: 'read' },
           api: {
             port: 3000,
             cors: {
@@ -383,6 +387,8 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          ask: { filesystem: 'read' },
+          chat: { filesystem: 'read' },
           api: {
             port: 3000,
             cors: {
@@ -926,6 +932,8 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          ask: { filesystem: 'read' },
+          chat: { filesystem: 'read' },
           api: {
             port: 3000,
             cors: {
@@ -1259,6 +1267,8 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          ask: { filesystem: 'read' },
+          chat: { filesystem: 'read' },
           api: {
             port: 3000,
             cors: {
@@ -1340,6 +1350,8 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          ask: { filesystem: 'read' },
+          chat: { filesystem: 'read' },
           api: {
             port: 3000,
             cors: {
@@ -1421,6 +1433,8 @@ describe('config', async () => {
             },
           },
           code: { filesystem: 'all' },
+          ask: { filesystem: 'read' },
+          chat: { filesystem: 'read' },
           api: {
             port: 3000,
             cors: {

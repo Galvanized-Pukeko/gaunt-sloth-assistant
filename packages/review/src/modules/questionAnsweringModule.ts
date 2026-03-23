@@ -13,6 +13,7 @@ import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
+import type { AgentResolvers } from '#src/core/types.js';
 
 /**
  * Ask a question and get an answer from the LLM
@@ -24,7 +25,8 @@ export async function askQuestion(
   source: string,
   preamble: string,
   content: string,
-  config: GthConfig
+  config: GthConfig,
+  resolvers?: AgentResolvers
 ): Promise<void> {
   const progressIndicator = config.streamOutput ? undefined : new ProgressIndicator('Thinking.');
   const messages = [new SystemMessage(preamble), new HumanMessage(content)];
@@ -36,7 +38,7 @@ export async function askQuestion(
   }
 
   // Run via Agent Runner (consistent with interactive session)
-  const runner = new GthAgentRunner(defaultStatusCallback);
+  const runner = new GthAgentRunner(defaultStatusCallback, resolvers);
   try {
     await runner.init('ask', config, new MemorySaver());
     await runner.processMessages(messages);

@@ -546,6 +546,12 @@ export const DEFAULT_CONFIG = {
         errorOnReviewFail: true,
       },
     },
+    ask: {
+      filesystem: 'read',
+    },
+    chat: {
+      filesystem: 'read',
+    },
     code: {
       filesystem: 'all',
     },
@@ -843,8 +849,14 @@ async function mergeConfig(
       DEFAULT_CONFIG.commands.code as Record<string, unknown>,
       config?.commands?.code as Record<string, unknown> | undefined
     ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    ...(config?.commands?.ask && { ask: config.commands.ask }),
-    ...(config?.commands?.chat && { chat: config.commands.chat }),
+    ask: deepMerge(
+      DEFAULT_CONFIG.commands.ask as Record<string, unknown>,
+      config?.commands?.ask as Record<string, unknown> | undefined
+    ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    chat: deepMerge(
+      DEFAULT_CONFIG.commands.chat as Record<string, unknown>,
+      config?.commands?.chat as Record<string, unknown> | undefined
+    ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     api: deepMerge(
       DEFAULT_CONFIG.commands.api as Record<string, unknown>,
       config?.commands?.api as Record<string, unknown> | undefined

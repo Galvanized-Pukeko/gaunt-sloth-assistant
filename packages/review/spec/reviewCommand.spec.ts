@@ -12,6 +12,11 @@ vi.mock('node:crypto', async () => {
 });
 
 // Define mocks at the top level
+const resolversMock = {
+  createResolvers: vi.fn(),
+};
+vi.mock('@gaunt-sloth/api/resolvers.js', () => resolversMock);
+
 const review = vi.fn();
 const llmUtils = {
   readBackstory: vi.fn(),
@@ -96,6 +101,7 @@ describe('reviewCommand', () => {
     llmUtils.readGuidelines.mockReturnValue('PROJECT GUIDELINES');
     llmUtils.readReviewInstructions.mockReturnValue('REVIEW INSTRUCTIONS');
     llmUtils.readSystemPrompt.mockReturnValue('');
+    resolversMock.createResolvers.mockReturnValue({ resolveTools: vi.fn(), cleanupTools: vi.fn() });
   });
 
   it('Should call review with file contents', async () => {
@@ -112,7 +118,9 @@ describe('reviewCommand', () => {
       expect.objectContaining({
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
-      })
+      }),
+      'review',
+      expect.any(Object)
     );
   });
 
@@ -135,7 +143,9 @@ describe('reviewCommand', () => {
       expect.objectContaining({
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
-      })
+      }),
+      'review',
+      expect.any(Object)
     );
   });
 
@@ -211,7 +221,9 @@ describe('reviewCommand', () => {
         requirementsProvider: 'jira-legacy',
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
-      })
+      }),
+      'review',
+      expect.any(Object)
     );
   });
 
@@ -255,7 +267,9 @@ describe('reviewCommand', () => {
         contentProvider: 'github',
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
-      })
+      }),
+      'review',
+      expect.any(Object)
     );
   });
 
@@ -285,7 +299,9 @@ describe('reviewCommand', () => {
       expect.objectContaining({
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
-      })
+      }),
+      'review',
+      expect.any(Object)
     );
   });
 
@@ -318,7 +334,9 @@ describe('reviewCommand', () => {
         contentProvider: 'github',
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
-      })
+      }),
+      'review',
+      expect.any(Object)
     );
   });
 });
