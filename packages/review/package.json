@@ -18,10 +18,10 @@
     "#src/*.js": "./dist/*.js"
   },
   "dependencies": {
-    "@gaunt-sloth/core": "*"
+    "@gaunt-sloth/core": "^1.4.0"
   },
   "peerDependencies": {
-    "@gaunt-sloth/tools": "*"
+    "@gaunt-sloth/tools": "^1.4.0"
   },
   "peerDependenciesMeta": {
     "@gaunt-sloth/tools": {

@@ -18,9 +18,9 @@
     "#src/*.js": "./dist/*.js"
   },
   "dependencies": {
-    "@gaunt-sloth/core": "*",
+    "@gaunt-sloth/core": "^1.4.0",
     "diff": "^8.0.3",
-    "langchain": "^1.2.32"
+    "langchain": "^1.2.36"
   },
   "files": [
     "./dist/*"
