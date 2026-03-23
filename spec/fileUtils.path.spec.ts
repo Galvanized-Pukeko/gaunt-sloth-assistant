@@ -8,8 +8,14 @@ vi.mock('node:fs', () => nodeFsMock);
 
 const nodePathMock = {
   resolve: vi.fn(),
+  dirname: vi.fn().mockImplementation((p: string) => p.substring(0, p.lastIndexOf('/'))),
 };
 vi.mock('node:path', () => nodePathMock);
+
+vi.mock('node:url', () => ({
+  default: { pathToFileURL: vi.fn() },
+  fileURLToPath: vi.fn().mockReturnValue('/mock/core/dist/utils/fileUtils.js'),
+}));
 
 const systemUtilsMock = {
   getCurrentWorkDir: vi.fn(),

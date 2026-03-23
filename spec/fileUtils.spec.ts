@@ -12,7 +12,6 @@ vi.mock('node:fs', () => fsUtilsMock);
 // Mock the systemUtils module
 const systemUtilsMock = {
   getCurrentWorkDir: vi.fn(),
-  getInstallDir: vi.fn(),
   exit: vi.fn(),
 };
 vi.mock('#src/utils/systemUtils.js', () => systemUtilsMock);
@@ -33,7 +32,6 @@ describe('utils', () => {
 
     // Set up default mock values
     systemUtilsMock.getCurrentWorkDir.mockReturnValue('/mock/project/dir');
-    systemUtilsMock.getInstallDir.mockReturnValue('/mock/install/dir');
   });
 
   describe('generateStandardFileName', () => {
@@ -101,27 +99,20 @@ describe('utils', () => {
       expect(fsUtilsMock.writeFileSync).not.toHaveBeenCalled();
       expect(fsUtilsMock.readFileSync).toHaveBeenCalledWith(filePath, { encoding: 'utf8' });
       expect(systemUtilsMock.getCurrentWorkDir).toHaveBeenCalled();
-      expect(systemUtilsMock.getInstallDir).not.toHaveBeenCalled();
       expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(expect.stringContaining('Reading'));
     });
 
     it('should exit with error if file not found in install directory', async () => {
       // Arrange
       const fileName = 'test.file';
-      const installDirPath = '/mock/install/dir';
-      const installFilePath = resolve(installDirPath, fileName);
 
-      // Mock readFileSync to throw ENOENT for both directories
+      // Mock readFileSync to throw ENOENT
       const enoentError = new Error('File not found') as NodeJS.ErrnoException;
       enoentError.code = 'ENOENT';
 
-      fsUtilsMock.readFileSync
-        .mockImplementationOnce(() => {
-          throw enoentError;
-        })
-        .mockImplementationOnce(() => {
-          throw enoentError;
-        });
+      fsUtilsMock.readFileSync.mockImplementation(() => {
+        throw enoentError;
+      });
 
       // Import the function after mocks are set up
       const { readFileFromInstallDir } = await import('#src/utils/fileUtils.js');
@@ -129,10 +120,12 @@ describe('utils', () => {
       // Act & Assert
       expect(() => readFileFromInstallDir(fileName)).toThrow();
       expect(fsUtilsMock.writeFileSync).not.toHaveBeenCalled();
-      expect(fsUtilsMock.readFileSync).toHaveBeenCalledWith(installFilePath, { encoding: 'utf8' });
-      expect(systemUtilsMock.getInstallDir).toHaveBeenCalled();
+      expect(fsUtilsMock.readFileSync).toHaveBeenCalledWith(
+        expect.stringContaining(fileName),
+        { encoding: 'utf8' }
+      );
       expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
-        expect.stringContaining(installFilePath)
+        expect.stringContaining(fileName)
       );
     });
   });

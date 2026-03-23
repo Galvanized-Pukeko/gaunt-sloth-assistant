@@ -8,6 +8,9 @@
  * When called without arguments, reads diff from stdin via the configured content provider.
  */
 
+import { setEntryPoint } from '@gaunt-sloth/core/utils/systemUtils.js';
+setEntryPoint(import.meta.url);
+
 import { initConfig } from '@gaunt-sloth/core/config.js';
 import { review } from '#src/modules/reviewModule.js';
 import { displayError } from '@gaunt-sloth/core/utils/consoleUtils.js';

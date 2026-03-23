@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { getInstallDir, getCurrentWorkDir } from '#src/utils/systemUtils.js';
+import { fileURLToPath } from 'node:url';
+import { getCurrentWorkDir } from '#src/utils/systemUtils.js';
 import { GSLOTH_DIR, GSLOTH_SETTINGS_DIR } from '#src/constants.js';
 import {
   displayError,
@@ -160,9 +161,10 @@ export function readFileFromProjectDir(fileName: string): string {
   return readFileSyncWithMessages(filePath);
 }
 
+const corePackageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
 export function readFileFromInstallDir(filePath: string): string {
-  const installDir = getInstallDir();
-  const installFilePath = resolve(installDir, filePath);
+  const installFilePath = resolve(corePackageDir, filePath);
   try {
     return readFileSync(installFilePath, { encoding: 'utf8' });
   } catch (readFromInstallDirError) {
