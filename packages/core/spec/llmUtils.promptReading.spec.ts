@@ -25,7 +25,6 @@ describe('prompt reading functions', async () => {
   const prefix = platform() == 'win32' ? 'C:\\' : '/';
   const mockProjectDir = `${prefix}project`;
 
-
   const systemUtils = await import('#src/utils/systemUtils.js');
   const prompt = await import('#src/utils/llmUtils.js');
 
@@ -105,10 +104,9 @@ describe('prompt reading functions', async () => {
           result = func({} as any);
         }
         expect(result).toBe('install content');
-        expect(fs.readFileSync).toHaveBeenCalledWith(
-          expect.stringContaining(filename),
-          { encoding: 'utf8' }
-        );
+        expect(fs.readFileSync).toHaveBeenCalledWith(expect.stringContaining(filename), {
+          encoding: 'utf8',
+        });
       });
 
       test(`throws error when ${filename} not found anywhere`, () => {
@@ -194,7 +192,6 @@ describe('prompt reading with identityProfile variations', async () => {
   const prefix = platform() == 'win32' ? 'C:\\' : '/';
   const mockProjectDir = `${prefix}project`;
 
-
   const systemUtils = await import('#src/utils/systemUtils.js');
   const prompt = await import('#src/utils/llmUtils.js');
 
@@ -228,9 +225,7 @@ describe('prompt reading with identityProfile variations', async () => {
     const profile = 'probox';
     const gslothDirPath = `${mockProjectDir}${sep}.gsloth`;
 
-    vi.mocked(fs.existsSync).mockImplementation((path) =>
-      [gslothDirPath].includes(String(path))
-    );
+    vi.mocked(fs.existsSync).mockImplementation((path) => [gslothDirPath].includes(String(path)));
     vi.mocked(fs.readFileSync).mockImplementation((path: unknown) => {
       if (String(path).endsWith('.gsloth.backstory.md')) return 'install content';
       throw new Error('not found');
@@ -238,10 +233,9 @@ describe('prompt reading with identityProfile variations', async () => {
 
     const result = (prompt as any).readBackstory({ identityProfile: profile });
     expect(result).toBe('install content');
-    expect(fs.readFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('.gsloth.backstory.md'),
-      { encoding: 'utf8' }
-    );
+    expect(fs.readFileSync).toHaveBeenCalledWith(expect.stringContaining('.gsloth.backstory.md'), {
+      encoding: 'utf8',
+    });
   });
 
   test('readBackstory falls back to project root when not in .gsloth-settings', () => {
@@ -298,10 +292,9 @@ describe('prompt reading with identityProfile variations', async () => {
       identityProfile: profile,
     });
     expect(result).toBe('install guidelines');
-    expect(fs.readFileSync).toHaveBeenCalledWith(
-      expect.stringContaining(filename),
-      { encoding: 'utf8' }
-    );
+    expect(fs.readFileSync).toHaveBeenCalledWith(expect.stringContaining(filename), {
+      encoding: 'utf8',
+    });
   });
 });
 
@@ -309,7 +302,6 @@ describe('prompt reading with identityProfile variations', async () => {
 describe('noDefaultPrompts behavior', async () => {
   const prefix = platform() == 'win32' ? 'C:\\' : '/';
   const mockProjectDir = `${prefix}project`;
-
 
   const systemUtils = await import('#src/utils/systemUtils.js');
   const prompt = await import('#src/utils/llmUtils.js');

@@ -120,13 +120,10 @@ describe('utils', () => {
       // Act & Assert
       expect(() => readFileFromInstallDir(fileName)).toThrow();
       expect(fsUtilsMock.writeFileSync).not.toHaveBeenCalled();
-      expect(fsUtilsMock.readFileSync).toHaveBeenCalledWith(
-        expect.stringContaining(fileName),
-        { encoding: 'utf8' }
-      );
-      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
-        expect.stringContaining(fileName)
-      );
+      expect(fsUtilsMock.readFileSync).toHaveBeenCalledWith(expect.stringContaining(fileName), {
+        encoding: 'utf8',
+      });
+      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(expect.stringContaining(fileName));
     });
   });
 });

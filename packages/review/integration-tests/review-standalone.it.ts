@@ -1,0 +1,87 @@
+import { describe, it, expect, afterEach } from 'vitest';
+import { execSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+describe('Standalone @gaunt-sloth/review integration test', () => {
+  let tempDir: string;
+
+  afterEach(() => {
+    if (tempDir && fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should work as a standalone package outside the workspace', async () => {
+    // Create a temporary directory
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsloth-review-standalone-'));
+
+    const rootDir = path.resolve('.');
+
+    // Pack both core and review tarballs directly into the temp directory
+    execSync(`npm pack --pack-destination ${tempDir} -w @gaunt-sloth/core -w @gaunt-sloth/review`, {
+      cwd: rootDir,
+      stdio: 'pipe',
+    });
+
+    // Initialize a fresh package.json in the temp directory
+    execSync('npm init -y', { cwd: tempDir, stdio: 'pipe' });
+
+    // Set type to module since @gaunt-sloth packages use ESM
+    const tempPkgPath = path.join(tempDir, 'package.json');
+    const tempPkg = JSON.parse(fs.readFileSync(tempPkgPath, 'utf8'));
+    tempPkg.type = 'module';
+    fs.writeFileSync(tempPkgPath, JSON.stringify(tempPkg, null, 2));
+
+    // Install the packed tarballs
+    execSync('npm install ./gaunt-sloth-core-1.4.0.tgz ./gaunt-sloth-review-1.4.0.tgz', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    // Write a minimal config: file content source, fake LLM, no rating
+    const config = {
+      llm: {
+        type: 'fake',
+        responses: ['Code Review\n\nScore: 8/10 PASS'],
+      },
+      contentSource: 'file',
+      commands: {
+        pr: {
+          contentSource: 'file',
+          rating: false,
+        },
+      },
+    };
+    fs.writeFileSync(path.join(tempDir, '.gsloth.config.json'), JSON.stringify(config, null, 2));
+
+    // Copy a test file to review
+    fs.copyFileSync(
+      path.join(rootDir, 'packages/assistant/integration-tests/workdir/filewithgoodcode.js'),
+      path.join(tempDir, 'filewithgoodcode.js')
+    );
+
+    // Run the review CLI from the installed package using spawnSync
+    // to capture stdout regardless of exit code
+    // Build a clean env: remove INIT_CWD so the child process uses its own cwd
+    // (otherwise it inherits the workspace root and picks up the wrong config)
+    const childEnv = { ...process.env, NODE_NO_WARNINGS: '1' };
+    delete childEnv.INIT_CWD;
+
+    const reviewBin = path.join(tempDir, 'node_modules', '.bin', 'gaunt-sloth-review');
+    const result = spawnSync('node', [reviewBin, 'filewithgoodcode.js'], {
+      cwd: tempDir,
+      encoding: 'utf8',
+      env: childEnv,
+      timeout: 60000,
+    });
+
+    const output = result.stdout;
+
+    // Assert the review output contains expected markers (score, PASS/FAIL)
+    // This proves @gaunt-sloth/review works as a standalone package
+    expect(output).toContain('PASS');
+    expect(output).toMatch(/\d+\/10/);
+  });
+});

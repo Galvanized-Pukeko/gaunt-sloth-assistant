@@ -29,7 +29,9 @@ export async function runCommandWithArgs(
   endOutput?: string,
   workDir?: string
 ): Promise<string> {
-  const testDir = path.resolve(workDir ? workDir : './integration-tests/workdir');
+  const testDir = path.resolve(
+    workDir ? workDir : './packages/assistant/integration-tests/workdir'
+  );
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
@@ -84,7 +86,9 @@ export async function runCommandExpectingExitCode(
   expectedExitCode: number,
   workDir?: string
 ): Promise<{ output: string; exitCode: number }> {
-  const testDir = path.resolve(workDir ? workDir : './integration-tests/workdir');
+  const testDir = path.resolve(
+    workDir ? workDir : './packages/assistant/integration-tests/workdir'
+  );
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
@@ -128,7 +132,9 @@ export function startChildProcess(
   stdin: 'ignore' | 'pipe',
   workDir?: string
 ) {
-  const testDir = path.resolve(workDir ? workDir : './integration-tests/workdir');
+  const testDir = path.resolve(
+    workDir ? workDir : './packages/assistant/integration-tests/workdir'
+  );
   const childProcess = spawn(command, args, {
     cwd: testDir,
     env: {

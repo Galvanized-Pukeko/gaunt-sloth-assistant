@@ -9,6 +9,10 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
  * Vitest plugin that resolves #src/ and @gaunt-sloth/ imports to actual
  * source files in the workspace packages. This ensures that vi.mock() and
  * dynamic imports all resolve to the same module identity.
+ *
+ * Packages are scanned in dependency order: core → tools → review → api → assistant.
+ * The review package has re-export stubs that delegate to core; those are
+ * detected and skipped so the canonical core module is always used.
  */
 function resolveWorkspaceImports() {
   return {
@@ -19,8 +23,9 @@ function resolveWorkspaceImports() {
       // Handle #src/ imports -> find the actual source in packages
       if (id.startsWith('#src/')) {
         const relative = id.replace('#src/', '').replace(/\.js$/, '.ts');
+
         // Try each package in dependency order
-        for (const pkg of ['core', 'tools', 'review', 'api']) {
+        for (const pkg of ['core', 'tools', 'review', 'api', 'assistant']) {
           const tsPath = resolve(__dirname, `packages/${pkg}/src/${relative}`);
           if (existsSync(tsPath)) {
             // Skip re-export stubs (files that just re-export from @gaunt-sloth/)
@@ -34,9 +39,6 @@ function resolveWorkspaceImports() {
             return tsPath;
           }
         }
-        // Fall back to root src/
-        const rootPath = resolve(__dirname, `src/${relative}`);
-        if (existsSync(rootPath)) return rootPath;
       }
 
       // Handle @gaunt-sloth/X/path.js -> packages/X/src/path.ts
@@ -53,7 +55,7 @@ function resolveWorkspaceImports() {
 export default defineConfig({
   plugins: [resolveWorkspaceImports()],
   test: {
-    include: ['spec/**/*.ts'],
+    include: ['packages/*/spec/**/*.ts'],
     environment: 'node',
     coverage: {
       provider: 'v8',

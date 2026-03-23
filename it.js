@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 
 // Script to launch integration tests
 
-execSync('node integration-tests/setup-config.js ' + process.argv[2], {
+execSync('node packages/assistant/integration-tests/setup-config.js ' + process.argv[2], {
   stdio: [process.stdin, process.stdout, process.stderr],
 });
 try {
