@@ -159,6 +159,7 @@ describe('config', async () => {
           ask: { filesystem: 'read' },
           chat: { filesystem: 'read' },
           api: {
+            filesystem: 'read',
             port: 3000,
             cors: {
               allowOrigin: 'http://localhost:3000',
@@ -258,6 +259,7 @@ describe('config', async () => {
           ask: { filesystem: 'read' },
           chat: { filesystem: 'read' },
           api: {
+            filesystem: 'read',
             port: 3000,
             cors: {
               allowOrigin: 'http://localhost:3000',
@@ -390,6 +392,7 @@ describe('config', async () => {
           ask: { filesystem: 'read' },
           chat: { filesystem: 'read' },
           api: {
+            filesystem: 'read',
             port: 3000,
             cors: {
               allowOrigin: 'http://localhost:3000',
@@ -935,6 +938,7 @@ describe('config', async () => {
           ask: { filesystem: 'read' },
           chat: { filesystem: 'read' },
           api: {
+            filesystem: 'read',
             port: 3000,
             cors: {
               allowOrigin: 'http://localhost:3000',
@@ -1270,6 +1274,7 @@ describe('config', async () => {
           ask: { filesystem: 'read' },
           chat: { filesystem: 'read' },
           api: {
+            filesystem: 'read',
             port: 3000,
             cors: {
               allowOrigin: 'http://localhost:3000',
@@ -1353,6 +1358,7 @@ describe('config', async () => {
           ask: { filesystem: 'read' },
           chat: { filesystem: 'read' },
           api: {
+            filesystem: 'read',
             port: 3000,
             cors: {
               allowOrigin: 'http://localhost:3000',
@@ -1436,6 +1442,7 @@ describe('config', async () => {
           ask: { filesystem: 'read' },
           chat: { filesystem: 'read' },
           api: {
+            filesystem: 'read',
             port: 3000,
             cors: {
               allowOrigin: 'http://localhost:3000',

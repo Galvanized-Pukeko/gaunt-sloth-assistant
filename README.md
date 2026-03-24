@@ -33,13 +33,13 @@ This repository is an NPM workspace monorepo. The dependency chain is:
 
 `@gaunt-sloth/review` depends only on `@gaunt-sloth/core` (with `@gaunt-sloth/tools` as an optional peer).
 
-| Package | Version | Description |
-|---|---|---|
-| `gaunt-sloth-assistant` | 1.4.0 | Main CLI application. Installs the `gsloth`/`gth` binaries. Most users only need this package. |
-| `@gaunt-sloth/api` | 1.4.0 | AG-UI server, A2A client, MCP utilities, and tool resolvers. Includes the `gaunt-sloth-api` binary. |
-| `@gaunt-sloth/review` | 1.4.0 | Review and Q&A modules with content providers (GitHub, Jira). Includes the `gaunt-sloth-review` binary for lightweight CI pipelines. |
-| `@gaunt-sloth/tools` | 1.4.0 | Filesystem toolkit, custom tools, dev tools, and middleware registry. |
-| `@gaunt-sloth/core` | 1.4.0 | Config system, agent infrastructure, LLM provider wrappers, and shared utilities. |
+| Package | Description |
+|---|---|
+| `gaunt-sloth-assistant` | Main CLI application. Installs the `gsloth`/`gth` binaries. Most users only need this package. |
+| `@gaunt-sloth/api` | AG-UI server, A2A client, MCP utilities, and tool resolvers. Includes the `gaunt-sloth-api` binary. |
+| `@gaunt-sloth/review` | Review and Q&A modules with content providers (GitHub, Jira). Includes the `gaunt-sloth-review` binary for lightweight CI pipelines. |
+| `@gaunt-sloth/tools` | Filesystem toolkit, custom tools, dev tools, and middleware registry. |
+| `@gaunt-sloth/core` | Config system, agent infrastructure, LLM provider wrappers, and shared utilities. |
 
 Most users install `gaunt-sloth-assistant` globally and do not interact with the sub-packages directly. `@gaunt-sloth/review` can be used standalone in CI pipelines — it has no dependency on `commander`, MCP, or A2A, making it a lighter option when only review functionality is needed.
 

@@ -1,6 +1,6 @@
 {
   "name": "@gaunt-sloth/core",
-  "version": "1.4.0",
+  "version": "0.0.1",
   "description": "Core utilities and types for Gaunt Sloth",
   "license": "MIT",
   "author": "Andrew Kondratev",

@@ -1,6 +1,6 @@
 {
   "name": "@gaunt-sloth/tools",
-  "version": "1.4.0",
+  "version": "0.0.1",
   "description": "Tools and middleware for Gaunt Sloth",
   "license": "MIT",
   "author": "Andrew Kondratev",
@@ -18,7 +18,7 @@
     "#src/*.js": "./dist/*.js"
   },
   "dependencies": {
-    "@gaunt-sloth/core": "^1.4.0",
+    "@gaunt-sloth/core": "^0.0.1",
     "diff": "^8.0.3",
     "langchain": "^1.2.36"
   },

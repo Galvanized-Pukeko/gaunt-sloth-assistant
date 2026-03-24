@@ -34,8 +34,15 @@ describe('Standalone @gaunt-sloth/review integration test', () => {
     tempPkg.type = 'module';
     fs.writeFileSync(tempPkgPath, JSON.stringify(tempPkg, null, 2));
 
+    // Find the packed tarballs by glob (version-independent)
+    const tarballs = fs
+      .readdirSync(tempDir)
+      .filter((f) => f.endsWith('.tgz'))
+      .map((f) => `./${f}`)
+      .join(' ');
+
     // Install the packed tarballs
-    execSync('npm install ./gaunt-sloth-core-1.4.0.tgz ./gaunt-sloth-review-1.4.0.tgz', {
+    execSync(`npm install ${tarballs}`, {
       cwd: tempDir,
       stdio: 'pipe',
     });
