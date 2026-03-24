@@ -253,6 +253,8 @@ export interface GthConfig {
       binaryFormats?: false | BinaryFormatConfig[];
     };
     api?: {
+      filesystem?: string[] | 'all' | 'read' | 'none';
+      builtInTools?: string[];
       port?: number;
       cors?: {
         allowOrigin?: string;
@@ -556,6 +558,7 @@ export const DEFAULT_CONFIG = {
       filesystem: 'all',
     },
     api: {
+      filesystem: 'read',
       port: 3000,
       cors: {
         allowOrigin: 'http://localhost:3000',

@@ -3,7 +3,11 @@
     "type": "deepseek",
     "model": "deepseek-reasoner"
   },
-  "builtInTools": ["show_a2ui_surface"],
+  "commands": {
+    "api": {
+      "builtInTools": ["show_a2ui_surface"]
+    }
+  },
   "canInterruptInferenceWithEsc": false,
   "pr": {
     "filesystem": "none"
