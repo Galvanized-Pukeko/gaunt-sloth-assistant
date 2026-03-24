@@ -12,7 +12,7 @@ export type StatusUpdateCallback = (level: StatusLevel, message: string) => void
 /**
  * Status level for logging and output control.
  * Levels are ordered by importance, with lower ordinal values being more verbose.
- * DEBUG (0) is most verbose, STREAM (6) is least verbose.
+ * DEBUG (0) is the most verbose, STREAM (6) is the least verbose.
  */
 export enum StatusLevel {
   DEBUG = 0,
@@ -46,8 +46,10 @@ export type ToolsResolver = (
 export type ToolsCleanup = () => Promise<void>;
 
 export type MiddlewareResolver = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   middleware: any[] | undefined,
   config: GthConfig
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) => Promise<any[]>;
 export type MiddlewareCleanup = () => Promise<void>;
 
