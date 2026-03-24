@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
-import { display } from '#src/utils/consoleUtils.js';
-import { getCurrentWorkDir } from '#src/utils/systemUtils.js';
+import { display } from '@gaunt-sloth/core/utils/consoleUtils.js';
+import { getCurrentWorkDir } from '@gaunt-sloth/core/utils/systemUtils.js';
 import type { ProviderConfig } from './types.js';
 
 import { readFileSyncWithMessages } from '#src/utils/fileUtils.js';

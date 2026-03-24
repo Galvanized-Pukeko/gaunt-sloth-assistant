@@ -1,4 +1,4 @@
-import { display, displayError, displayWarning } from '#src/utils/consoleUtils.js';
+import { display, displayError, displayWarning } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import type { JiraConfig } from './types.js';
 import {
   getJiraCredentials,

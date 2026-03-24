@@ -11,10 +11,10 @@ import { tool } from '@langchain/core/tools';
 import { createAgent, createMiddleware, type AgentMiddleware } from 'langchain';
 import * as z from 'zod';
 
-import type { GthConfig, RatingConfig } from '#src/config.js';
-import { setArtifact, deleteArtifact } from '#src/state/artifactStore.js';
-import { debugLog, debugLogError } from '#src/utils/debugUtils.js';
-import { getNewRunnableConfig } from '#src/utils/llmUtils.js';
+import type { GthConfig, RatingConfig } from '@gaunt-sloth/core/config.js';
+import { setArtifact, deleteArtifact } from '@gaunt-sloth/core/state/artifactStore.js';
+import { debugLog, debugLogError } from '@gaunt-sloth/core/utils/debugUtils.js';
+import { getNewRunnableConfig } from '@gaunt-sloth/core/utils/llmUtils.js';
 
 /**
  * Schema describing the result of the review rating step.

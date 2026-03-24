@@ -1,4 +1,4 @@
-import type { GthConfig, RatingConfig } from '#src/config.js';
+import type { GthConfig, RatingConfig } from '@gaunt-sloth/core/config.js';
 import {
   defaultStatusCallback,
   displayDebug,
@@ -9,19 +9,20 @@ import {
   flushSessionLog,
   initSessionLogging,
   stopSessionLogging,
-} from '#src/utils/consoleUtils.js';
+} from '@gaunt-sloth/core/utils/consoleUtils.js';
 import { getCommandOutputFilePath } from '#src/utils/fileUtils.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { GthAgentRunner } from '#src/core/GthAgentRunner.js';
+import { GthAgentRunner } from '@gaunt-sloth/core/core/GthAgentRunner.js';
 import { MemorySaver } from '@langchain/langgraph';
-import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
+import { ProgressIndicator } from '@gaunt-sloth/core/utils/ProgressIndicator.js';
 import {
+  createReviewRateMiddleware,
   REVIEW_RATE_ARTIFACT_KEY,
   type ReviewRatingArtifact,
 } from '#src/middleware/reviewRateMiddleware.js';
-import { deleteArtifact, getArtifact } from '#src/state/artifactStore.js';
-import { setExitCode } from '#src/utils/systemUtils.js';
-import type { AgentResolvers } from '#src/core/types.js';
+import { deleteArtifact, getArtifact } from '@gaunt-sloth/core/state/artifactStore.js';
+import { setExitCode } from '@gaunt-sloth/core/utils/systemUtils.js';
+import type { AgentResolvers } from '@gaunt-sloth/core/core/types.js';
 
 export async function review(
   source: string,
@@ -52,7 +53,9 @@ export async function review(
       );
     });
 
-    config.middleware = [...middlewareWithoutReviewRate, { name: 'review-rate', ...rateConfig }];
+    // Resolve review-rate middleware directly rather than going through the registry
+    const reviewRateMiddleware = await createReviewRateMiddleware(rateConfig, config);
+    config.middleware = [...middlewareWithoutReviewRate, reviewRateMiddleware];
   }
 
   const runner = new GthAgentRunner(defaultStatusCallback, resolvers);

@@ -1,7 +1,7 @@
-import { env } from '#src/utils/systemUtils.js';
+import { env } from '@gaunt-sloth/core/utils/systemUtils.js';
 import type { JiraConfig } from '#src/sources/types.js';
 
-import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
+import { ProgressIndicator } from '@gaunt-sloth/core/utils/ProgressIndicator.js';
 
 export interface ResolvedJiraCredentials {
   cloudId: string;

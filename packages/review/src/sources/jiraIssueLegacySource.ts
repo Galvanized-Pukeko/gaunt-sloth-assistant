@@ -1,5 +1,5 @@
-import { display, displayError, displayWarning } from '#src/utils/consoleUtils.js';
-import { env } from '#src/utils/systemUtils.js';
+import { display, displayError, displayWarning } from '@gaunt-sloth/core/utils/consoleUtils.js';
+import { env } from '@gaunt-sloth/core/utils/systemUtils.js';
 import type { JiraLegacyConfig } from '#src/sources/types.js';
 
 interface JiraIssueResponse {

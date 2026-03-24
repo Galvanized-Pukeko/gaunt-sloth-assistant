@@ -7,7 +7,6 @@
  */
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { RatingConfig } from '@gaunt-sloth/core/config.js';
 import { AgentMiddleware } from 'langchain';
 
 /**
@@ -16,7 +15,6 @@ import { AgentMiddleware } from 'langchain';
 export type PredefinedMiddlewareName =
   | 'anthropic-prompt-caching'
   | 'summarization'
-  | 'review-rate'
   | 'binary-content-injection';
 
 /**
@@ -91,7 +89,6 @@ export interface BinaryContentInjectionConfig {
 export type PredefinedMiddlewareConfig =
   | ({ name: 'anthropic-prompt-caching' } & AnthropicPromptCachingConfig)
   | ({ name: 'summarization' } & SummarizationConfig)
-  | ({ name: 'review-rate' } & RatingConfig)
   | ({ name: 'binary-content-injection' } & BinaryContentInjectionConfig);
 
 /**

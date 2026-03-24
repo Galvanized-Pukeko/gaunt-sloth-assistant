@@ -1,6 +1,6 @@
 import type { ProviderConfig } from './types.js';
-import { execAsync } from '#src/utils/systemUtils.js';
-import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
+import { execAsync } from '@gaunt-sloth/core/utils/systemUtils.js';
+import { ProgressIndicator } from '@gaunt-sloth/core/utils/ProgressIndicator.js';
 
 /**
  * Gets PR diff using GitHub CLI

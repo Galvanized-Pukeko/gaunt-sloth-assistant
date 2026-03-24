@@ -1,7 +1,7 @@
-import type { GthConfig } from '#src/config.js';
-import { displayError } from '#src/utils/consoleUtils.js';
+import type { GthConfig } from '@gaunt-sloth/core/config.js';
+import { displayError } from '@gaunt-sloth/core/utils/consoleUtils.js';
 
-import { wrapContent } from '#src/utils/llmUtils.js';
+import { wrapContent } from '@gaunt-sloth/core/utils/llmUtils.js';
 
 /**
  * Requirements sources. Expected to be in `.sources/` dir.
