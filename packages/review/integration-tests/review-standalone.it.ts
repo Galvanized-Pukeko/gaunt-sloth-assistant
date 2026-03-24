@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -20,13 +20,25 @@ describe('Standalone @gaunt-sloth/review integration test', () => {
     const rootDir = path.resolve('.');
 
     // Pack both core and review tarballs directly into the temp directory
-    execSync(`npm pack --pack-destination ${tempDir} -w @gaunt-sloth/core -w @gaunt-sloth/review`, {
-      cwd: rootDir,
-      stdio: 'pipe',
-    });
+    spawnSync(
+      'npm',
+      [
+        'pack',
+        '--pack-destination',
+        tempDir,
+        '-w',
+        '@gaunt-sloth/core',
+        '-w',
+        '@gaunt-sloth/review',
+      ],
+      {
+        cwd: rootDir,
+        stdio: 'pipe',
+      }
+    );
 
     // Initialize a fresh package.json in the temp directory
-    execSync('npm init -y', { cwd: tempDir, stdio: 'pipe' });
+    spawnSync('npm', ['init', '-y'], { cwd: tempDir, stdio: 'pipe' });
 
     // Set type to module since @gaunt-sloth packages use ESM
     const tempPkgPath = path.join(tempDir, 'package.json');
@@ -38,14 +50,16 @@ describe('Standalone @gaunt-sloth/review integration test', () => {
     const tarballs = fs
       .readdirSync(tempDir)
       .filter((f) => f.endsWith('.tgz'))
-      .map((f) => `./${f}`)
-      .join(' ');
+      .map((f) => `./${f}`);
 
-    // Install the packed tarballs
-    execSync(`npm install ${tarballs}`, {
+    // Install the packed tarballs (use spawnSync to avoid shell injection)
+    const installResult = spawnSync('npm', ['install', ...tarballs], {
       cwd: tempDir,
       stdio: 'pipe',
     });
+    if (installResult.status !== 0) {
+      throw new Error(`Command failed: npm install ${tarballs.join(' ')}\n${installResult.stderr}`);
+    }
 
     // Write a minimal config: file content source, fake LLM, no rating
     const config = {
