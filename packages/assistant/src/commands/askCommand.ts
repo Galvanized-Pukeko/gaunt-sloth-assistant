@@ -49,6 +49,12 @@ export function askCommand(
       const { askQuestion } =
         await import('@gaunt-sloth/review/modules/questionAnsweringModule.js');
       const { createResolvers } = await import('@gaunt-sloth/api/resolvers.js');
-      await askQuestion('ASK', getAskSystemPrompt(config), content.join('\n'), config, createResolvers());
+      await askQuestion(
+        'ASK',
+        getAskSystemPrompt(config),
+        content.join('\n'),
+        config,
+        createResolvers()
+      );
     });
 }

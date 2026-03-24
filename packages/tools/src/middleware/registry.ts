@@ -69,10 +69,12 @@ const predefinedMiddlewareFactories = {
     settings: Record<string, unknown>,
     gthConfig: GthConfig
   ): Promise<AgentMiddleware> => {
-    const { createReviewRateMiddleware } = await import(
-      '@gaunt-sloth/review/middleware/reviewRateMiddleware.js'
+    const { createReviewRateMiddleware } =
+      await import('@gaunt-sloth/review/middleware/reviewRateMiddleware.js');
+    return createReviewRateMiddleware(
+      settings,
+      gthConfig as Parameters<typeof createReviewRateMiddleware>[1]
     );
-    return createReviewRateMiddleware(settings, gthConfig);
   },
 } satisfies Record<string, PredefinedMiddlewareFactory>;
 

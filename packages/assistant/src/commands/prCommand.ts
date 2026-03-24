@@ -93,7 +93,14 @@ export function prCommand(
       const { createResolvers } = await import('@gaunt-sloth/api/resolvers.js');
       // TODO consider including requirements id
       // TODO sanitize prId
-      await review(`PR-${prId}`, getReviewSystemPrompt(config), content.join('\n'), config, 'pr', createResolvers());
+      await review(
+        `PR-${prId}`,
+        getReviewSystemPrompt(config),
+        content.join('\n'),
+        config,
+        'pr',
+        createResolvers()
+      );
 
       if (
         requirementsId &&

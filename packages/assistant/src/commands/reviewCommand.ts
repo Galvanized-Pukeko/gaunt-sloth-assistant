@@ -107,6 +107,13 @@ export function reviewCommand(
       }
       const { review } = await import('@gaunt-sloth/review/modules/reviewModule.js');
       const { createResolvers } = await import('@gaunt-sloth/api/resolvers.js');
-      await review('REVIEW', getReviewSystemPrompt(config), content.join('\n'), config, 'review', createResolvers());
+      await review(
+        'REVIEW',
+        getReviewSystemPrompt(config),
+        content.join('\n'),
+        config,
+        'review',
+        createResolvers()
+      );
     });
 }
