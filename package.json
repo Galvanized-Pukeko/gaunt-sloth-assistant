@@ -35,7 +35,7 @@
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.1",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
@@ -44,8 +44,8 @@
     "jiti": "^2.6.1",
     "prettier": "^3.8.1",
     "typedoc": "^0.28.18",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
   },
   "overrides": {
     "rimraf": "^6.1.0",
