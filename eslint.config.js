@@ -12,12 +12,50 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Shared TypeScript rules
+const tsRules = {
+  ...tseslint.configs.recommended.rules,
+  ...prettierConfig.rules,
+  semi: 'error',
+  'eol-last': 'error',
+  'prettier/prettier': 'error',
+  '@typescript-eslint/explicit-function-return-type': 'off',
+  '@typescript-eslint/no-explicit-any': 'warn',
+  '@typescript-eslint/no-unused-vars': [
+    'error',
+    { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+  ],
+};
+
+// Helper to create a package source config
+function pkgSourceConfig(pkg) {
+  return {
+    files: [`packages/${pkg}/src/**/*.ts`],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module',
+        project: path.resolve(__dirname, `packages/${pkg}/tsconfig.json`),
+      },
+      globals: {
+        ...globals.node,
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      prettier: prettierPlugin,
+    },
+    rules: tsRules,
+  };
+}
+
 // Global ignores applied to all configurations
 const globalIgnores = [
   '**/node_modules/**',
   '**/dist/**',
-  'integration-tests/workdir',
-  'integration-tests/workdir-with-profiles',
+  'packages/assistant/integration-tests/workdir',
+  'packages/assistant/integration-tests/workdir-with-profiles',
   'docs-generated/**',
   'readonly/**',
   'coverage/**',
@@ -53,41 +91,20 @@ export default defineConfig([
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
-  // Source TypeScript files
-  {
-    files: ['src/**/*.ts'],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: 'module',
-        project: path.resolve(__dirname, 'tsconfig.json'),
-      },
-      globals: {
-        ...globals.node,
-      },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
-      prettier: prettierPlugin,
-    },
-    rules: {
-      ...tseslint.configs.recommended.rules,
-      ...prettierConfig.rules,
-      semi: 'error',
-      'eol-last': 'error',
-      'prettier/prettier': 'error',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
-      ],
-    },
-  },
+  // Workspace package TypeScript files
+  pkgSourceConfig('core'),
+  pkgSourceConfig('tools'),
+  pkgSourceConfig('api'),
+  pkgSourceConfig('review'),
+  pkgSourceConfig('assistant'),
   // Test TypeScript files with separate project reference
   {
-    files: ['spec/**/*.ts', 'integration-tests/**/*.ts', 'vitest.config.ts', 'vitest-it.config.ts'],
+    files: [
+      'packages/*/spec/**/*.ts',
+      'packages/*/integration-tests/**/*.ts',
+      'vitest.config.ts',
+      'vitest-it.config.ts',
+    ],
     languageOptions: {
       parser: tsParser,
       parserOptions: {

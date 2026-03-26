@@ -1,0 +1,28 @@
+{
+  "name": "@gaunt-sloth/tools",
+  "version": "0.0.1",
+  "description": "Tools and middleware for Gaunt Sloth",
+  "license": "MIT",
+  "author": "Andrew Kondratev",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./*.js": "./dist/*.js"
+  },
+  "imports": {
+    "#src/*.js": "./dist/*.js"
+  },
+  "dependencies": {
+    "@gaunt-sloth/core": "^0.0.1",
+    "diff": "^8.0.3",
+    "langchain": "^1.2.36"
+  },
+  "files": [
+    "./dist/*"
+  ]
+}

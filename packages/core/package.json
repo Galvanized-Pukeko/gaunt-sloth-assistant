@@ -1,0 +1,57 @@
+{
+  "name": "@gaunt-sloth/core",
+  "version": "0.0.1",
+  "description": "Core utilities and types for Gaunt Sloth",
+  "license": "MIT",
+  "author": "Andrew Kondratev",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./*.js": "./dist/*.js"
+  },
+  "imports": {
+    "#src/*.js": "./dist/*.js"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.1.35",
+    "@langchain/langgraph": "^1.2.5",
+    "langchain": "^1.2.36"
+  },
+  "peerDependencies": {
+    "@langchain/anthropic": "^1.3.25",
+    "@langchain/deepseek": "^1.0.18",
+    "@langchain/google": "^0.1.8",
+    "@langchain/groq": "^1.1.5",
+    "@langchain/openai": "^1.2.0",
+    "@langchain/xai": "^1.3.10"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/anthropic": {
+      "optional": true
+    },
+    "@langchain/deepseek": {
+      "optional": true
+    },
+    "@langchain/google": {
+      "optional": true
+    },
+    "@langchain/groq": {
+      "optional": true
+    },
+    "@langchain/openai": {
+      "optional": true
+    },
+    "@langchain/xai": {
+      "optional": true
+    }
+  },
+  "files": [
+    "./dist/*",
+    ".gsloth.*.md"
+  ]
+}

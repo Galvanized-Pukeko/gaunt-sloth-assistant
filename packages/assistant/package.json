@@ -1,0 +1,59 @@
+{
+  "name": "gaunt-sloth-assistant",
+  "version": "1.4.1",
+  "description": "",
+  "license": "MIT",
+  "author": "Andrew Kondratev",
+  "type": "module",
+  "main": "dist/cli.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant.git"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "mcp",
+    "llm",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=11.0.0"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "bin": {
+    "gaunt-sloth-assistant": "cli.js",
+    "gaunt-sloth": "cli.js",
+    "gsloth": "cli.js",
+    "gth": "cli.js"
+  },
+  "dependencies": {
+    "@gaunt-sloth/api": "^0.0.1",
+    "@gaunt-sloth/core": "^0.0.1",
+    "@gaunt-sloth/review": "^0.0.1",
+    "@gaunt-sloth/tools": "^0.0.1",
+    "@langchain/anthropic": "^1.3.25",
+    "@langchain/core": "^1.1.35",
+    "@langchain/deepseek": "^1.0.18",
+    "@langchain/google": "^0.1.8",
+    "@langchain/groq": "^1.1.5",
+    "@langchain/openai": "^1.2.0",
+    "@langchain/xai": "^1.3.10",
+    "commander": "^14.0.3"
+  },
+  "imports": {
+    "#src/*.js": "./dist/*.js"
+  },
+  "exports": {
+    "./*": "./dist/*.js"
+  },
+  "types": "./dist/*",
+  "files": [
+    "./dist/*",
+    "cli.js",
+    ".gsloth.*.md"
+  ]
+}

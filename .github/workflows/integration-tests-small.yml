@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [24.x]
+        node-version: [22.x]
         provider: [groq, inception, openrouter, xai]
       max-parallel: 3
 
