@@ -51,12 +51,36 @@ Alternatively `gh release create --notes "notes"`
 
 This step is now automated, and GitHub action publishes any new release with Release action.
 
+### Publishing the assistant package
+
 ```bash
 npm login
 npm publish
 ```
 
 Remember to review a list of files in the build, before confirming it.
+
+### Publishing library packages
+
+The `@gaunt-sloth/core`, `@gaunt-sloth/tools`, `@gaunt-sloth/api`, and `@gaunt-sloth/review`
+packages are published separately from the assistant.
+
+Preview what will be included in each package:
+
+```bash
+npm pack --dry-run -w @gaunt-sloth/core
+npm pack --dry-run -w @gaunt-sloth/tools
+npm pack --dry-run -w @gaunt-sloth/api
+npm pack --dry-run -w @gaunt-sloth/review
+```
+
+Publish all library packages (first time requires `--access public` for scoped packages):
+
+```bash
+npm publish --access public -w @gaunt-sloth/core -w @gaunt-sloth/tools -w @gaunt-sloth/api -w @gaunt-sloth/review
+```
+
+Subsequent publishes do not need `--access public`.
 
 ## Viewing diff side by side
 
