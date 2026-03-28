@@ -6,17 +6,18 @@ without workspace hoisting leaking in transitive dependencies from other package
 
 ## Bumping versions before deploy
 
-Before the first test-deploy, bump the version in `packages/core/package.json`
-and `packages/review/package.json` directly (just edit the `"version"` field).
-Don't use `npm version` — that creates tags and commits. No tag, no commit,
-just the version number. This avoids conflicts with already-published versions
-on npm.
+Before the first test-deploy, bump versions ahead of what's published on npm.
+Edit the `"version"` field directly in `packages/core/package.json` and
+`packages/review/package.json`. Also update the `@gaunt-sloth/core` dependency
+version in `packages/review/package.json` to match.
 
-Also bump the `@gaunt-sloth/core` dependency version in
-`packages/review/package.json` to match the new core version.
+Don't use `npm version` — that creates tags and commits. For test-deploy
+iterations you want just the version number change, no tags.
 
 You only need to bump once — after that, re-run `./test-deploy.sh` as many
 times as needed while iterating. The tarball is rebuilt from source each time.
+
+See [RELEASE-HOWTO.md](RELEASE-HOWTO.md) for the full release and tagging process.
 
 ## Deploy
 
@@ -33,7 +34,7 @@ This will:
 3. Create `../gaunt-sloth-review-test-deploy/` as a clean staging directory
 4. Copy `package-lock.json` for deterministic resolution
 5. Install both tarballs locally in staging (resolves transitive deps)
-6. Install `@gaunt-sloth/review` globally from the tarball
+6. Install `@gaunt-sloth/review` globally from the staging `node_modules`
 
 After running, test with:
 
@@ -47,10 +48,9 @@ gaunt-sloth-review <pr-number> [requirements...]
 ./test-undeploy.sh
 ```
 
-This will:
-
-1. Uninstall `@gaunt-sloth/review` and `@gaunt-sloth/core` from global node_modules
-2. Remove the `../gaunt-sloth-review-test-deploy/` staging directory
+This removes `@gaunt-sloth/review` and `@gaunt-sloth/core` from global
+node_modules and deletes the `../gaunt-sloth-review-test-deploy/` staging
+directory.
 
 ## Why a staging directory?
 
@@ -58,6 +58,6 @@ Installing a tarball globally with `npm install -g file.tgz` resolves
 dependencies from the npm registry. If `@gaunt-sloth/core` hasn't been
 published yet (or is at a different version), transitive deps won't resolve.
 
-The staging directory acts as a local registry: both tarballs are installed
-there first so npm can resolve `@gaunt-sloth/review` -> `@gaunt-sloth/core`
-locally before the global install.
+The staging directory installs both tarballs locally first, then
+`npm install -g node_modules/@gaunt-sloth/review` picks up the real
+package with all dependencies already resolved.

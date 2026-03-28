@@ -13,6 +13,8 @@ Make sure `npm config set git-tag-version true`
 ! Important ! The `files` block of package.json strictly controls what is actually released,
 the `files` makes .npmignore ignored.
 
+### Assistant package
+
 For patch, e.g., from 0.0.8 to 0.0.9
 
 ```bash
@@ -28,6 +30,24 @@ git push --follow-tags
 ```
 
 Type `\` and then Enter to type new line in message.
+
+### Library packages
+
+Library packages (`@gaunt-sloth/core`, `@gaunt-sloth/tools`, `@gaunt-sloth/api`,
+`@gaunt-sloth/review`) are versioned independently. `npm version` does not work
+well in workspaces for scoped packages, so bump versions manually:
+
+1. Edit the `"version"` field in each package's `package.json`
+2. Update cross-references (e.g. `@gaunt-sloth/core` dependency in review)
+3. Commit and tag each package:
+
+```bash
+git tag "@gaunt-sloth/core@0.0.2"
+git tag "@gaunt-sloth/review@0.0.2"
+git push --follow-tags
+```
+
+Tags follow the `@scope/name@version` convention (same as npm).
 
 ## Publish Release to GitHub
 
@@ -62,9 +82,6 @@ Remember to review a list of files in the build, before confirming it.
 
 ### Publishing library packages
 
-The `@gaunt-sloth/core`, `@gaunt-sloth/tools`, `@gaunt-sloth/api`, and `@gaunt-sloth/review`
-packages are published separately from the assistant.
-
 Preview what will be included in each package:
 
 ```bash
@@ -81,6 +98,11 @@ npm publish --access public -w @gaunt-sloth/core -w @gaunt-sloth/tools -w @gaunt
 ```
 
 Subsequent publishes do not need `--access public`.
+
+### Test-deploying library packages
+
+See [TEST-DEPLOY.md](TEST-DEPLOY.md) for how to test-deploy `@gaunt-sloth/review`
+as a standalone global install before publishing.
 
 ## Viewing diff side by side
 
