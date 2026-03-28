@@ -6,6 +6,8 @@ Built with TypeScript and distributed via NPM, Gaunt Sloth maintains minimal dep
 
 ![GSloth Banner](assets/gaunt-sloth-logo.png)
 
+test 09
+
 Based on [LangChain.js](https://github.com/langchain-ai/langchainjs)
 
 [Documentation](https://gaunt-sloth-assistant.github.io/docs/) | [Official Site](https://gaunt-sloth-assistant.github.io/) | [NPM](https://www.npmjs.com/package/gaunt-sloth-assistant) | [GitHub](https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant)
