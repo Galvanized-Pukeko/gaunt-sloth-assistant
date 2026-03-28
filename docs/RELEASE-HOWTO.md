@@ -95,13 +95,14 @@ npm pack --dry-run -w @gaunt-sloth/api
 npm pack --dry-run -w @gaunt-sloth/review
 ```
 
-Publish all library packages (first time requires `--access public` for scoped packages):
+Publish all library packages:
 
 ```bash
-npm publish --access public -w @gaunt-sloth/core -w @gaunt-sloth/tools -w @gaunt-sloth/api -w @gaunt-sloth/review
+npm publish -w @gaunt-sloth/core -w @gaunt-sloth/tools -w @gaunt-sloth/api -w @gaunt-sloth/review
 ```
 
-Subsequent publishes do not need `--access public`.
+Note: the first ever publish of a scoped package requires `--access public`.
+After that it's not needed.
 
 ### Test-deploying library packages
 
