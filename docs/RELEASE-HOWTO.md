@@ -39,15 +39,17 @@ well in workspaces for scoped packages, so bump versions manually:
 
 1. Edit the `"version"` field in each package's `package.json`
 2. Update cross-references (e.g. `@gaunt-sloth/core` dependency in review)
-3. Commit and tag each package:
+3. Commit and create annotated tags for each package:
 
 ```bash
-git tag "@gaunt-sloth/core@0.0.2"
-git tag "@gaunt-sloth/review@0.0.2"
+git tag -a "@gaunt-sloth/core@0.0.3" -m "Release @gaunt-sloth/core@0.0.3"
+git tag -a "@gaunt-sloth/review@0.0.3" -m "Release @gaunt-sloth/review@0.0.3"
 git push --follow-tags
 ```
 
 Tags follow the `@scope/name@version` convention (same as npm).
+
+Use annotated tags (`-a`) — lightweight tags are not pushed by `--follow-tags`.
 
 ## Publish Release to GitHub (assistant only)
 
