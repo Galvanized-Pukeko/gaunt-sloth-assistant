@@ -23,3 +23,11 @@ Tools and middleware for Gaunt Sloth.
 import { builtInToolsConfig } from '@gaunt-sloth/tools/builtInToolsConfig.js';
 import { resolveMiddleware } from '@gaunt-sloth/tools/middleware/registry.js';
 ```
+
+## Related packages
+
+- [`@gaunt-sloth/core`](../core) — Core utilities, config, and agent infrastructure
+- [`@gaunt-sloth/tools`](../tools) — Built-in tools, filesystem toolkit, and middleware registry (this package)
+- [`@gaunt-sloth/api`](../api) — API server, AG-UI, MCP, and A2A integration
+- [`@gaunt-sloth/review`](../review) — Review and Q&A modules with standalone CLI
+- [`gaunt-sloth-assistant`](../assistant) — Main CLI application

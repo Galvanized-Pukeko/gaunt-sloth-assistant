@@ -29,3 +29,11 @@ import { reviewModule } from '@gaunt-sloth/review/reviewModule.js';
 import { questionAnsweringModule } from '@gaunt-sloth/review/questionAnsweringModule.js';
 import { commandUtils } from '@gaunt-sloth/review/commandUtils.js';
 ```
+
+## Related packages
+
+- [`@gaunt-sloth/core`](../core) — Core utilities, config, and agent infrastructure
+- [`@gaunt-sloth/tools`](../tools) — Built-in tools, filesystem toolkit, and middleware registry
+- [`@gaunt-sloth/api`](../api) — API server, AG-UI, MCP, and A2A integration
+- [`@gaunt-sloth/review`](../review) — Review and Q&A modules with standalone CLI (this package)
+- [`gaunt-sloth-assistant`](../assistant) — Main CLI application

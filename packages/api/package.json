@@ -4,6 +4,16 @@
   "description": "API server for Gaunt Sloth",
   "license": "MIT",
   "author": "Andrew Kondratev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant.git",
+    "directory": "packages/api"
+  },
+  "bugs": {
+    "url": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues"
+  },
+  "homepage": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/tree/main/packages/api#readme",
+  "keywords": ["ai", "agent", "llm", "api", "ag-ui", "mcp", "a2a"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

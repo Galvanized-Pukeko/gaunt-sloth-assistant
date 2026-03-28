@@ -35,3 +35,11 @@ import { OAuthClientProviderImpl } from '@gaunt-sloth/api/OAuthClientProviderImp
 import { mcpUtils } from '@gaunt-sloth/api/mcpUtils.js';
 import { createResolvers } from '@gaunt-sloth/api/resolvers.js';
 ```
+
+## Related packages
+
+- [`@gaunt-sloth/core`](../core) — Core utilities, config, and agent infrastructure
+- [`@gaunt-sloth/tools`](../tools) — Built-in tools, filesystem toolkit, and middleware registry
+- [`@gaunt-sloth/api`](../api) — API server, AG-UI, MCP, and A2A integration (this package)
+- [`@gaunt-sloth/review`](../review) — Review and Q&A modules with standalone CLI
+- [`gaunt-sloth-assistant`](../assistant) — Main CLI application

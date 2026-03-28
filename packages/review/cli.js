@@ -8,6 +8,17 @@
  * When called without arguments, reads diff from stdin via the configured content provider.
  */
 
+import { createRequire } from 'node:module';
+
+const args = process.argv.slice(2);
+
+if (args.includes('--version') || args.includes('-v')) {
+  const require = createRequire(import.meta.url);
+  const { version } = require('./package.json');
+  console.log(version);
+  process.exit(0);
+}
+
 import { setEntryPoint } from '@gaunt-sloth/core/utils/systemUtils.js';
 setEntryPoint(import.meta.url);
 
@@ -16,8 +27,6 @@ import { review } from '#src/modules/reviewModule.js';
 import { displayError } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import { getContentFromSource, getRequirementsFromSource } from '#src/commands/commandUtils.js';
 import { buildSystemMessages } from '@gaunt-sloth/core/utils/llmUtils.js';
-
-const args = process.argv.slice(2);
 
 async function main() {
   try {

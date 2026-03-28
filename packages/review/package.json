@@ -4,6 +4,16 @@
   "description": "Review functionality for Gaunt Sloth",
   "license": "MIT",
   "author": "Andrew Kondratev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant.git",
+    "directory": "packages/review"
+  },
+  "bugs": {
+    "url": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues"
+  },
+  "homepage": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/tree/main/packages/review#readme",
+  "keywords": ["ai", "agent", "llm", "code-review", "cli"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

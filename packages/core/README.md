@@ -25,3 +25,11 @@ All modules are exported via the `./` export map pattern (`./*.js`), e.g.:
 import { GthAgentRunner } from '@gaunt-sloth/core/agentRunner.js';
 import { display } from '@gaunt-sloth/core/utils/consoleUtils.js';
 ```
+
+## Related packages
+
+- [`@gaunt-sloth/core`](../core) — Core utilities, config, and agent infrastructure (this package)
+- [`@gaunt-sloth/tools`](../tools) — Built-in tools, filesystem toolkit, and middleware registry
+- [`@gaunt-sloth/api`](../api) — API server, AG-UI, MCP, and A2A integration
+- [`@gaunt-sloth/review`](../review) — Review and Q&A modules with standalone CLI
+- [`gaunt-sloth-assistant`](../assistant) — Main CLI application

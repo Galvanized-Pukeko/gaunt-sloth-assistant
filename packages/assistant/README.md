@@ -41,3 +41,11 @@ npm install -g gaunt-sloth-assistant
 ```
 
 For full usage documentation see the [root README](../../README.md) and [docs/COMMANDS.md](../../docs/COMMANDS.md).
+
+## Related packages
+
+- [`@gaunt-sloth/core`](../core) — Core utilities, config, and agent infrastructure
+- [`@gaunt-sloth/tools`](../tools) — Built-in tools, filesystem toolkit, and middleware registry
+- [`@gaunt-sloth/api`](../api) — API server, AG-UI, MCP, and A2A integration
+- [`@gaunt-sloth/review`](../review) — Review and Q&A modules with standalone CLI
+- [`gaunt-sloth-assistant`](../assistant) — Main CLI application (this package)

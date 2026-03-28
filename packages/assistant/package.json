@@ -10,6 +10,10 @@
     "type": "git",
     "url": "git+https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant.git"
   },
+  "bugs": {
+    "url": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues"
+  },
+  "homepage": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant#readme",
   "keywords": [
     "ai",
     "agent",
