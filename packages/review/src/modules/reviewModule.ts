@@ -58,7 +58,12 @@ export async function review(
     config.middleware = [...middlewareWithoutReviewRate, reviewRateMiddleware];
   }
 
-  const runner = new GthAgentRunner(defaultStatusCallback, resolvers);
+  // When no resolvers are provided (e.g. standalone CLI without @gaunt-sloth/tools),
+  // supply a minimal middleware resolver that passes through already-resolved middleware.
+  const effectiveResolvers: AgentResolvers = resolvers ?? {
+    resolveMiddleware: async (middleware) => middleware ?? [],
+  };
+  const runner = new GthAgentRunner(defaultStatusCallback, effectiveResolvers);
   try {
     await runner.init(command, config, new MemorySaver());
     await runner.processMessages(messages);

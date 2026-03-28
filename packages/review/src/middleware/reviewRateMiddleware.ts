@@ -12,8 +12,9 @@ import { createAgent, createMiddleware, type AgentMiddleware } from 'langchain';
 import * as z from 'zod';
 
 import type { GthConfig, RatingConfig } from '@gaunt-sloth/core/config.js';
-import { setArtifact, deleteArtifact } from '@gaunt-sloth/core/state/artifactStore.js';
+import { setArtifact, deleteArtifact, getArtifact } from '@gaunt-sloth/core/state/artifactStore.js';
 import { debugLog, debugLogError } from '@gaunt-sloth/core/utils/debugUtils.js';
+import { displayWarning } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import { getNewRunnableConfig } from '@gaunt-sloth/core/utils/llmUtils.js';
 
 /**
@@ -117,7 +118,21 @@ export function createReviewRateMiddleware(
             },
             getNewRunnableConfig()
           );
+
+          const artifact = getArtifact(REVIEW_RATE_ARTIFACT_KEY);
+          if (!artifact) {
+            displayWarning(
+              'ReviewRateMiddleware: rating agent completed but did not call the rating tool. ' +
+                'The model may not have followed instructions to call ' +
+                REVIEW_RATE_TOOL_NAME +
+                '.'
+            );
+          }
         } catch (error) {
+          displayWarning(
+            'ReviewRateMiddleware: rating agent failed — ' +
+              (error instanceof Error ? error.message : String(error))
+          );
           debugLogError('ReviewRateMiddleware.invoke', error);
         }
 
