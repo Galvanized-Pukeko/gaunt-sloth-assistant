@@ -3,6 +3,8 @@
 
 Gaunt Sloth Assistant is a command-line AI assistant for CI/CD workflows, code reviews, and DIY projects. It supports PR and diff reviews with requirements context, code and diff Q&A, interactive chat and coding sessions, and controlled automation through predefined tools and JSON or JavaScript configuration.
 
+test
+
 ![GSloth Banner](assets/gaunt-sloth-logo.png)
 
 Based on [LangChain.js](https://github.com/langchain-ai/langchainjs)
