@@ -49,7 +49,11 @@ git push --follow-tags
 
 Tags follow the `@scope/name@version` convention (same as npm).
 
-## Publish Release to GitHub
+## Publish Release to GitHub (assistant only)
+
+Library packages don't need GitHub releases — they're consumed as npm
+dependencies, so npm is the distribution channel. Git tags provide
+version history in the repo.
 
 Note the release version from pervious step and do
 
