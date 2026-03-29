@@ -24,6 +24,14 @@ npm ci
 npm run build
 ```
 
+If you need to regenerate `package-lock.json`, use the `--workspaces --include-workspace-root` flags:
+
+```bash
+npm install --workspaces --include-workspace-root
+```
+
+Plain `npm install` may omit workspace entries from the lockfile, which causes `npm ci` to fail with "Missing from lock file" errors.
+
 Useful commands:
 
 ```bash
