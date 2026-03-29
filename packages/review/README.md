@@ -2,6 +2,28 @@
 
 Review and question-answering functionality for Gaunt Sloth.
 
+## Installation
+
+This package does not include any AI provider packages. This is by design to
+keep the install minimal and avoid pulling in providers you don't use. Install
+the review package together with the provider required by your configuration:
+
+```bash
+# OpenRouter / OpenAI
+npm install -g @gaunt-sloth/review @langchain/openai
+
+# Google (Vertex AI / AI Studio)
+npm install -g @gaunt-sloth/review @langchain/google
+
+# Anthropic
+npm install -g @gaunt-sloth/review @langchain/anthropic
+
+# Groq
+npm install -g @gaunt-sloth/review @langchain/groq
+```
+
+See [`@gaunt-sloth/core`](../core) for the full list of supported providers.
+
 ## Contents
 
 - Review module (`reviewModule`) — diff and content review orchestration
