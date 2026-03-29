@@ -5,6 +5,8 @@ on:
 
 jobs:
   test-and-lint:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     
     strategy:
