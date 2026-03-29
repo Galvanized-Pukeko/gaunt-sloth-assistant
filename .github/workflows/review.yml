@@ -29,7 +29,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm i gaunt-sloth-assistant@1.2.3 -g && gth --version
+        run: npm i @gaunt-sloth/review @langchain/openai -g && gaunt-sloth-review --version
 
       - name: Extract issue number from PR title
         id: extract_issue
@@ -45,14 +45,16 @@ jobs:
         continue-on-error: true
         run: |
           if [ -z "${{ steps.extract_issue.outputs.issue_number }}" ]; then
-            echo "ℹ️ **Tip:** To link this PR to an issue, start your PR title with the issue number followed by a space (e.g., '123 Fix authentication bug')" | tee review.md
-            echo "" >> review.md
-            gth --nopipe -i review pr ${{ github.event.pull_request.number }}
+            gaunt-sloth-review ${{ github.event.pull_request.number }}
+            # Prepend tip about linking issues when no issue number was found
+            TIP="ℹ️ **Tip:** To link this PR to an issue, start your PR title with the issue number followed by a space (e.g., '123 Fix authentication bug')"
+            echo -e "${TIP}\n\n$(cat review.md)" > review.md
           else
-            gth --nopipe -i review pr ${{ github.event.pull_request.number }} ${{ steps.extract_issue.outputs.issue_number }}
+            gaunt-sloth-review ${{ github.event.pull_request.number }} ${{ steps.extract_issue.outputs.issue_number }}
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GSLOTH_IDENTITY_PROFILE: review
           OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
 
       - name: Hide older AI review comments and post new one
