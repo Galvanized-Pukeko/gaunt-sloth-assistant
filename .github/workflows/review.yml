@@ -29,7 +29,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm i @gaunt-sloth/review @langchain/openai -g && gaunt-sloth-review --version
+        run: npm i @gaunt-sloth/review@0.0.4 @langchain/openai@1.2.0 -g && gaunt-sloth-review --version
 
       - name: Extract issue number from PR title
         id: extract_issue
@@ -47,8 +47,10 @@ jobs:
           if [ -z "${{ steps.extract_issue.outputs.issue_number }}" ]; then
             gaunt-sloth-review ${{ github.event.pull_request.number }}
             # Prepend tip about linking issues when no issue number was found
-            TIP="ℹ️ **Tip:** To link this PR to an issue, start your PR title with the issue number followed by a space (e.g., '123 Fix authentication bug')"
-            echo -e "${TIP}\n\n$(cat review.md)" > review.md
+            { echo 'ℹ️ **Tip:** To link this PR to an issue, start your PR title with the issue number followed by a space (e.g., "123 Fix authentication bug")'
+              echo ""
+              cat review.md
+            } > review.tmp && mv review.tmp review.md
           else
             gaunt-sloth-review ${{ github.event.pull_request.number }} ${{ steps.extract_issue.outputs.issue_number }}
           fi
