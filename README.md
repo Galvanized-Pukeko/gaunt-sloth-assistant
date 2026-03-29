@@ -103,7 +103,7 @@ These apply to every command:
 
 - **`init`** - Initialize Gaunt Sloth in your project (auto-detects API keys when called without arguments)
 - **`get`** - Inspect the effective prompt or provider-backed input used by another command
-- **`pr`** - ⚠️ This feature requires GitHub CLI to be installed. Review pull requests with optional requirement integration (GitHub issues or Jira).
+- **`pr`** - ⚠️ This feature requires GitHub CLI to be installed. Review pull requests with optional requirement integration (GitHub issues or Jira). For CI pipelines, consider the lightweight [`@gaunt-sloth/review`](./packages/review#readme) package.
 - **`review`** - Review any diff or content from various sources
 - **`ask`** - Ask questions about code or programming topics
 - **`chat`** - Start an interactive chat session

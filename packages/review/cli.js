@@ -30,7 +30,9 @@ import { buildSystemMessages } from '@gaunt-sloth/core/utils/llmUtils.js';
 
 async function main() {
   try {
-    const config = await initConfig({});
+    const config = await initConfig({
+      identityProfile: process.env.GSLOTH_IDENTITY_PROFILE,
+    });
 
     // First arg is content (e.g. PR number), rest are requirements
     const contentArg = args[0];

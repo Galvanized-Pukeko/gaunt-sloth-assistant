@@ -15,6 +15,24 @@ Review and question-answering functionality for Gaunt Sloth.
 
 The package ships a standalone binary `gaunt-sloth-review` for CI-friendly reviews that does not depend on `commander`. This makes it suitable for embedding in pipelines where a minimal footprint is preferred.
 
+```bash
+gaunt-sloth-review <pr-number> [requirement-ids...]
+gaunt-sloth-review --version
+```
+
+### Identity profiles
+
+To use a different config profile (e.g. separate provider/auth for CI vs local),
+set the `GSLOTH_IDENTITY_PROFILE` environment variable:
+
+```bash
+GSLOTH_IDENTITY_PROFILE=review gaunt-sloth-review 123
+```
+
+This loads config from `.gsloth-settings/review/` instead of the default
+`.gsloth/` directory. Useful when CI uses different credentials or a different
+LLM provider than local development.
+
 ## Dependencies
 
 - `@gaunt-sloth/core` (required)
