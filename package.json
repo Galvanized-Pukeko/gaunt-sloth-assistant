@@ -11,7 +11,7 @@
     "url": "git+https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant.git"
   },
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=24.0.0",
     "npm": ">=11.0.0"
   },
   "workspaces": [
