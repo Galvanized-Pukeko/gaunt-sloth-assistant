@@ -15,6 +15,6 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
-      - run: npm publish --provenance --access public --tag latest
+      - run: npm publish --provenance --access public --tag latest -w gaunt-sloth-assistant
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
