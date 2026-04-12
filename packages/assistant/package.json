@@ -35,7 +35,7 @@
     "gth": "cli.js"
   },
   "dependencies": {
-    "@gaunt-sloth/api": "^0.0.1",
+    "@gaunt-sloth/api": "^0.0.2",
     "@gaunt-sloth/core": "^0.0.1",
     "@gaunt-sloth/review": "^0.0.1",
     "@gaunt-sloth/tools": "^0.0.1",
