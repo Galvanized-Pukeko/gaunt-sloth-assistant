@@ -57,7 +57,7 @@ function convertMessage(msg: {
 
 export async function startAgUiServer(config: GthConfig, port: number): Promise<void> {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '5mb' }));
 
   displayInfo(
     'WARNING: AG-UI server is intended for local clients only. Do not expose to public networks.'
@@ -90,7 +90,7 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
 
   // AG-UI endpoint — standard path per AG-UI protocol
   app.post('/agents/:agentId/run', async (req, res) => {
-    const { threadId, runId, messages } = req.body;
+    const { threadId, runId, messages, forwardedProps } = req.body;
     const effectiveThreadId = threadId || randomUUID();
     const effectiveRunId = runId || randomUUID();
 
@@ -109,14 +109,6 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
         })
       );
 
-      // Build LangChain messages, prepending system prompt for new threads
-      const langChainMessages: BaseMessage[] = [];
-      if (!initializedThreads.has(effectiveThreadId)) {
-        initializedThreads.add(effectiveThreadId);
-        langChainMessages.push(...buildSystemMessages(config, readChatPrompt(config)));
-      }
-      langChainMessages.push(...(messages || []).map(convertMessage));
-
       const messageId = randomUUID();
 
       // Get runnable config with thread_id for checkpointing
@@ -128,7 +120,21 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
       // Stream the response with typed events
       let textMessageStarted = false;
 
-      for await (const event of agent.streamWithEvents(langChainMessages, runConfig)) {
+      let eventStream;
+      if (forwardedProps?.command?.resume !== undefined) {
+        eventStream = agent.streamWithEventsResume(forwardedProps.command.resume, runConfig);
+      } else {
+        // Build LangChain messages, prepending system prompt for new threads
+        const langChainMessages: BaseMessage[] = [];
+        if (!initializedThreads.has(effectiveThreadId)) {
+          initializedThreads.add(effectiveThreadId);
+          langChainMessages.push(...buildSystemMessages(config, readChatPrompt(config)));
+        }
+        langChainMessages.push(...(messages || []).map(convertMessage));
+        eventStream = agent.streamWithEvents(langChainMessages, runConfig);
+      }
+
+      for await (const event of eventStream) {
         switch (event.type) {
           case 'text': {
             if (!textMessageStarted) {

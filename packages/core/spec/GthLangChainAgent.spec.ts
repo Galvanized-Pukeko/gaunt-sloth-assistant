@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
-import { AIMessage, AIMessageChunk, HumanMessage } from '@langchain/core/messages';
-import { MemorySaver } from '@langchain/langgraph';
+import { AIMessage, AIMessageChunk, HumanMessage, ToolMessage } from '@langchain/core/messages';
+import { Command, GraphInterrupt, MemorySaver } from '@langchain/langgraph';
 import type { GthConfig } from '#src/config.js';
 import type { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { FakeListChatModel, FakeStreamingChatModel } from '@langchain/core/utils/testing';
@@ -723,6 +723,211 @@ describe('GthLangChainAgent', () => {
         StatusLevel.SUCCESS,
         'Wrote model output (image/png) to /tmp/gth_test_ASK.png'
       );
+    });
+  });
+
+  describe('streamWithEvents', () => {
+    it('should swallow GraphInterrupt and end the iterator', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      // Underlying stream throws GraphInterrupt — simulates a tool calling interrupt()
+      agentMock.stream.mockRejectedValue(new GraphInterrupt([{ value: 'paused' }]));
+
+      const runConfig: RunnableConfig = {
+        recursionLimit: 1000,
+        configurable: { thread_id: 't1' },
+      };
+      const events: unknown[] = [];
+      for await (const ev of agent.streamWithEvents([new HumanMessage('go')], runConfig)) {
+        events.push(ev);
+      }
+
+      // No events yielded — generator returned cleanly without throwing
+      expect(events).toEqual([]);
+    });
+
+    it('should rethrow non-GraphInterrupt errors', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      agentMock.stream.mockRejectedValue(new Error('boom'));
+
+      const runConfig: RunnableConfig = {
+        recursionLimit: 1000,
+        configurable: { thread_id: 't2' },
+      };
+
+      await expect(async () => {
+        for await (const _ev of agent.streamWithEvents([new HumanMessage('go')], runConfig)) {
+          // drain
+        }
+      }).rejects.toThrow('boom');
+    });
+  });
+
+  describe('streamWithEventsResume', () => {
+    it('should throw if not initialized', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const runConfig: RunnableConfig = {
+        recursionLimit: 1000,
+        configurable: { thread_id: 't' },
+      };
+      await expect(async () => {
+        for await (const _ of agent.streamWithEventsResume('value', runConfig)) {
+          // drain
+        }
+      }).rejects.toThrow('Agent not initialized. Call init() first.');
+    });
+
+    it('should call underlying agent.stream with a Command({resume}) instance', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      // Empty stream — we only care that stream() was invoked correctly
+      async function* empty() {}
+      agentMock.stream.mockResolvedValue(empty());
+
+      const runConfig: RunnableConfig = {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'resumed-thread' },
+      };
+      for await (const _ev of agent.streamWithEventsResume(
+        '{"mimeType":"image/jpeg","data":"AAA"}',
+        runConfig
+      )) {
+        // drain
+      }
+
+      expect(agentMock.stream).toHaveBeenCalledOnce();
+      const [arg, opts] = agentMock.stream.mock.calls[0];
+      expect(arg).toBeInstanceOf(Command);
+      expect((arg as Command).resume).toBe('{"mimeType":"image/jpeg","data":"AAA"}');
+      expect(opts).toMatchObject({
+        configurable: { thread_id: 'resumed-thread' },
+        streamMode: 'messages',
+      });
+    });
+
+    it('should yield processed tool_result events from the resumed stream', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      // Simulate a resumed run: AIMessage proposing a tool call, then a ToolMessage with result
+      const aiWithToolCall = new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'tc-1', name: 'capture_image', args: {} }],
+      });
+      const toolResult = new ToolMessage({ content: 'IMAGE_BYTES', tool_call_id: 'tc-1' });
+
+      async function* resumedStream() {
+        yield [aiWithToolCall, {}];
+        yield [toolResult, {}];
+      }
+      agentMock.stream.mockResolvedValue(resumedStream());
+
+      const events: { type: string; id?: string; content?: string }[] = [];
+      for await (const ev of agent.streamWithEventsResume('payload', {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'resumed-thread' },
+      })) {
+        events.push(ev as { type: string; id?: string; content?: string });
+      }
+
+      expect(events.map((e) => e.type)).toEqual([
+        'tool_start',
+        'tool_args',
+        'tool_end',
+        'tool_result',
+      ]);
+      expect(events[3]).toMatchObject({ type: 'tool_result', id: 'tc-1', content: 'IMAGE_BYTES' });
+    });
+  });
+
+  describe('extractAndFlattenTools — frontend-fulfilled tools', () => {
+    it('should wrap tools with metadata.client === true so invoke() calls interrupt()', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+
+      const originalInvoke = vi.fn().mockResolvedValue('original');
+      const clientTool = {
+        name: 'capture_image',
+        description: 'client',
+        invoke: originalInvoke,
+        call: originalInvoke,
+        metadata: { client: true },
+        // Object.getPrototypeOf needs a prototype-bearing object
+      } as unknown as StructuredToolInterface;
+
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+
+      await agent.init(undefined, {
+        ...mockConfig,
+        llm: fakeListChatModel,
+        tools: [clientTool],
+      } as GthConfig);
+
+      // The agent received a wrapped clone — extract it from createAgent's call
+      const createAgentArg = createAgentMock.mock.calls[0][0] as {
+        tools: StructuredToolInterface[];
+      };
+      const wrappedTool = createAgentArg.tools.find((t) => t.name === 'capture_image');
+      expect(wrappedTool).toBeDefined();
+
+      // Original tool's invoke must be untouched (the agent must clone before mutating)
+      expect(clientTool.invoke).toBe(originalInvoke);
+      expect(originalInvoke).not.toHaveBeenCalled();
+
+      // Calling invoke() outside a graph run throws — confirms interrupt() was reached.
+      // (Inside a real LangGraph node, this throws GraphInterrupt; outside, a regular Error
+      // about "called outside the context".) Either way, the wrapper called interrupt(),
+      // not the original invoke.
+      await expect(
+        (
+          wrappedTool as StructuredToolInterface & {
+            invoke: (_i: unknown) => Promise<unknown>;
+          }
+        ).invoke({})
+      ).rejects.toThrow(/interrupt/i);
+      expect(originalInvoke).not.toHaveBeenCalled();
+    });
+
+    it('should leave tools without metadata.client untouched', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+
+      const serverInvoke = vi.fn().mockResolvedValue('server-result');
+      const serverTool = {
+        name: 'server_tool',
+        description: 'server',
+        invoke: serverInvoke,
+        call: serverInvoke,
+      } as unknown as StructuredToolInterface;
+
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+
+      await agent.init(undefined, {
+        ...mockConfig,
+        llm: fakeListChatModel,
+        tools: [serverTool],
+      } as GthConfig);
+
+      const createAgentArg = createAgentMock.mock.calls[0][0] as {
+        tools: StructuredToolInterface[];
+      };
+      const passedTool = createAgentArg.tools.find((t) => t.name === 'server_tool');
+
+      // Same instance passed through — no clone, no wrap
+      expect(passedTool).toBe(serverTool);
+      expect((passedTool as StructuredToolInterface).invoke).toBe(serverInvoke);
     });
   });
 

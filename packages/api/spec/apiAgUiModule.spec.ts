@@ -27,11 +27,13 @@ vi.mock('@langchain/langgraph', () => ({
 const gthLangChainAgentInitMock = vi.fn();
 const gthLangChainAgentStreamMock = vi.fn();
 const gthLangChainAgentStreamWithEventsMock = vi.fn();
+const gthLangChainAgentStreamWithEventsResumeMock = vi.fn();
 vi.mock('#src/core/GthLangChainAgent.js', () => {
   const GthLangChainAgent = vi.fn();
   GthLangChainAgent.prototype.init = gthLangChainAgentInitMock;
   GthLangChainAgent.prototype.stream = gthLangChainAgentStreamMock;
   GthLangChainAgent.prototype.streamWithEvents = gthLangChainAgentStreamWithEventsMock;
+  GthLangChainAgent.prototype.streamWithEventsResume = gthLangChainAgentStreamWithEventsResumeMock;
   return {
     GthLangChainAgent,
   };
@@ -161,6 +163,7 @@ describe('apiAgUiModule', () => {
     });
     gthLangChainAgentStreamMock.mockReturnValue(emptyStream());
     gthLangChainAgentStreamWithEventsMock.mockReturnValue(emptyStream());
+    gthLangChainAgentStreamWithEventsResumeMock.mockReturnValue(emptyStream());
     // Reset to default so tests that override it don't bleed into the next test
     llmUtilsMock.buildSystemMessages.mockReturnValue([]);
   });
@@ -449,6 +452,75 @@ describe('apiAgUiModule', () => {
       const [passedMessages] = gthLangChainAgentStreamWithEventsMock.mock.calls[0];
       expect(passedMessages[0]).toMatchObject({ role: 'user' });
     });
+
+    // ─── Frontend-fulfilled tool resume ────────────────────────────────────
+
+    it('should route to streamWithEventsResume when forwardedProps.command.resume is present', async () => {
+      gthLangChainAgentStreamWithEventsResumeMock.mockReturnValue(textStream('resumed'));
+
+      const handler = await getRunHandler();
+      const req = makeRunReq({
+        threadId: 'resume-thread',
+        forwardedProps: {
+          command: {
+            resume: '{"mimeType":"image/jpeg","data":"AAA"}',
+            interruptEvent: { toolCallId: 'tc-1', runId: 'run-1' },
+          },
+        },
+      });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      expect(gthLangChainAgentStreamWithEventsResumeMock).toHaveBeenCalledOnce();
+      const [resumeValue] = gthLangChainAgentStreamWithEventsResumeMock.mock.calls[0];
+      expect(resumeValue).toBe('{"mimeType":"image/jpeg","data":"AAA"}');
+      expect(gthLangChainAgentStreamWithEventsMock).not.toHaveBeenCalled();
+    });
+
+    it('should skip message conversion and system prepend on resume', async () => {
+      llmUtilsMock.buildSystemMessages.mockReturnValue([
+        { role: 'system', content: 'You are Gaunt Sloth.' },
+      ]);
+
+      const handler = await getRunHandler();
+      const req = makeRunReq({
+        threadId: 'fresh-resume-thread',
+        // Even though messages and a fresh thread imply system-prepend on the normal path,
+        // the resume branch should not call buildSystemMessages.
+        messages: [{ role: 'user', content: 'should be ignored', id: '1' }],
+        forwardedProps: { command: { resume: 'value', interruptEvent: { toolCallId: 'tc-2' } } },
+      });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      expect(llmUtilsMock.buildSystemMessages).not.toHaveBeenCalled();
+      expect(gthLangChainAgentStreamWithEventsMock).not.toHaveBeenCalled();
+      expect(gthLangChainAgentStreamWithEventsResumeMock).toHaveBeenCalledOnce();
+    });
+
+    it('should pass runConfig with thread_id to streamWithEventsResume', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({
+        threadId: 'resume-thread-42',
+        forwardedProps: { command: { resume: 'val' } },
+      });
+
+      await handler(req, makeMockRes());
+
+      const [, runConfig] = gthLangChainAgentStreamWithEventsResumeMock.mock.calls[0];
+      expect(runConfig.configurable).toMatchObject({ thread_id: 'resume-thread-42' });
+    });
+  });
+
+  // ─── express.json body limit ─────────────────────────────────────────────
+
+  it('should configure express.json with 5mb body limit', async () => {
+    const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+    await startAgUiServer(baseConfig, 3000);
+
+    expect(expressJsonMock).toHaveBeenCalledWith({ limit: '5mb' });
   });
 
   // ─── /health endpoint ──────────────────────────────────────────────────────

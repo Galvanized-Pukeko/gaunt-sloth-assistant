@@ -11,11 +11,11 @@ import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.j
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape, getCurrentWorkDir } from '#src/utils/systemUtils.js';
-import { AIMessage, ToolMessage } from '@langchain/core/messages';
+import { AIMessage, BaseMessage, ToolMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
-import { BaseCheckpointSaver } from '@langchain/langgraph';
+import { BaseCheckpointSaver, interrupt, Command, GraphInterrupt } from '@langchain/langgraph';
 import { createAgent, createMiddleware } from 'langchain';
 import {
   extractInlineBinaryBlocks,
@@ -329,6 +329,11 @@ export class GthLangChainAgent implements GthAgentInterface {
   /**
    * Stream agent events as typed AgentStreamEvent objects.
    * Yields text deltas, tool call lifecycle events, and tool results.
+   *
+   * If a tool with `metadata.client === true` triggers `interrupt()`, the underlying
+   * graph throws `GraphInterrupt`; this generator catches it and ends cleanly so the
+   * caller's transport (e.g. AG-UI SSE) can finish the run with the tool call hanging.
+   * Resume the suspended graph via {@link streamWithEventsResume} on the same thread id.
    */
   async *streamWithEvents(
     messages: Message[],
@@ -341,8 +346,57 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLog('=== Starting streamWithEvents ===');
     debugLogObject('LLM Input Messages', messages);
 
-    const stream = await this.agent.stream({ messages }, { ...runConfig, streamMode: 'messages' });
+    try {
+      const stream = await this.agent.stream(
+        { messages },
+        { ...runConfig, streamMode: 'messages' }
+      );
+      yield* this.processEventStream(stream);
+    } catch (e) {
+      if (e instanceof GraphInterrupt || (e as Error).name === 'GraphInterrupt') {
+        debugLog('Graph suspended via GraphInterrupt');
+        return;
+      }
+      throw e;
+    }
+  }
 
+  /**
+   * Resume a graph that was suspended via `interrupt()` with the supplied value.
+   *
+   * The runnable config must carry the same `thread_id` used when the graph was
+   * suspended (the checkpointer keys state by thread). The resume value is whatever
+   * the suspending tool needs back — for frontend-fulfilled tools this is the value
+   * the client sends in `forwardedProps.command.resume`.
+   */
+  async *streamWithEventsResume(
+    resumeValue: unknown,
+    runConfig: RunnableConfig
+  ): AsyncGenerator<AgentStreamEvent> {
+    if (!this.agent || !this.config) {
+      throw new Error('Agent not initialized. Call init() first.');
+    }
+
+    debugLog('=== Starting streamWithEventsResume ===');
+
+    try {
+      const stream = await this.agent.stream(new Command({ resume: resumeValue }), {
+        ...runConfig,
+        streamMode: 'messages',
+      });
+      yield* this.processEventStream(stream);
+    } catch (e) {
+      if (e instanceof GraphInterrupt || (e as Error).name === 'GraphInterrupt') {
+        debugLog('Graph suspended via GraphInterrupt');
+        return;
+      }
+      throw e;
+    }
+  }
+
+  private async *processEventStream(
+    stream: IterableReadableStream<[BaseMessage, Record<string, unknown>]>
+  ): AsyncGenerator<AgentStreamEvent> {
     // Buffer tool calls across chunks so we use final (complete) args
     const pendingToolCalls = new Map<string, { id: string; name: string; args: unknown }>();
 
@@ -432,7 +486,21 @@ export class GthLangChainAgent implements GthAgentInterface {
         flattenedTools.push(...(toolOrToolkit as BaseToolkit).getTools());
       } else {
         // This is a regular tool
-        flattenedTools.push(toolOrToolkit as StructuredToolInterface);
+        let singleTool = toolOrToolkit as StructuredToolInterface;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((singleTool as any).metadata?.client === true) {
+          // Clone the tool to avoid mutating the original
+          singleTool = Object.assign(Object.create(Object.getPrototypeOf(singleTool)), singleTool);
+          const stubFunc = async (_input: unknown, _config?: RunnableConfig) => {
+            const value = await interrupt({ name: singleTool.name });
+            return typeof value === 'string' ? value : JSON.stringify(value);
+          };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          singleTool.invoke = stubFunc as any;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          singleTool.call = stubFunc as any;
+        }
+        flattenedTools.push(singleTool);
       }
     }
     return flattenedTools;
