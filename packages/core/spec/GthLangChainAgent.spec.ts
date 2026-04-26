@@ -768,6 +768,112 @@ describe('GthLangChainAgent', () => {
         }
       }).rejects.toThrow('boom');
     });
+
+    it('should isolate tool_call_chunks per round so the second call gets its own args', async () => {
+      // Repro for the bug where OpenAI restarts tool_call_chunks.index at 0
+      // for each LLM round. Without per-round isolation, the second call's
+      // index-0 chunks collide with the first call's group in collapseToolCallChunks
+      // and the second call's args end up empty.
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      // Round 1: list_directory(path: ".")
+      const r1Start = new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [{ id: 'tc-1', name: 'list_directory', args: '', index: 0 }],
+      });
+      const r1Body = new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [{ args: '{"path":"."}', index: 0 }],
+      });
+      const r1Result = new ToolMessage({ content: '[FILE] start.js', tool_call_id: 'tc-1' });
+
+      // Round 2: get_file_info(path: "start.js") — index restarts at 0
+      const r2Start = new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [{ id: 'tc-2', name: 'get_file_info', args: '', index: 0 }],
+      });
+      const r2Body = new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [{ args: '{"path":"start.js"}', index: 0 }],
+      });
+      const r2Result = new ToolMessage({ content: 'size: 3001', tool_call_id: 'tc-2' });
+
+      async function* streamed() {
+        yield [r1Start, {}];
+        yield [r1Body, {}];
+        yield [r1Result, {}];
+        yield [r2Start, {}];
+        yield [r2Body, {}];
+        yield [r2Result, {}];
+      }
+      agentMock.stream.mockResolvedValue(streamed());
+
+      const events: { type: string; id?: string; delta?: string; content?: string }[] = [];
+      for await (const ev of agent.streamWithEvents([new HumanMessage('go')], {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'multi-round' },
+      })) {
+        events.push(ev as { type: string; id?: string; delta?: string; content?: string });
+      }
+
+      const argEvents = events.filter((e) => e.type === 'tool_args');
+      expect(argEvents).toHaveLength(2);
+      expect(JSON.parse(argEvents[0].delta!)).toEqual({ path: '.' });
+      expect(JSON.parse(argEvents[1].delta!)).toEqual({ path: 'start.js' });
+    });
+
+    it('should join tool_call_chunks across AIMessageChunks into final args', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      // Each chunk carries a partial slice of the args JSON; only the joined
+      // sequence parses to {path: "/home"}.
+      const chunk1 = new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [{ id: 'tc-1', name: 'list_directory', args: '{"pa', index: 0 }],
+      });
+      const chunk2 = new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [{ args: 'th": ', index: 0 }],
+      });
+      const chunk3 = new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [{ args: '"/home"}', index: 0 }],
+      });
+      const toolResult = new ToolMessage({ content: '[FILE] x', tool_call_id: 'tc-1' });
+
+      async function* streamed() {
+        yield [chunk1, {}];
+        yield [chunk2, {}];
+        yield [chunk3, {}];
+        yield [toolResult, {}];
+      }
+      agentMock.stream.mockResolvedValue(streamed());
+
+      const events: { type: string; id?: string; delta?: string; content?: string }[] = [];
+      for await (const ev of agent.streamWithEvents([new HumanMessage('go')], {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'tc-stream' },
+      })) {
+        events.push(ev as { type: string; id?: string; delta?: string; content?: string });
+      }
+
+      expect(events.map((e) => e.type)).toEqual([
+        'tool_start',
+        'tool_args',
+        'tool_end',
+        'tool_result',
+      ]);
+      expect(events[0]).toMatchObject({ type: 'tool_start', id: 'tc-1', name: 'list_directory' });
+      expect(events[1]).toMatchObject({ type: 'tool_args', id: 'tc-1' });
+      expect(JSON.parse(events[1].delta!)).toEqual({ path: '/home' });
+      expect(events[3]).toMatchObject({ type: 'tool_result', id: 'tc-1', content: '[FILE] x' });
+    });
   });
 
   describe('streamWithEventsResume', () => {

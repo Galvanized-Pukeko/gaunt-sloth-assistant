@@ -11,7 +11,7 @@ import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.j
 import { formatToolCalls } from '#src/utils/llmUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
 import { stopWaitingForEscape, waitForEscape, getCurrentWorkDir } from '#src/utils/systemUtils.js';
-import { AIMessage, BaseMessage, ToolMessage } from '@langchain/core/messages';
+import { AIMessage, AIMessageChunk, BaseMessage, ToolMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { BaseToolkit, StructuredToolInterface } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
@@ -397,33 +397,68 @@ export class GthLangChainAgent implements GthAgentInterface {
   private async *processEventStream(
     stream: IterableReadableStream<[BaseMessage, Record<string, unknown>]>
   ): AsyncGenerator<AgentStreamEvent> {
-    // Buffer tool calls across chunks so we use final (complete) args
-    const pendingToolCalls = new Map<string, { id: string; name: string; args: unknown }>();
+    // Aggregate AIMessageChunks via concat so tool_call_chunks collapse into
+    // tool_calls with complete args (per-chunk tool_calls only ever sees that
+    // chunk's slice of the args JSON, which is rarely valid on its own).
+    let aggregatedAIChunk: AIMessageChunk | null = null;
+    const flushed = new Set<string>();
+
+    function* flushAggregated(): Generator<AgentStreamEvent> {
+      if (!aggregatedAIChunk) return;
+      const toolCalls = aggregatedAIChunk.tool_calls ?? [];
+      const invalidToolCalls = aggregatedAIChunk.invalid_tool_calls ?? [];
+      for (const tc of toolCalls) {
+        const id = tc.id as string | undefined;
+        if (!id || flushed.has(id)) continue;
+        flushed.add(id);
+        yield { type: 'tool_start', id, name: tc.name };
+        yield { type: 'tool_args', id, delta: JSON.stringify(tc.args ?? {}) };
+        yield { type: 'tool_end', id };
+      }
+      // Surface invalid tool calls too so the client at least sees the raw args
+      // string the model produced, instead of silently dropping them.
+      for (const tc of invalidToolCalls) {
+        const id = tc.id as string | undefined;
+        if (!id || flushed.has(id)) continue;
+        flushed.add(id);
+        yield { type: 'tool_start', id, name: tc.name ?? '' };
+        yield { type: 'tool_args', id, delta: tc.args ?? '' };
+        yield { type: 'tool_end', id };
+      }
+    }
 
     for await (const [chunk, _metadata] of stream) {
       debugLogObject('streamWithEvents chunk', { chunk, _metadata });
 
-      if (AIMessage.isInstance(chunk) && chunk.tool_calls && chunk.tool_calls.length > 0) {
-        for (const tool_call of chunk.tool_calls) {
-          // Keep updating with latest args as LLM streams them across chunks
-          pendingToolCalls.set(tool_call.id as string, {
-            id: tool_call.id as string,
-            name: tool_call.name,
-            args: tool_call.args,
-          });
+      if (AIMessageChunk.isInstance(chunk)) {
+        aggregatedAIChunk = aggregatedAIChunk ? aggregatedAIChunk.concat(chunk) : chunk;
+        // Yield text incrementally — use this chunk's text (delta), not the
+        // aggregated content which is cumulative.
+        if (chunk.text) {
+          yield { type: 'text', delta: chunk.text as string };
         }
-      } else if (AIMessage.isInstance(chunk) && chunk.text) {
-        yield { type: 'text', delta: chunk.text as string };
+      } else if (AIMessage.isInstance(chunk)) {
+        // Non-chunk AIMessage (e.g. on resumed runs) carries final tool_calls
+        // directly; merge them into the aggregate so flushAggregated emits them.
+        if (chunk.tool_calls && chunk.tool_calls.length > 0) {
+          const synthetic = new AIMessageChunk({
+            content: '',
+            tool_calls: chunk.tool_calls,
+          });
+          aggregatedAIChunk = aggregatedAIChunk ? aggregatedAIChunk.concat(synthetic) : synthetic;
+        }
+        if (chunk.text) {
+          yield { type: 'text', delta: chunk.text as string };
+        }
       }
 
       if (chunk instanceof ToolMessage) {
-        // Flush buffered tool calls with their final args before the tool result
-        for (const tc of pendingToolCalls.values()) {
-          yield { type: 'tool_start', id: tc.id, name: tc.name };
-          yield { type: 'tool_args', id: tc.id, delta: JSON.stringify(tc.args ?? {}) };
-          yield { type: 'tool_end', id: tc.id };
-        }
-        pendingToolCalls.clear();
+        yield* flushAggregated();
+        // Reset between rounds. OpenAI restarts tool_call_chunks.index at 0
+        // for each new LLM round; without this reset the next round's chunks
+        // collide with the previous round's groups in collapseToolCallChunks
+        // and end up with empty args.
+        aggregatedAIChunk = null;
 
         const content =
           typeof chunk.content === 'string' ? chunk.content : JSON.stringify(chunk.content);
@@ -431,12 +466,8 @@ export class GthLangChainAgent implements GthAgentInterface {
       }
     }
 
-    // Flush any tool calls not followed by a ToolMessage (e.g. terminal tool calls)
-    for (const tc of pendingToolCalls.values()) {
-      yield { type: 'tool_start', id: tc.id, name: tc.name };
-      yield { type: 'tool_args', id: tc.id, delta: JSON.stringify(tc.args ?? {}) };
-      yield { type: 'tool_end', id: tc.id };
-    }
+    // Flush any tool calls not followed by a ToolMessage (e.g. terminal tool calls).
+    yield* flushAggregated();
   }
 
   async cleanup(): Promise<void> {
