@@ -1,4 +1,5 @@
 {
+  "//1": "Root workspace package — not published. Publishable packages live in packages/* (assistant, api, core, review, tools).",
   "name": "gaunt-sloth-workspace",
   "version": "0.0.0",
   "private": true,
@@ -31,12 +32,13 @@
     "typedoc": "typedoc",
     "chat": "node packages/assistant/cli.js"
   },
+  "//2": "Root workspace package — not published, holds dev dependencies. Publishable packages live in packages/* (assistant, api, core, review, tools).",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/node": "^22.19.17",
-    "@typescript-eslint/eslint-plugin": "^8.59.0",
-    "@typescript-eslint/parser": "^8.59.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
     "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
@@ -44,7 +46,7 @@
     "jiti": "^2.6.1",
     "prettier": "^3.8.3",
     "typedoc": "^0.28.19",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.5"
   },
   "overrides": {

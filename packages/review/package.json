@@ -34,7 +34,7 @@
     "#src/*.js": "./dist/*.js"
   },
   "dependencies": {
-    "@gaunt-sloth/core": "^0.0.3"
+    "@gaunt-sloth/core": "^0.0.4"
   },
   "peerDependencies": {
     "@gaunt-sloth/tools": "^0.0.1"
