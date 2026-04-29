@@ -1,15 +1,14 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "name": "Gaunt Sloth Assistant",
-  "entryPoints": ["src"],
-  "entryPointStrategy": "expand",
+  "entryPoints": ["packages/*"],
+  "entryPointStrategy": "packages",
   "categorizeByGroup": false,
   "out": "./docs-generated",
   "projectDocuments": ["docs/COMMANDS.md", "docs/CONFIGURATION.md", "CONTRIBUTING.md"],
   "sourceLinkExternal": true,
-  "includeVersion": true,
+  "includeVersion": false,
   "navigationLinks": {
-    "0.9 (legacy docs)": "https://gaunt-sloth-assistant.github.io/docs-0.9/",
     "GitHub": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant"
   },
   "highlightLanguages": ["typescript", "javascript", "markdown", "json", "bash"],
