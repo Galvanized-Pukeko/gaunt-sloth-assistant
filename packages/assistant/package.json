@@ -36,8 +36,8 @@
   },
   "dependencies": {
     "@gaunt-sloth/api": "^0.0.3",
-    "@gaunt-sloth/core": "^0.0.4",
-    "@gaunt-sloth/review": "^0.0.4",
+    "@gaunt-sloth/core": "^0.1.0",
+    "@gaunt-sloth/review": "^0.1.0",
     "@gaunt-sloth/tools": "^0.0.1",
     "@langchain/anthropic": "^1.3.28",
     "@langchain/core": "^1.1.42",
