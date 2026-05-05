@@ -29,7 +29,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm i @gaunt-sloth/review@0.0.4 @langchain/openai@1.2.0 -g && gaunt-sloth-review --version
+        run: npm i @gaunt-sloth/review@0.1.0 @langchain/openai@1.2.0 -g && gaunt-sloth-review --version
 
       - name: Extract issue number from PR title
         id: extract_issue

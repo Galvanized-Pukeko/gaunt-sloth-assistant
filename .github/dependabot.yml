@@ -6,7 +6,13 @@
 version: 2
 updates:
   - package-ecosystem: 'npm' # See documentation for possible values
-    directory: '/' # Location of package manifests
+    directories:
+      - '/'
+      - '/packages/api'
+      - '/packages/assistant'
+      - '/packages/core'
+      - '/packages/review'
+      - '/packages/tools'
     schedule:
       interval: 'weekly'
     ignore:
