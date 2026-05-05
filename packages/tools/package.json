@@ -1,6 +1,6 @@
 {
   "name": "@gaunt-sloth/tools",
-  "version": "0.0.1",
+  "version": "0.0.6",
   "description": "Tools and middleware for Gaunt Sloth",
   "license": "MIT",
   "author": "Andrew Kondratev",
@@ -13,7 +13,13 @@
     "url": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues"
   },
   "homepage": "https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/tree/main/packages/tools#readme",
-  "keywords": ["ai", "agent", "llm", "tools", "middleware"],
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "tools",
+    "middleware"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -28,7 +34,7 @@
     "#src/*.js": "./dist/*.js"
   },
   "dependencies": {
-    "@gaunt-sloth/core": "^0.0.4",
+    "@gaunt-sloth/core": "0.0.6",
     "diff": "^9.0.0",
     "langchain": "^1.2.36"
   },

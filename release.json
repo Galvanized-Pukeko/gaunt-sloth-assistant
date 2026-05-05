@@ -1,0 +1,4 @@
+{
+  "//": "Single source of truth for the lock-stepped @gaunt-sloth/* package versions (core, tools, api, review). The user-facing CLI in packages/assistant has its own version. Run `npm run release:bump` to apply.",
+  "version": "0.0.6"
+}

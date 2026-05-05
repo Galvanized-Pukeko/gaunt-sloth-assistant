@@ -41,6 +41,102 @@ npm run lint-n-fix
 npm run format
 ```
 
+## Local Development Registry (optional)
+
+The four publishable packages — `@gaunt-sloth/{core,tools,api,review}` — release
+in lock-step from a single `release.json`. When iterating against downstream
+consumers (`galvanized-pukeko-ai-ui`, `pukeko-robot-controller`, etc.), it is
+much faster to publish dev versions to a local [Verdaccio](https://verdaccio.org)
+registry than to rebuild tarballs each cycle.
+
+### One-time setup
+
+Start the container and register a local user (any credentials — this is a
+single-user dev registry):
+
+```bash
+docker run -d -p 4873:4873 \
+  -v ~/.verdaccio/config.yaml:/verdaccio/conf/config.yaml \
+  --name verdaccio verdaccio/verdaccio:latest
+
+curl -X PUT http://localhost:4873/-/user/org.couchdb.user:dev \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"dev","password":"dev","email":"dev@local"}'
+```
+
+The response includes a token. Add it to `~/.npmrc`:
+
+```
+//localhost:4873/:_authToken=<token>
+```
+
+`~/.verdaccio/config.yaml` should disable the `npmjs` proxy for `@gaunt-sloth/*`
+so local publishes are authoritative regardless of what's on npmjs (otherwise
+publishing a version lower than the public `latest` is rejected). Add this rule
+*before* the default `'@*/*'` block:
+
+```yaml
+packages:
+  '@gaunt-sloth/*':
+    access: $all
+    publish: $authenticated
+    unpublish: $authenticated
+  '@galvanized-pukeko/*':   # add other in-house scopes the same way
+    access: $all
+    publish: $authenticated
+    unpublish: $authenticated
+
+  # default scoped + unscoped rules below — leave them as shipped (proxy: npmjs)
+  '@*/*':
+    access: $all
+    publish: $authenticated
+    unpublish: $authenticated
+    proxy: npmjs
+  '**':
+    access: $all
+    publish: $authenticated
+    unpublish: $authenticated
+    proxy: npmjs
+```
+
+Each repo that consumes the synced packages should carry a gitignored `.npmrc`
+routing those scopes to localhost:
+
+```
+@gaunt-sloth:registry=http://localhost:4873
+```
+
+### Release workflow
+
+`release.json` is the single source of truth for the synced version:
+
+```bash
+# Apply the version from release.json to all four synced package.jsons:
+npm run release:bump
+
+# Or set release.json and apply in one step:
+npm run release:bump -- 0.0.7
+
+npm run build
+npm run release:publish    # publishes core → tools → api → review to Verdaccio
+```
+
+`release:bump` writes the new version into `packages/{tools,core,api,review}`,
+pins their internal `@gaunt-sloth/*` deps to that exact version (no caret —
+the lock-stepped set has no useful range semantics), and rewrites
+`packages/assistant`'s `@gaunt-sloth/*` pins to match without touching
+assistant's own version (1.5.x is its independent user-facing semver).
+
+Then in any downstream repo, bump its `@gaunt-sloth/*` pins to the new version
+and run `npm install` — Verdaccio serves the local copy via the per-repo
+`.npmrc` scope routing.
+
+To publish to the public registry instead of Verdaccio:
+
+```bash
+REGISTRY=https://registry.npmjs.org npm run release:publish
+```
+
 ## Development Expectations
 
 - Follow the existing project structure and naming conventions.

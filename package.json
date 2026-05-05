@@ -30,7 +30,9 @@
     "format": "prettier --write 'packages/*/src/**/*.{js,ts}'",
     "prepare": "echo 'skipping prepare'",
     "typedoc": "typedoc",
-    "chat": "node packages/assistant/cli.js"
+    "chat": "node packages/assistant/cli.js",
+    "release:bump": "node bump.mjs",
+    "release:publish": "./publish-all.sh"
   },
   "//2": "Root workspace package — not published, holds dev dependencies. Publishable packages live in packages/* (assistant, api, core, review, tools).",
   "devDependencies": {

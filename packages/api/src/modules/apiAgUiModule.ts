@@ -119,6 +119,7 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
 
       // Stream the response with typed events
       let textMessageStarted = false;
+      let reasoningMessageId: string | null = null;
 
       let eventStream;
       if (forwardedProps?.command?.resume !== undefined) {
@@ -196,6 +197,41 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
                 messageId: randomUUID(),
               })
             );
+            break;
+          }
+          case 'reasoning_start': {
+            reasoningMessageId = randomUUID();
+            res.write(
+              encoder.encode({
+                type: EventType.REASONING_MESSAGE_START,
+                messageId: reasoningMessageId,
+                role: 'reasoning',
+              })
+            );
+            break;
+          }
+          case 'reasoning_delta': {
+            if (reasoningMessageId) {
+              res.write(
+                encoder.encode({
+                  type: EventType.REASONING_MESSAGE_CONTENT,
+                  messageId: reasoningMessageId,
+                  delta: event.delta,
+                })
+              );
+            }
+            break;
+          }
+          case 'reasoning_end': {
+            if (reasoningMessageId) {
+              res.write(
+                encoder.encode({
+                  type: EventType.REASONING_MESSAGE_END,
+                  messageId: reasoningMessageId,
+                })
+              );
+              reasoningMessageId = null;
+            }
             break;
           }
         }

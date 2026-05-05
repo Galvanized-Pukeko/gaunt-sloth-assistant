@@ -327,6 +327,23 @@ for example `Partial<RawGthConfig>`
 and later cast them to RawGthConfig when providing them as argument to function
 which expects full interface. Even better option is to provide all properties.
 
+## Releasing the Synced Packages
+
+The four publishable packages — `@gaunt-sloth/{core,tools,api,review}` — share
+a single version pulled from `release.json`. The `assistant` workspace has its
+own user-facing version (1.5.x) and only its `@gaunt-sloth/*` dep pins are
+rewritten by the release script.
+
+```
+npm run release:bump            # apply release.json
+npm run release:bump -- 0.0.7   # set release.json + apply
+npm run release:publish         # publish core → tools → api → review
+```
+
+Defaults to a local Verdaccio at `http://localhost:4873`. To target npmjs:
+`REGISTRY=https://registry.npmjs.org npm run release:publish`. Full setup is in
+[CONTRIBUTING.md](./CONTRIBUTING.md#local-development-registry-optional).
+
 ## Development Workflow
 
 Please follow this workflow:

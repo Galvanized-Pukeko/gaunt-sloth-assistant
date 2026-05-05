@@ -25,6 +25,9 @@ import {
 
 export type AgentStreamEvent =
   | { type: 'text'; delta: string }
+  | { type: 'reasoning_start' }
+  | { type: 'reasoning_delta'; delta: string }
+  | { type: 'reasoning_end' }
   | { type: 'tool_start'; id: string; name: string }
   | { type: 'tool_args'; id: string; delta: string }
   | { type: 'tool_end'; id: string }
@@ -401,6 +404,7 @@ export class GthLangChainAgent implements GthAgentInterface {
     // tool_calls with complete args (per-chunk tool_calls only ever sees that
     // chunk's slice of the args JSON, which is rarely valid on its own).
     let aggregatedAIChunk: AIMessageChunk | null = null;
+    let reasoningOpen = false;
     const flushed = new Set<string>();
 
     function* flushAggregated(): Generator<AgentStreamEvent> {
@@ -432,9 +436,26 @@ export class GthLangChainAgent implements GthAgentInterface {
 
       if (AIMessageChunk.isInstance(chunk)) {
         aggregatedAIChunk = aggregatedAIChunk ? aggregatedAIChunk.concat(chunk) : chunk;
+
+        // Reasoning deltas — Ollama (Qwen3, deepseek-r1) and Anthropic surface
+        // thinking text in additional_kwargs.reasoning_content. Stream it as a
+        // separate event series so clients can render it apart from the answer.
+        const reasoningDelta = chunk.additional_kwargs?.reasoning_content;
+        if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
+          if (!reasoningOpen) {
+            reasoningOpen = true;
+            yield { type: 'reasoning_start' };
+          }
+          yield { type: 'reasoning_delta', delta: reasoningDelta };
+        }
+
         // Yield text incrementally — use this chunk's text (delta), not the
         // aggregated content which is cumulative.
         if (chunk.text) {
+          if (reasoningOpen) {
+            reasoningOpen = false;
+            yield { type: 'reasoning_end' };
+          }
           yield { type: 'text', delta: chunk.text as string };
         }
       } else if (AIMessage.isInstance(chunk)) {
@@ -448,11 +469,19 @@ export class GthLangChainAgent implements GthAgentInterface {
           aggregatedAIChunk = aggregatedAIChunk ? aggregatedAIChunk.concat(synthetic) : synthetic;
         }
         if (chunk.text) {
+          if (reasoningOpen) {
+            reasoningOpen = false;
+            yield { type: 'reasoning_end' };
+          }
           yield { type: 'text', delta: chunk.text as string };
         }
       }
 
       if (chunk instanceof ToolMessage) {
+        if (reasoningOpen) {
+          reasoningOpen = false;
+          yield { type: 'reasoning_end' };
+        }
         yield* flushAggregated();
         // Reset between rounds. OpenAI restarts tool_call_chunks.index at 0
         // for each new LLM round; without this reset the next round's chunks
@@ -464,6 +493,12 @@ export class GthLangChainAgent implements GthAgentInterface {
           typeof chunk.content === 'string' ? chunk.content : JSON.stringify(chunk.content);
         yield { type: 'tool_result', id: chunk.tool_call_id as string, content };
       }
+    }
+
+    // Close any still-open reasoning block before flushing tool calls.
+    if (reasoningOpen) {
+      reasoningOpen = false;
+      yield { type: 'reasoning_end' };
     }
 
     // Flush any tool calls not followed by a ToolMessage (e.g. terminal tool calls).
