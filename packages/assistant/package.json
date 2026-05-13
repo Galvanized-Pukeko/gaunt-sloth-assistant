@@ -39,7 +39,7 @@
     "@gaunt-sloth/core": "0.1.1",
     "@gaunt-sloth/review": "0.1.1",
     "@gaunt-sloth/tools": "0.1.1",
-    "@langchain/anthropic": "^1.3.28",
+    "@langchain/anthropic": "^1.3.29",
     "@langchain/core": "^1.1.42",
     "@langchain/deepseek": "^1.0.25",
     "@langchain/google": "^0.1.11",
