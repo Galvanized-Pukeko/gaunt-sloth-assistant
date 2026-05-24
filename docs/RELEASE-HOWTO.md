@@ -28,7 +28,7 @@ workspace members, so commit and tag yourself:
 npm version patch -w gaunt-sloth-assistant   # or minor / major — edits packages/assistant/package.json only
 git commit -am "Release notes"
 git tag -a v1.5.1 -m "Release notes"
-git push --follow-tags
+git push --tags
 ```
 
 Type `\` and then Enter to type a new line in the message.
