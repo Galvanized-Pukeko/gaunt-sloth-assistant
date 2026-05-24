@@ -1,6 +1,7 @@
 /node_modules/
 /dist/
 .npmrc
+.npmrc.bk
 /packages/*/dist/
 /packages/*/node_modules/
 /packages/*/tsconfig.tsbuildinfo
