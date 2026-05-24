@@ -15,21 +15,23 @@ the `files` makes .npmignore ignored.
 
 ### Assistant package
 
-For patch, e.g., from 0.0.8 to 0.0.9
+The CLI `gaunt-sloth-assistant` lives in `packages/assistant` and carries its
+own version (tagged `vX.Y.Z`), independent of the lock-stepped `@gaunt-sloth/*`
+libraries. The repo root (`gaunt-sloth-workspace`) is `private` and is **never
+published** — `npm version` / `npm publish` run at the root do not touch the
+assistant.
+
+Bump the assistant inside its workspace. npm does **not** auto-commit or tag for
+workspace members, so commit and tag yourself:
 
 ```bash
-npm version patch -m "Release notes"
+npm version patch -w gaunt-sloth-assistant   # or minor / major — edits packages/assistant/package.json only
+git commit -am "Release notes"
+git tag -a v1.5.1 -m "Release notes"
 git push --follow-tags
 ```
 
-For minor, e.g., from 0.0.8 to 0.1.0
-
-```bash
-npm version minor -m "Release notes"
-git push --follow-tags
-```
-
-Type `\` and then Enter to type new line in message.
+Type `\` and then Enter to type a new line in the message.
 
 ### Library packages
 
@@ -79,9 +81,12 @@ This step is now automated, and GitHub action publishes any new release with Rel
 
 ### Publishing the assistant package
 
+The repo root is `private`, so publish from the assistant workspace — `npm publish`
+at the root will refuse:
+
 ```bash
 npm login
-npm publish
+npm publish -w gaunt-sloth-assistant
 ```
 
 Remember to review a list of files in the build, before confirming it.
