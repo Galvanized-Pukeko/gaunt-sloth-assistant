@@ -4,7 +4,11 @@ import { EventEncoder } from '@ag-ui/encoder';
 import { EventType } from '@ag-ui/core';
 import { GthConfig } from '@gaunt-sloth/core/config.js';
 import { GthLangChainAgent } from '@gaunt-sloth/core/core/GthLangChainAgent.js';
-import { defaultStatusCallback, displayInfo, displayWarning } from '@gaunt-sloth/core/utils/consoleUtils.js';
+import {
+  defaultStatusCallback,
+  displayInfo,
+  displayWarning,
+} from '@gaunt-sloth/core/utils/consoleUtils.js';
 import {
   getNewRunnableConfig,
   buildSystemMessages,
@@ -75,7 +79,9 @@ function parseToolArguments(raw: string | undefined, toolName: string): Record<s
       );
       return recovered as Record<string, unknown>;
     }
-    displayWarning(`Unparseable tool arguments for ${toolName} (${JSON.stringify(s)}); defaulting to {}.`);
+    displayWarning(
+      `Unparseable tool arguments for ${toolName} (${JSON.stringify(s)}); defaulting to {}.`
+    );
     return {};
   }
 }
