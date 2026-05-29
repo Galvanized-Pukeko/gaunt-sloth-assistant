@@ -26,7 +26,8 @@
     "npm": ">=11.0.0"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepack": "tsc"
   },
   "bin": {
     "gaunt-sloth-assistant": "cli.js",

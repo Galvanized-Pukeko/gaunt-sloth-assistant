@@ -15,6 +15,10 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
+      # Build in dependency order (core → tools → api → review → assistant) so
+      # the assistant's dist/ exists in the published tarball. The `files` block
+      # ships ./dist/*; without this step npm publishes a dist-less, broken bin.
+      - run: npm run build
       - run: npm publish --provenance --access public --tag latest -w gaunt-sloth-assistant
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
