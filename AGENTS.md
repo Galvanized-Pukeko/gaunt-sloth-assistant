@@ -76,6 +76,30 @@ Middleware provides hooks to intercept and control agent execution at critical p
 - Middleware types are in [src/middleware/types.ts](src/middleware/types.ts)
 - Provider-specific middleware can be auto-injected via `postProcessJsonConfig()` in preset files
 
+### AG-UI Server (`@gaunt-sloth/api`)
+
+`startAgUiServer()` ([packages/api/src/modules/apiAgUiModule.ts](packages/api/src/modules/apiAgUiModule.ts))
+exposes the agent over the AG-UI protocol at `POST /agents/:agentId/run`,
+streaming typed SSE events. It is intended for **local clients only** (a local
+web UI talking to a local CLI agent); do not expose it to public networks.
+
+Request handling:
+- A request carrying `forwardedProps.command.resume` resumes a graph suspended
+  by `interrupt()` (client-fulfilled tools); otherwise it starts a fresh run.
+- The client is the source of truth for history: it sends the full message list
+  every turn, and LangGraph's `add_messages` reducer dedupes by message id, so
+  re-sending prior messages does not duplicate state on the checkpointer.
+
+**Be defensive when converting client messages.** A single malformed message
+must never abort a run — because it is part of the persisted history, it would
+otherwise poison every subsequent turn on the thread. In particular, tool-call
+`arguments` strings are parsed via `parseToolArguments()`, not raw `JSON.parse`:
+local models (Ollama/Gemma) do not honor `disable_parallel_tool_use`, and their
+streamed delta reassembly can concatenate sibling calls' argument buffers into
+invalid JSON such as `{}{}` or `{"steps":3}{}`. The parser recovers the first
+complete JSON value, warns via `displayWarning`, and falls back to `{}`. Keep
+new client-message parsing on this resilient path.
+
 ## Tool Use
 
 Precedence for your tool use:

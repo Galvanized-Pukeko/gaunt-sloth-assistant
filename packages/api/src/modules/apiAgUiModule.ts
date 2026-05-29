@@ -4,7 +4,7 @@ import { EventEncoder } from '@ag-ui/encoder';
 import { EventType } from '@ag-ui/core';
 import { GthConfig } from '@gaunt-sloth/core/config.js';
 import { GthLangChainAgent } from '@gaunt-sloth/core/core/GthLangChainAgent.js';
-import { defaultStatusCallback, displayInfo } from '@gaunt-sloth/core/utils/consoleUtils.js';
+import { defaultStatusCallback, displayInfo, displayWarning } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import {
   getNewRunnableConfig,
   buildSystemMessages,
@@ -16,6 +16,69 @@ import type { BaseMessage } from '@langchain/core/messages';
 import { createResolvers } from '#src/resolvers.js';
 
 const initializedThreads = new Set<string>();
+
+/**
+ * Return the first complete JSON value at the start of `s`, ignoring any
+ * trailing characters. Used to recover from streamed tool-call argument
+ * reassembly that concatenates objects (e.g. `{}{}` or `{"steps":3}{}`) when a
+ * model emits parallel tool calls — local models like Ollama/Gemma don't honor
+ * `disable_parallel_tool_use`, and their delta streams can merge sibling calls'
+ * argument buffers. Returns `undefined` if no complete leading value is found.
+ */
+function extractFirstJsonValue(s: string): unknown {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+    } else if (c === '{' || c === '[') {
+      depth++;
+    } else if (c === '}' || c === ']') {
+      depth--;
+      if (depth === 0) {
+        try {
+          return JSON.parse(s.slice(0, i + 1));
+        } catch {
+          return undefined;
+        }
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Parse a tool call's `arguments` string defensively. A single malformed
+ * argument payload must not abort the whole run — the message is part of the
+ * persisted history and would otherwise poison every subsequent turn on the
+ * thread.
+ */
+function parseToolArguments(raw: string | undefined, toolName: string): Record<string, unknown> {
+  const s = (raw ?? '').trim();
+  if (!s) return {};
+  try {
+    return JSON.parse(s);
+  } catch {
+    const recovered = extractFirstJsonValue(s);
+    if (recovered && typeof recovered === 'object') {
+      displayWarning(
+        `Recovered malformed tool arguments for ${toolName} (${JSON.stringify(s)} -> ${JSON.stringify(recovered)}). ` +
+          'Likely parallel tool calls from a model that ignores disable_parallel_tool_use.'
+      );
+      return recovered as Record<string, unknown>;
+    }
+    displayWarning(`Unparseable tool arguments for ${toolName} (${JSON.stringify(s)}); defaulting to {}.`);
+    return {};
+  }
+}
 
 /**
  * Convert AG-UI message format to LangChain BaseMessage
@@ -38,7 +101,7 @@ function convertMessage(msg: {
           tool_calls: msg.toolCalls.map((tc) => ({
             id: tc.id,
             name: tc.function.name,
-            args: JSON.parse(tc.function.arguments || '{}'),
+            args: parseToolArguments(tc.function.arguments, tc.function.name),
             type: 'tool_call' as const,
           })),
         });
