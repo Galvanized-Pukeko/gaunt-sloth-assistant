@@ -53,6 +53,15 @@ Tags follow the `@scope/name@version` convention (same as npm).
 
 Use annotated tags (`-a`) — lightweight tags are not pushed by `--follow-tags`.
 
+Or use the helper, which reads each library's current `package.json` version and
+tags all four (`core`, `tools`, `api`, `review`) — the assistant is excluded.
+Existing tags are skipped, so it's safe to re-run:
+
+```bash
+./tag-packages.sh            # create the tags locally
+./tag-packages.sh --push     # create and push them (PUSH=1 ./tag-packages.sh also works)
+```
+
 ## Publish Release to GitHub (assistant only)
 
 Library packages don't need GitHub releases — they're consumed as npm
