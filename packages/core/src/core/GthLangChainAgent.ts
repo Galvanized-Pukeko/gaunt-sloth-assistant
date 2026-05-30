@@ -374,7 +374,8 @@ export class GthLangChainAgent implements GthAgentInterface {
    */
   async *streamWithEventsResume(
     resumeValue: unknown,
-    runConfig: RunnableConfig
+    runConfig: RunnableConfig,
+    queuedMessages?: BaseMessage[]
   ): AsyncGenerator<AgentStreamEvent> {
     if (!this.agent || !this.config) {
       throw new Error('Agent not initialized. Call init() first.');
@@ -383,7 +384,17 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLog('=== Starting streamWithEventsResume ===');
 
     try {
-      const stream = await this.agent.stream(new Command({ resume: resumeValue }), {
+      // Queued follow-up messages: when the client sends mid-task input
+      // alongside the resume, append it to the graph's `messages` state via
+      // Command.update so the agent sees it on its next decision turn — no
+      // separate run, no dangling tool calls. (Ordering note: the update lands
+      // around the resumed tool result; lenient local models tolerate this,
+      // strict tool-call/result adjacency providers may not.)
+      const command =
+        queuedMessages && queuedMessages.length > 0
+          ? new Command({ resume: resumeValue, update: { messages: queuedMessages } })
+          : new Command({ resume: resumeValue });
+      const stream = await this.agent.stream(command, {
         ...runConfig,
         streamMode: 'messages',
       });

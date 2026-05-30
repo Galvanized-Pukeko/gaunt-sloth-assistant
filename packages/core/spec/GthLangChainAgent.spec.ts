@@ -921,6 +921,53 @@ describe('GthLangChainAgent', () => {
       });
     });
 
+    it('should attach queued messages via Command.update when provided', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      async function* empty() {}
+      agentMock.stream.mockResolvedValue(empty());
+
+      const runConfig: RunnableConfig = {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'steer-thread' },
+      };
+      const correction = new HumanMessage('turn around, wrong way');
+      for await (const _ev of agent.streamWithEventsResume('resumeVal', runConfig, [correction])) {
+        // drain
+      }
+
+      const [arg] = agentMock.stream.mock.calls[0];
+      expect(arg).toBeInstanceOf(Command);
+      expect((arg as Command).resume).toBe('resumeVal');
+      expect((arg as unknown as { update: { messages: unknown[] } }).update.messages).toEqual([
+        correction,
+      ]);
+    });
+
+    it('should not set Command.update when queued messages are empty', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      async function* empty() {}
+      agentMock.stream.mockResolvedValue(empty());
+
+      const runConfig: RunnableConfig = {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'no-steer-thread' },
+      };
+      for await (const _ev of agent.streamWithEventsResume('resumeVal', runConfig, [])) {
+        // drain
+      }
+
+      const [arg] = agentMock.stream.mock.calls[0];
+      expect((arg as unknown as { update?: unknown }).update).toBeUndefined();
+    });
+
     it('should yield processed tool_result events from the resumed stream', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
       const fakeListChatModel = new FakeListChatModel({ responses: [] });

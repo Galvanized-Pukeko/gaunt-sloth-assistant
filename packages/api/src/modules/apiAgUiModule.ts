@@ -192,7 +192,25 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
 
       let eventStream;
       if (forwardedProps?.command?.resume !== undefined) {
-        eventStream = agent.streamWithEventsResume(forwardedProps.command.resume, runConfig);
+        // Follow-up messages piggy-backed on the resume: deliver them to the
+        // agent on its next decision turn via Command.update (see
+        // GthLangChainAgent.streamWithEventsResume). Accepts plain strings or
+        // AG-UI message objects.
+        const queued = forwardedProps.command.queuedMessages;
+        const queuedMessages: BaseMessage[] = Array.isArray(queued)
+          ? queued
+              .map((s: unknown) =>
+                typeof s === 'string'
+                  ? new HumanMessage(s)
+                  : convertMessage(s as Parameters<typeof convertMessage>[0])
+              )
+              .filter((m): m is BaseMessage => Boolean(m))
+          : [];
+        eventStream = agent.streamWithEventsResume(
+          forwardedProps.command.resume,
+          runConfig,
+          queuedMessages
+        );
       } else {
         // Build LangChain messages, prepending system prompt for new threads
         const langChainMessages: BaseMessage[] = [];

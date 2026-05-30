@@ -512,6 +512,36 @@ describe('apiAgUiModule', () => {
       const [, runConfig] = gthLangChainAgentStreamWithEventsResumeMock.mock.calls[0];
       expect(runConfig.configurable).toMatchObject({ thread_id: 'resume-thread-42' });
     });
+
+    it('should forward string queued messages as HumanMessages', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({
+        threadId: 'queue-thread',
+        forwardedProps: {
+          command: { resume: 'val', queuedMessages: ['turn around', 'go slower'] },
+        },
+      });
+
+      await handler(req, makeMockRes());
+
+      const [, , queuedMessages] = gthLangChainAgentStreamWithEventsResumeMock.mock.calls[0];
+      expect(queuedMessages).toHaveLength(2);
+      expect(queuedMessages[0]).toMatchObject({ role: 'user', content: 'turn around' });
+      expect(queuedMessages[1]).toMatchObject({ role: 'user', content: 'go slower' });
+    });
+
+    it('should pass an empty array when command.queuedMessages is absent', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({
+        threadId: 'no-queue-thread',
+        forwardedProps: { command: { resume: 'val' } },
+      });
+
+      await handler(req, makeMockRes());
+
+      const [, , queuedMessages] = gthLangChainAgentStreamWithEventsResumeMock.mock.calls[0];
+      expect(queuedMessages).toEqual([]);
+    });
   });
 
   // ─── express.json body limit ─────────────────────────────────────────────
