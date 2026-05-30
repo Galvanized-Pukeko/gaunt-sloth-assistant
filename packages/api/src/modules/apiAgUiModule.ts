@@ -343,6 +343,25 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
     res.json({ status: 'ok' });
   });
 
+  // Agent metadata — lets clients display which model/provider is serving them.
+  // provider is read from the LangChain model's _llmType() (e.g. "ollama",
+  // "anthropic"); model from config.modelDisplayName, falling back to the
+  // chat model's own `model` field.
+  app.get('/info', (_req, res) => {
+    const llm = config.llm as { _llmType?: () => string; model?: string } | undefined;
+    let provider: string | null = null;
+    try {
+      provider = typeof llm?._llmType === 'function' ? llm._llmType() : null;
+    } catch {
+      provider = null;
+    }
+    res.json({
+      status: 'ok',
+      provider,
+      model: config.modelDisplayName ?? llm?.model ?? null,
+    });
+  });
+
   return new Promise((resolve) => {
     app.listen(port, () => {
       displayInfo(`AG-UI server listening at http://localhost:${port}`);
