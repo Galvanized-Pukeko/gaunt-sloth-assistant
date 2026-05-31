@@ -115,12 +115,21 @@ const baseConfig = {
 } as Partial<GthConfig> as GthConfig;
 
 function makeMockRes() {
+  // `on` captures the 'close' listener the handler registers to abort inference
+  // on client disconnect. `emitClose` lets a test fire it.
+  const listeners: Record<string, Array<(..._args: unknown[]) => void>> = {};
   return {
     setHeader: vi.fn(),
     write: vi.fn(),
     end: vi.fn(),
     json: vi.fn(),
     status: vi.fn().mockReturnThis(),
+    on: vi.fn((eventName: string, cb: (..._args: unknown[]) => void) => {
+      (listeners[eventName] ??= []).push(cb);
+    }),
+    emitClose: () => {
+      for (const cb of listeners['close'] ?? []) cb();
+    },
   };
 }
 
@@ -366,6 +375,71 @@ describe('apiAgUiModule', () => {
       const events = mockEncoderInstance.encode.mock.calls.map((c) => c[0]);
       const errorEvent = events.find((e) => e.type === 'RUN_ERROR');
       expect(errorEvent!.message).toBe('something went wrong');
+    });
+
+    // ─── Client disconnect / abort ─────────────────────────────────────────
+
+    it('should register a response close listener and pass an AbortSignal to streamWithEvents', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'abort-signal-thread' });
+      const res = makeMockRes();
+
+      await handler(req, res);
+
+      // Must listen on the response, not the request: req 'close' fires as soon
+      // as the POST body is consumed and would abort every run instantly.
+      expect(res.on).toHaveBeenCalledWith('close', expect.any(Function));
+      const [, , signal] = gthLangChainAgentStreamWithEventsMock.mock.calls[0];
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal.aborted).toBe(false);
+    });
+
+    it('should NOT abort the run on a normal completion (close after finish)', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'normal-complete-thread' });
+      const res = makeMockRes();
+
+      await handler(req, res);
+      // Connection closes after the response finished — must not abort.
+      res.emitClose();
+
+      const [, , signal] = gthLangChainAgentStreamWithEventsMock.mock.calls[0];
+      expect(signal.aborted).toBe(false);
+    });
+
+    it('should pass an AbortSignal to streamWithEventsResume', async () => {
+      const handler = await getRunHandler();
+      const req = makeRunReq({
+        threadId: 'abort-resume-thread',
+        forwardedProps: { command: { resume: 'val' } },
+      });
+
+      await handler(req, makeMockRes());
+
+      const [, , , signal] = gthLangChainAgentStreamWithEventsResumeMock.mock.calls[0];
+      expect(signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('should NOT emit RUN_ERROR when the run is aborted by client disconnect', async () => {
+      const res = makeMockRes();
+      // Simulate the client going away mid-stream: fire response 'close' (aborts
+      // the signal) then surface the resulting AbortError out of the stream.
+      gthLangChainAgentStreamWithEventsMock.mockImplementation(() =>
+        (async function* () {
+          res.emitClose();
+          const err = new Error('Aborted');
+          err.name = 'AbortError';
+          throw err;
+        })()
+      );
+
+      const handler = await getRunHandler();
+      const req = makeRunReq({ threadId: 'aborted-run-thread' });
+
+      await handler(req, res);
+
+      const events = mockEncoderInstance.encode.mock.calls.map((c) => c[0]);
+      expect(events.find((e) => e.type === 'RUN_ERROR')).toBeUndefined();
     });
 
     it('should emit TEXT_MESSAGE_CONTENT for each text event in the stream', async () => {

@@ -340,7 +340,8 @@ export class GthLangChainAgent implements GthAgentInterface {
    */
   async *streamWithEvents(
     messages: Message[],
-    runConfig: RunnableConfig
+    runConfig: RunnableConfig,
+    signal?: AbortSignal
   ): AsyncGenerator<AgentStreamEvent> {
     if (!this.agent || !this.config) {
       throw new Error('Agent not initialized. Call init() first.');
@@ -350,14 +351,20 @@ export class GthLangChainAgent implements GthAgentInterface {
     debugLogObject('LLM Input Messages', messages);
 
     try {
+      // `signal` lets the transport (e.g. the AG-UI server on client disconnect)
+      // cancel the in-flight LLM generation, not just stop reading from it.
       const stream = await this.agent.stream(
         { messages },
-        { ...runConfig, streamMode: 'messages' }
+        { ...runConfig, streamMode: 'messages', signal }
       );
       yield* this.processEventStream(stream);
     } catch (e) {
-      if (e instanceof GraphInterrupt || (e as Error).name === 'GraphInterrupt') {
-        debugLog('Graph suspended via GraphInterrupt');
+      if (
+        e instanceof GraphInterrupt ||
+        (e as Error).name === 'GraphInterrupt' ||
+        (e as Error).name === 'AbortError'
+      ) {
+        debugLog('Graph suspended (GraphInterrupt) or aborted by caller');
         return;
       }
       throw e;
@@ -375,7 +382,8 @@ export class GthLangChainAgent implements GthAgentInterface {
   async *streamWithEventsResume(
     resumeValue: unknown,
     runConfig: RunnableConfig,
-    queuedMessages?: BaseMessage[]
+    queuedMessages?: BaseMessage[],
+    signal?: AbortSignal
   ): AsyncGenerator<AgentStreamEvent> {
     if (!this.agent || !this.config) {
       throw new Error('Agent not initialized. Call init() first.');
@@ -397,11 +405,16 @@ export class GthLangChainAgent implements GthAgentInterface {
       const stream = await this.agent.stream(command, {
         ...runConfig,
         streamMode: 'messages',
+        signal,
       });
       yield* this.processEventStream(stream);
     } catch (e) {
-      if (e instanceof GraphInterrupt || (e as Error).name === 'GraphInterrupt') {
-        debugLog('Graph suspended via GraphInterrupt');
+      if (
+        e instanceof GraphInterrupt ||
+        (e as Error).name === 'GraphInterrupt' ||
+        (e as Error).name === 'AbortError'
+      ) {
+        debugLog('Graph suspended (GraphInterrupt) or aborted by caller');
         return;
       }
       throw e;

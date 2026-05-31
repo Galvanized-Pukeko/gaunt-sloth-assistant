@@ -168,6 +168,23 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
+    // Cancel in-flight inference when the client goes away (e.g. the frontend's
+    // Stop button calls HttpAgent.abortRun(), which aborts the fetch). Without
+    // this the LangGraph run — and the local model — keeps generating into a
+    // dead socket.
+    //
+    // Listen on the *response* 'close', not the request's: req 'close' fires as
+    // soon as the POST body is consumed (right after express.json() reads it),
+    // which would abort every run instantly. res 'close' fires when the
+    // connection actually goes away. `finished`, set just before res.end(),
+    // distinguishes a normal completion (close after we're done) from a real
+    // client disconnect (close while still streaming).
+    const ac = new AbortController();
+    let finished = false;
+    res.on('close', () => {
+      if (!finished) ac.abort();
+    });
+
     try {
       // RUN_STARTED
       res.write(
@@ -209,7 +226,8 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
         eventStream = agent.streamWithEventsResume(
           forwardedProps.command.resume,
           runConfig,
-          queuedMessages
+          queuedMessages,
+          ac.signal
         );
       } else {
         // Build LangChain messages, prepending system prompt for new threads
@@ -219,7 +237,7 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
           langChainMessages.push(...buildSystemMessages(config, readChatPrompt(config)));
         }
         langChainMessages.push(...(messages || []).map(convertMessage));
-        eventStream = agent.streamWithEvents(langChainMessages, runConfig);
+        eventStream = agent.streamWithEvents(langChainMessages, runConfig, ac.signal);
       }
 
       for await (const event of eventStream) {
@@ -343,8 +361,14 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
         })
       );
 
+      finished = true;
       res.end();
     } catch (error) {
+      // A client-initiated abort isn't an error — the socket is already gone, so
+      // there's nothing to write to. Only surface RUN_ERROR for real failures.
+      if (ac.signal.aborted) {
+        return;
+      }
       const errorMessage = error instanceof Error ? error.message : String(error);
       res.write(
         encoder.encode({

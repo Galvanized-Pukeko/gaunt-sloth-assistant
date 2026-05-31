@@ -769,6 +769,53 @@ describe('GthLangChainAgent', () => {
       }).rejects.toThrow('boom');
     });
 
+    it('should forward the AbortSignal to the underlying agent.stream', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      async function* empty() {}
+      agentMock.stream.mockResolvedValue(empty());
+
+      const ac = new AbortController();
+      const runConfig: RunnableConfig = {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'abortable' },
+      };
+      for await (const _ev of agent.streamWithEvents(
+        [new HumanMessage('go')],
+        runConfig,
+        ac.signal
+      )) {
+        // drain
+      }
+
+      const [, opts] = agentMock.stream.mock.calls[0];
+      expect((opts as { signal?: AbortSignal }).signal).toBe(ac.signal);
+    });
+
+    it('should swallow AbortError and end the iterator (caller-cancelled run)', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      agentMock.stream.mockRejectedValue(abortError);
+
+      const events: unknown[] = [];
+      for await (const ev of agent.streamWithEvents([new HumanMessage('go')], {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'aborted' },
+      })) {
+        events.push(ev);
+      }
+
+      expect(events).toEqual([]);
+    });
+
     it('should isolate tool_call_chunks per round so the second call gets its own args', async () => {
       // Repro for the bug where OpenAI restarts tool_call_chunks.index at 0
       // for each LLM round. Without per-round isolation, the second call's
@@ -966,6 +1013,28 @@ describe('GthLangChainAgent', () => {
 
       const [arg] = agentMock.stream.mock.calls[0];
       expect((arg as unknown as { update?: unknown }).update).toBeUndefined();
+    });
+
+    it('should forward the AbortSignal to the underlying agent.stream', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const fakeListChatModel = new FakeListChatModel({ responses: [] });
+      fakeListChatModel.bindTools = vi.fn().mockReturnValue(fakeListChatModel);
+      await agent.init(undefined, { ...mockConfig, llm: fakeListChatModel });
+
+      async function* empty() {}
+      agentMock.stream.mockResolvedValue(empty());
+
+      const ac = new AbortController();
+      const runConfig: RunnableConfig = {
+        recursionLimit: 1000,
+        configurable: { thread_id: 'resume-abortable' },
+      };
+      for await (const _ev of agent.streamWithEventsResume('resumeVal', runConfig, [], ac.signal)) {
+        // drain
+      }
+
+      const [, opts] = agentMock.stream.mock.calls[0];
+      expect((opts as { signal?: AbortSignal }).signal).toBe(ac.signal);
     });
 
     it('should yield processed tool_result events from the resumed stream', async () => {
