@@ -13,26 +13,6 @@ Make sure `npm config set git-tag-version true`
 ! Important ! The `files` block of package.json strictly controls what is actually released,
 the `files` makes .npmignore ignored.
 
-### Assistant package
-
-The CLI `gaunt-sloth-assistant` lives in `packages/assistant` and carries its
-own version (tagged `vX.Y.Z`), independent of the lock-stepped `@gaunt-sloth/*`
-libraries. The repo root (`gaunt-sloth-workspace`) is `private` and is **never
-published** — `npm version` / `npm publish` run at the root do not touch the
-assistant.
-
-Bump the assistant inside its workspace. npm does **not** auto-commit or tag for
-workspace members, so commit and tag yourself:
-
-```bash
-npm version patch -w gaunt-sloth-assistant   # or minor / major — edits packages/assistant/package.json only
-git commit -am "Release notes"
-git tag -a v1.5.1 -m "Release notes"
-git push --tags
-```
-
-Type `\` and then Enter to type a new line in the message.
-
 ### Library packages
 
 Library packages (`@gaunt-sloth/core`, `@gaunt-sloth/tools`, `@gaunt-sloth/api`,
@@ -61,6 +41,26 @@ Existing tags are skipped, so it's safe to re-run:
 ./tag-packages.sh            # create the tags locally
 ./tag-packages.sh --push     # create and push them (PUSH=1 ./tag-packages.sh also works)
 ```
+
+### Assistant package
+
+The CLI `gaunt-sloth-assistant` lives in `packages/assistant` and carries its
+own version (tagged `vX.Y.Z`), independent of the lock-stepped `@gaunt-sloth/*`
+libraries. The repo root (`gaunt-sloth-workspace`) is `private` and is **never
+published** — `npm version` / `npm publish` run at the root do not touch the
+assistant.
+
+Bump the assistant inside its workspace. npm does **not** auto-commit or tag for
+workspace members, so commit and tag yourself:
+
+```bash
+npm version patch -w gaunt-sloth-assistant   # or minor / major — edits packages/assistant/package.json only
+git commit -am "Release notes"
+git tag -a v1.5.1 -m "Release notes"
+git push --tags
+```
+
+Type `\` and then Enter to type a new line in the message.
 
 ## Publish Release to GitHub (assistant only)
 
