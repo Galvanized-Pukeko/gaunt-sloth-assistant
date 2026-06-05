@@ -174,6 +174,13 @@ export interface GthConfig {
    */
   debugLog?: boolean;
   /**
+   * LangGraph recursion limit for an agent run — the maximum number of
+   * super-steps (model ↔ tool round-trips) before the graph throws. Defaults to
+   * 1000, which suits long coding chains; embodied / tight-loop consumers can
+   * lower it so a stuck run fails fast and visibly instead of grinding.
+   */
+  recursionLimit?: number;
+  /**
    * Console logging level. Only messages at or above this level will be displayed.
    * Valid values: 'debug', 'info', 'display', 'success', 'warning', 'error', 'stream'
    * Default: 'info' (not debug)

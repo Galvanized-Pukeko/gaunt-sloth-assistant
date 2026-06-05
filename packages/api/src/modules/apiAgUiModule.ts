@@ -197,9 +197,10 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
 
       const messageId = randomUUID();
 
-      // Get runnable config with thread_id for checkpointing
+      // Get runnable config with thread_id for checkpointing. config.recursionLimit
+      // (when set by the consumer) caps the agent's super-steps per run.
       const runConfig = {
-        ...getNewRunnableConfig(),
+        ...getNewRunnableConfig(config.recursionLimit),
         configurable: { thread_id: effectiveThreadId },
       };
 

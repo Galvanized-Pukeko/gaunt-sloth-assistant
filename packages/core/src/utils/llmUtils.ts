@@ -19,9 +19,9 @@ import { SystemMessage } from '@langchain/core/messages';
  * We normally do not have multiple sessions in the terminal, but I had bad stuff happening in tests
  * and in another prototype project where I was importing Gaunt Sloth.
  */
-export function getNewRunnableConfig(): RunnableConfig {
+export function getNewRunnableConfig(recursionLimit: number = 1000): RunnableConfig {
   return {
-    recursionLimit: 1000,
+    recursionLimit,
     configurable: { thread_id: randomUUID() },
   };
 }
