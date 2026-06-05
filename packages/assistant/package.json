@@ -36,10 +36,10 @@
     "gth": "cli.js"
   },
   "dependencies": {
-    "@gaunt-sloth/api": "0.1.5",
-    "@gaunt-sloth/core": "0.1.5",
-    "@gaunt-sloth/review": "0.1.5",
-    "@gaunt-sloth/tools": "0.1.5",
+    "@gaunt-sloth/api": "0.1.6",
+    "@gaunt-sloth/core": "0.1.6",
+    "@gaunt-sloth/review": "0.1.6",
+    "@gaunt-sloth/tools": "0.1.6",
     "@langchain/anthropic": "^1.4.0",
     "@langchain/core": "^1.1.48",
     "@langchain/deepseek": "^1.0.27",
