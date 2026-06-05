@@ -42,6 +42,31 @@ Existing tags are skipped, so it's safe to re-run:
 ./tag-packages.sh --push     # create and push them (PUSH=1 ./tag-packages.sh also works)
 ```
 
+### Publishing library packages
+
+Preview what will be included in each package:
+
+```bash
+npm pack --dry-run -w @gaunt-sloth/core
+npm pack --dry-run -w @gaunt-sloth/tools
+npm pack --dry-run -w @gaunt-sloth/api
+npm pack --dry-run -w @gaunt-sloth/review
+```
+
+Publish all library packages:
+
+```bash
+npm publish -w @gaunt-sloth/core -w @gaunt-sloth/tools -w @gaunt-sloth/api -w @gaunt-sloth/review
+```
+
+Note: the first ever publish of a scoped package requires `--access public`.
+After that it's not needed.
+
+### Test-deploying library packages
+
+See [TEST-DEPLOY.md](TEST-DEPLOY.md) for how to test-deploy `@gaunt-sloth/review`
+as a standalone global install before publishing.
+
 ### Assistant package
 
 The CLI `gaunt-sloth-assistant` lives in `packages/assistant` and carries its
@@ -99,31 +124,6 @@ npm publish -w gaunt-sloth-assistant
 ```
 
 Remember to review a list of files in the build, before confirming it.
-
-### Publishing library packages
-
-Preview what will be included in each package:
-
-```bash
-npm pack --dry-run -w @gaunt-sloth/core
-npm pack --dry-run -w @gaunt-sloth/tools
-npm pack --dry-run -w @gaunt-sloth/api
-npm pack --dry-run -w @gaunt-sloth/review
-```
-
-Publish all library packages:
-
-```bash
-npm publish -w @gaunt-sloth/core -w @gaunt-sloth/tools -w @gaunt-sloth/api -w @gaunt-sloth/review
-```
-
-Note: the first ever publish of a scoped package requires `--access public`.
-After that it's not needed.
-
-### Test-deploying library packages
-
-See [TEST-DEPLOY.md](TEST-DEPLOY.md) for how to test-deploy `@gaunt-sloth/review`
-as a standalone global install before publishing.
 
 ## Viewing diff side by side
 
