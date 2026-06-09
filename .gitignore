@@ -28,5 +28,6 @@ test.log
 /vitest-it.config.js
 /vitest-it.config.js.map
 out/*
+briefs/*
 req
 readonly
