@@ -7,6 +7,7 @@ import {
   displayWarning,
 } from '@gaunt-sloth/core/utils/consoleUtils.js';
 import { buildSystemMessages, readPrAutoPrompt } from '@gaunt-sloth/core/utils/llmUtils.js';
+import { debugLog } from '@gaunt-sloth/core/utils/debugUtils.js';
 import { HumanMessage } from '@langchain/core/messages';
 import { StructuredToolInterface, tool } from '@langchain/core/tools';
 import { z } from 'zod';
@@ -14,6 +15,8 @@ import { createResolvers } from '@gaunt-sloth/api/resolvers.js';
 import { get as getGhPrDiff } from '@gaunt-sloth/review/sources/ghPrDiffSource.js';
 import { get as getGhPrView } from '@gaunt-sloth/review/sources/ghPrViewSource.js';
 import { get as getGhIssue } from '@gaunt-sloth/review/sources/ghIssueSource.js';
+import { get as getJiraIssue } from '@gaunt-sloth/review/sources/jiraIssueSource.js';
+import { get as getJiraIssueLegacy } from '@gaunt-sloth/review/sources/jiraIssueLegacySource.js';
 import type { ProviderConfig } from '@gaunt-sloth/review/sources/types.js';
 
 export interface PrAutoModeResult {
@@ -77,20 +80,13 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
     const prMetadata = await getGhPrView(getGithubContentProviderConfig(config), undefined);
     state.prMetadata = prMetadata ?? '';
     if (state.prMetadata) {
-      displayInfo('Auto mode retrieved current-branch PR metadata with gh.');
-      const requirementsIssueId = extractRequirementsGithubIssueId(state.prMetadata);
-      if (requirementsIssueId) {
-        const requirements = await getGhIssue(
-          getGithubRequirementsProviderConfig(config),
-          requirementsIssueId
-        );
-        state.requirements = requirements ?? '';
-        if (state.requirements) {
-          displayInfo(
-            `Auto mode retrieved requirements from GitHub issue #${requirementsIssueId} linked in the PR description.`
-          );
-        }
-      }
+      const prNumber = extractGithubPrNumber(state.prMetadata);
+      displayInfo(
+        prNumber
+          ? `Auto mode retrieved current-branch PR #${prNumber} metadata with gh.`
+          : 'Auto mode retrieved current-branch PR metadata with gh.'
+      );
+      state.requirements = await discoverRequirementsFromPrMetadata(config, state.prMetadata);
     }
   } catch (error) {
     displayWarning(
@@ -119,6 +115,10 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
     await runner.cleanup();
   }
 
+  // The discovery agent streams its final text without a trailing newline, so emit a
+  // blank line to separate it from the review agent's output that follows.
+  displayInfo('');
+
   return {
     diff: state.diff.trim(),
     requirements: state.requirements.trim(),
@@ -141,17 +141,41 @@ function getPrAutoAgentConfig(
   };
 }
 
+// The discovery agent records the requirements it found via set_requirements, so it must
+// always stay available even when an allowedTools allow-list is configured.
+const ALWAYS_KEEP_DISCOVERY_TOOLS = new Set(['set_requirements']);
+
 function createPrAutoResolvers(config: GthConfig, state: PrAutoToolState): AgentResolvers {
   const baseResolvers = createResolvers();
+  const allowedTools = config.commands?.pr?.auto?.allowedTools;
   return {
     ...baseResolvers,
     resolveTools: async (effectiveConfig, command) => {
       const baseTools = baseResolvers.resolveTools
         ? await baseResolvers.resolveTools(effectiveConfig, command)
         : [];
-      return [...baseTools, ...createPrAutoTools(config, state)];
+      const tools = [...baseTools, ...createPrAutoTools(config, state)];
+      return filterDiscoveryTools(tools, allowedTools);
     },
   };
+}
+
+/**
+ * Trim the discovery agent's resolved tools to an allow-list of names. set_requirements is
+ * always kept so the agent can record requirements. When the allow-list is omitted, all tools
+ * are returned unchanged; an empty array keeps only the always-kept tools.
+ */
+export function filterDiscoveryTools(
+  tools: StructuredToolInterface[],
+  allowedTools: string[] | undefined
+): StructuredToolInterface[] {
+  if (allowedTools === undefined) {
+    return tools;
+  }
+  const allowed = new Set(allowedTools);
+  return tools.filter(
+    (tool) => allowed.has(tool.name) || ALWAYS_KEEP_DISCOVERY_TOOLS.has(tool.name)
+  );
 }
 
 function createPrAutoTools(config: GthConfig, state: PrAutoToolState): StructuredToolInterface[] {
@@ -233,6 +257,69 @@ function getGithubRequirementsProviderConfig(config: GthConfig): ProviderConfig 
   );
 }
 
+function getJiraRequirementsProviderConfig(config: GthConfig): ProviderConfig | null {
+  return getProviderConfig(
+    config.builtInToolsConfig?.jira ??
+      config.requirementSourceConfig?.jira ??
+      config.requirementsProviderConfig?.jira
+  );
+}
+
+/**
+ * Deterministically resolve requirements from PR metadata, using a fast path that matches
+ * the configured requirements provider. Falls back to '' when nothing is found, leaving the
+ * discovery agent to resolve requirements.
+ */
+async function discoverRequirementsFromPrMetadata(
+  config: GthConfig,
+  prMetadata: string
+): Promise<string> {
+  const requirementsProvider =
+    config.commands?.pr?.requirementsProvider ?? config.requirementsProvider;
+
+  if (requirementsProvider === 'jira' || requirementsProvider === 'jira-legacy') {
+    const issueKey = extractJiraIssueKey(prMetadata);
+    if (!issueKey) {
+      return '';
+    }
+    const jiraConfig = getJiraRequirementsProviderConfig(config);
+    try {
+      const requirements =
+        (requirementsProvider === 'jira-legacy'
+          ? await getJiraIssueLegacy(jiraConfig ?? {}, issueKey)
+          : await getJiraIssue(jiraConfig, issueKey)) ?? '';
+      if (requirements) {
+        displayInfo(
+          `Auto mode retrieved requirements from Jira issue ${issueKey} linked in the PR description.`
+        );
+      }
+      return requirements;
+    } catch (error) {
+      // The deterministic Jira fast path uses the Jira REST API, which needs its own
+      // credentials (PAT / base64 token) that are independent of any Jira MCP OAuth. When
+      // those aren't configured - e.g. an MCP-only setup - skip quietly and let the discovery
+      // agent resolve requirements via its tools (e.g. the Jira MCP server).
+      debugLog(
+        `Auto mode skipped the deterministic Jira REST lookup for ${issueKey}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return '';
+    }
+  }
+
+  const requirementsIssueId = extractRequirementsGithubIssueId(prMetadata);
+  if (!requirementsIssueId) {
+    return '';
+  }
+  const requirements =
+    (await getGhIssue(getGithubRequirementsProviderConfig(config), requirementsIssueId)) ?? '';
+  if (requirements) {
+    displayInfo(
+      `Auto mode retrieved requirements from GitHub issue #${requirementsIssueId} linked in the PR description.`
+    );
+  }
+  return requirements;
+}
+
 function extractRequirementsGithubIssueId(prMetadata: string): string | undefined {
   const requirementsLine = prMetadata.split('\n').find((line) => /requirements?/i.test(line));
   const candidates = [requirementsLine, prMetadata].filter((value): value is string =>
@@ -249,6 +336,36 @@ function extractRequirementsGithubIssueId(prMetadata: string): string | undefine
       const hashIssueMatch = candidate.match(/#(\d+)/);
       if (hashIssueMatch?.[1]) {
         return hashIssueMatch[1];
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function extractGithubPrNumber(prMetadata: string): string | undefined {
+  // formatPrView emits "GitHub PR: #<number>" as the first line when the number is known.
+  return prMetadata.match(/GitHub PR:\s*#(\d+)/)?.[1];
+}
+
+function extractJiraIssueKey(prMetadata: string): string | undefined {
+  const requirementsLine = prMetadata.split('\n').find((line) => /requirements?/i.test(line));
+  const candidates = [requirementsLine, prMetadata].filter((value): value is string =>
+    Boolean(value)
+  );
+
+  for (const candidate of candidates) {
+    // Atlassian browse URL, e.g. https://company.atlassian.net/browse/ABC-123
+    const urlMatch = candidate.match(/atlassian\.net\/browse\/([A-Z][A-Z0-9]+-\d+)/i);
+    if (urlMatch?.[1]) {
+      return urlMatch[1].toUpperCase();
+    }
+
+    // Bare ticket key on a requirements line, e.g. "Requirements: ABC-123"
+    if (candidate === requirementsLine) {
+      const keyMatch = candidate.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+      if (keyMatch?.[1]) {
+        return keyMatch[1];
       }
     }
   }

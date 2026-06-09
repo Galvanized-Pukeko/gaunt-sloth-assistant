@@ -30,7 +30,6 @@ interface InnerState {
   useColour: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   waitForEscapeCallback?: (_: any, key: any) => void;
-  waitForEscapeShouldPause: boolean;
   logWriteStream?: WriteStream;
 }
 
@@ -39,7 +38,6 @@ const innerState: InnerState = {
   stringFromStdin: '',
   useColour: false,
   waitForEscapeCallback: undefined,
-  waitForEscapeShouldPause: false,
   logWriteStream: undefined,
 };
 
@@ -62,8 +60,9 @@ export const waitForEscape = (callback: () => void, enabled: boolean) => {
     return;
   }
   emitKeypressEvents(process.stdin);
-  innerState.waitForEscapeShouldPause = process.stdin.isPaused?.() ?? false;
   process.stdin.setRawMode(true);
+  // Resume stdin so keypress events fire. This refs the stdin handle, keeping the
+  // event loop alive; stopWaitingForEscape unrefs it again so the process can exit.
   process.stdin.resume?.();
   innerState.waitForEscapeCallback = keypressHandler(callback);
   process.stdin.on('keypress', innerState.waitForEscapeCallback);
@@ -79,10 +78,12 @@ export const stopWaitingForEscape = () => {
     process.stdin.setRawMode(false);
     process.stdin.off('keypress', innerState.waitForEscapeCallback);
     innerState.waitForEscapeCallback = undefined;
-    if (innerState.waitForEscapeShouldPause) {
-      process.stdin.pause?.();
-    }
-    innerState.waitForEscapeShouldPause = false;
+    // Unref stdin so it no longer keeps the event loop alive (waitForEscape resumed
+    // it, which refs the handle). On a TTY stdin.isPaused() is false, so we must not
+    // rely on re-pausing only "previously paused" streams - that left one-shot
+    // commands (e.g. `gth pr` auto mode) hanging after completion. unref leaves the
+    // read state untouched, so interactive sessions (chat) re-ref via rl.question().
+    process.stdin.unref?.();
   }
 };
 

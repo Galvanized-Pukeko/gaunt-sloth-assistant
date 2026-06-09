@@ -102,6 +102,20 @@ export interface GthConfig {
   builtInTools?: string[];
   tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
   /**
+   * Restrict the agent to this allow-list of tool names, applied after every tool source
+   * (filesystem, built-in, custom, MCP, A2A, and `tools`) is resolved. This is the only knob
+   * that can gate MCP and A2A tools, which have no per-source override of their own.
+   *
+   * - omitted/undefined: no filtering, all resolved tools remain available.
+   * - non-empty array: keep only tools whose name is in the list.
+   * - empty array `[]`: disable every tool. MCP servers are not even contacted (no OAuth),
+   *   which is useful for agents that only need to reason over the prompt (e.g. the review
+   *   agent).
+   *
+   * Can be overridden per command via `commands.<command>.allowedTools`.
+   */
+  allowedTools?: string[];
+  /**
    * Middleware configuration for LangChain v1.
    * Middleware provides hooks to intercept and control agent execution at critical points.
    *
@@ -223,6 +237,8 @@ export interface GthConfig {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. Empty array disables all tools for `gth pr`'s review agent. */
+      allowedTools?: string[];
       logWorkForReviewInSeconds?: number;
       rating?: RatingConfig;
       binaryFormats?: false | BinaryFormatConfig[];
@@ -238,6 +254,8 @@ export interface GthConfig {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. Empty array disables all tools for the review agent. */
+      allowedTools?: string[];
       rating?: RatingConfig;
       binaryFormats?: false | BinaryFormatConfig[];
     };
@@ -245,18 +263,24 @@ export interface GthConfig {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. */
+      allowedTools?: string[];
       binaryFormats?: false | BinaryFormatConfig[];
     };
     chat?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. */
+      allowedTools?: string[];
       binaryFormats?: false | BinaryFormatConfig[];
     };
     code?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. */
+      allowedTools?: string[];
       devTools?: GthDevToolsConfig;
       binaryFormats?: false | BinaryFormatConfig[];
     };
@@ -318,6 +342,18 @@ export interface PrAutoModeConfig {
   builtInTools?: string[];
   customTools?: CustomToolsConfig | false;
   tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
+  /**
+   * Restrict the discovery agent to this allow-list of tool names, applied after all tools
+   * are resolved. Unlike `builtInTools`/`customTools`/`filesystem` (which gate whole tool
+   * groups), this trims the final tool set by exact name, so it can pare down MCP server
+   * tools (e.g. "mcp__jira__getJiraIssue") and the auto-mode helper tools
+   * ("gh_pr"/"gh_diff"/"gh_issue"/"set_diff") to the minimum needed.
+   *
+   * `set_requirements` is always retained regardless, since it is how the discovery agent
+   * records the requirements it found. When omitted, all resolved tools remain available; an
+   * empty array keeps only `set_requirements`.
+   */
+  allowedTools?: string[];
 }
 
 export type BinaryFormatType = 'image' | 'file' | 'audio' | 'video' | 'binary';

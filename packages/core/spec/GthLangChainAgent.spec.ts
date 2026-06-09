@@ -254,6 +254,58 @@ describe('GthLangChainAgent', () => {
 
       await agent.init(undefined, configWithTools);
     });
+
+    it('should filter resolved tools by the allowedTools allow-list', async () => {
+      const resolveTools = vi
+        .fn()
+        .mockResolvedValue([
+          { name: 'mcp__jira__getJiraIssue' },
+          { name: 'mcp__jira__searchJiraIssuesUsingJql' },
+          { name: 'gh_pr' },
+        ] as StructuredToolInterface[]);
+      const agent = new GthLangChainAgent(statusUpdateCallback, {
+        resolveTools,
+        resolveMiddleware: async (m) => m ?? [],
+      });
+
+      const config = {
+        ...mockConfig,
+        allowedTools: ['mcp__jira__getJiraIssue'],
+      } as GthConfig;
+
+      await agent.init(undefined, config);
+
+      expect(resolveTools).toHaveBeenCalled();
+      const toolsArg = createAgentMock.mock.calls.at(-1)?.[0].tools as StructuredToolInterface[];
+      expect(toolsArg.map((t) => t.name)).toEqual(['mcp__jira__getJiraIssue']);
+    });
+
+    it('should disable all tools and skip resolution when allowedTools is empty', async () => {
+      const resolveTools = vi
+        .fn()
+        .mockResolvedValue([{ name: 'gh_pr' }] as StructuredToolInterface[]);
+      const agent = new GthLangChainAgent(statusUpdateCallback, {
+        resolveTools,
+        resolveMiddleware: async (m) => m ?? [],
+      });
+
+      const config = {
+        ...mockConfig,
+        tools: [{ name: 'cfg_tool' } as StructuredToolInterface],
+        allowedTools: [],
+      } as GthConfig;
+
+      await agent.init(undefined, config);
+
+      // Empty allow-list must not contact MCP / trigger OAuth, so resolveTools is skipped.
+      expect(resolveTools).not.toHaveBeenCalled();
+      const toolsArg = createAgentMock.mock.calls.at(-1)?.[0].tools as StructuredToolInterface[];
+      expect(toolsArg).toEqual([]);
+      expect(statusUpdateCallback).not.toHaveBeenCalledWith(
+        StatusLevel.INFO,
+        expect.stringContaining('Loaded tools')
+      );
+    });
   });
 
   describe('invoke', () => {
@@ -1229,6 +1281,22 @@ describe('GthLangChainAgent', () => {
 
       expect(result.filesystem).toBe('read');
       expect(result.builtInTools).toEqual(['general']);
+    });
+
+    it('should merge command-specific allowedTools and fall back to the top-level value', () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const config = {
+        ...mockConfig,
+        allowedTools: ['global_tool'],
+        commands: {
+          pr: { allowedTools: [] },
+        },
+      } as GthConfig;
+
+      // Command-level empty array overrides the top-level allow-list.
+      expect(agent.getEffectiveConfig(config, 'pr').allowedTools).toEqual([]);
+      // Commands without their own allowedTools fall back to the top-level value.
+      expect(agent.getEffectiveConfig(config, 'code').allowedTools).toEqual(['global_tool']);
     });
 
     it('should warn when model does not support tools', () => {

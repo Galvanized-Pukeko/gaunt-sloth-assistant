@@ -8,6 +8,7 @@ const processMock = {
     off: vi.fn(),
     resume: vi.fn(),
     pause: vi.fn(),
+    unref: vi.fn(),
     isPaused: vi.fn(),
   },
   versions: {
@@ -182,20 +183,28 @@ describe('systemUtils', () => {
       // Assert
       expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(false);
       expect(processMock.stdin.off).toHaveBeenCalledWith('keypress', keypressHandler);
-      expect(processMock.stdin.pause).not.toHaveBeenCalled();
     });
 
-    it('should pause stdin during cleanup if waitForEscape resumed a paused stream', async () => {
+    it('should unref stdin during cleanup so the process can exit', async () => {
       const { waitForEscape, stopWaitingForEscape } = await import('#src/utils/systemUtils.js');
 
-      processMock.stdin.isPaused.mockReturnValue(true);
       const callback = vi.fn();
 
       waitForEscape(callback, true);
       stopWaitingForEscape();
 
+      // waitForEscape resumes stdin (refs the handle); stopWaitingForEscape must
+      // unref it again, otherwise one-shot commands hang after completion on a TTY.
       expect(processMock.stdin.resume).toHaveBeenCalled();
-      expect(processMock.stdin.pause).toHaveBeenCalled();
+      expect(processMock.stdin.unref).toHaveBeenCalled();
+    });
+
+    it('should not unref stdin when no escape handler is active', async () => {
+      const { stopWaitingForEscape } = await import('#src/utils/systemUtils.js');
+
+      stopWaitingForEscape();
+
+      expect(processMock.stdin.unref).not.toHaveBeenCalled();
     });
 
     it('should handle multiple calls safely', async () => {

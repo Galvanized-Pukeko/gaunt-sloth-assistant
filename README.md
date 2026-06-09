@@ -23,7 +23,9 @@ The promise of Gaunt Sloth:
 - **Extensibility**. Feel free to write some JS and create your Tool, Provider or connect to the MCP server of your choice.
 - **No vendor lock-in**. Just BYO API keys.
 - **Easy installation via NPM**.
-- **All prompts are editable** via markdown files. 
+- **All prompts are editable** via markdown files, you are in full control.
+- **Stateless code reviews** — developers can't argue it into changing its mind.
+- **Run on premises** with local models on your terms.
 
 ## Workspace Packages
 

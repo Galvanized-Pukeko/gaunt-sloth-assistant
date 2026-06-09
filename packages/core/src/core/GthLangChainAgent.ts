@@ -70,19 +70,31 @@ export class GthLangChainAgent implements GthAgentInterface {
       this.statusUpdate(StatusLevel.INFO, `Model: ${this.config.modelDisplayName}`);
     }
 
+    // An empty allowedTools allow-list disables every tool. Skip resolution entirely so we
+    // don't contact MCP servers (and trigger OAuth) just to discard the result.
+    const allowedTools = this.config.allowedTools;
+    const toolsDisabled = Array.isArray(allowedTools) && allowedTools.length === 0;
+
     // Resolve tools via resolver or fall back to config tools only
     debugLog('Resolving tools...');
-    const resolvedTools = this.resolvers?.resolveTools
-      ? await this.resolvers.resolveTools(this.config, command)
-      : [];
+    const resolvedTools =
+      !toolsDisabled && this.resolvers?.resolveTools
+        ? await this.resolvers.resolveTools(this.config, command)
+        : [];
     debugLog(`Resolved tools loaded: ${resolvedTools.length}`);
 
     // Get user config tools
-    const flattenedConfigTools = this.extractAndFlattenTools(this.config.tools || []);
+    const flattenedConfigTools = toolsDisabled
+      ? []
+      : this.extractAndFlattenTools(this.config.tools || []);
     debugLog(`User config tools loaded: ${flattenedConfigTools.length}`);
 
-    // Combine all tools
-    const tools = [...resolvedTools, ...flattenedConfigTools];
+    // Combine all tools, then apply the allowedTools name allow-list when configured.
+    let tools = [...resolvedTools, ...flattenedConfigTools];
+    if (Array.isArray(allowedTools)) {
+      const allowed = new Set(allowedTools);
+      tools = tools.filter((tool) => allowed.has(tool.name));
+    }
 
     if (tools.length > 0) {
       const toolNames = tools
@@ -557,6 +569,8 @@ export class GthLangChainAgent implements GthAgentInterface {
       filesystem: cmdConfig?.filesystem !== undefined ? cmdConfig.filesystem : config.filesystem,
       builtInTools:
         cmdConfig?.builtInTools !== undefined ? cmdConfig.builtInTools : config.builtInTools,
+      allowedTools:
+        cmdConfig?.allowedTools !== undefined ? cmdConfig.allowedTools : config.allowedTools,
       binaryFormats:
         cmdConfig?.binaryFormats !== undefined ? cmdConfig.binaryFormats : config.binaryFormats,
     };
