@@ -11,11 +11,12 @@ import {
   readChatPrompt,
   readCodePrompt,
   readGuidelines,
+  readPrAutoPrompt,
   readReviewInstructions,
   readSystemPrompt,
 } from '@gaunt-sloth/core/utils/llmUtils.js';
 
-export type PromptCommandType = 'ask' | 'review' | 'pr' | 'chat' | 'code';
+export type PromptCommandType = 'ask' | 'review' | 'pr' | 'pr-auto' | 'chat' | 'code';
 export type ProviderCommandType = 'review' | 'pr';
 export type ProviderInputType = 'content' | 'requirements';
 
@@ -43,6 +44,23 @@ export function getCommandSystemPrompt(command: PromptCommandType, config: GthCo
   }
   if (command === 'review' || command === 'pr') {
     return getReviewSystemPrompt(config);
+  }
+  if (command === 'pr-auto') {
+    const messages = buildSystemMessages(config, readPrAutoPrompt(config));
+    const [systemMessage] = messages;
+    const content = systemMessage?.content;
+
+    if (typeof content === 'string') {
+      return content;
+    }
+
+    if (Array.isArray(content)) {
+      return content
+        .map((item) => (typeof item === 'string' ? item : 'text' in item ? item.text : ''))
+        .join('\n');
+    }
+
+    return '';
   }
 
   const modePrompt = command === 'chat' ? readChatPrompt(config) : readCodePrompt(config);

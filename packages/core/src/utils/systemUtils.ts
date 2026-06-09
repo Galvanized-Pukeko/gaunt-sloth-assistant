@@ -1,5 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'url';
+import { emitKeypressEvents } from 'node:readline';
 import { createInterface, type Interface as ReadLineInterface } from 'node:readline/promises';
 import { displayInfo, displayWarning } from './consoleUtils.js';
 import { createWriteStream, readFileSync, type WriteStream } from 'node:fs';
@@ -29,6 +30,7 @@ interface InnerState {
   useColour: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   waitForEscapeCallback?: (_: any, key: any) => void;
+  waitForEscapeShouldPause: boolean;
   logWriteStream?: WriteStream;
 }
 
@@ -37,12 +39,18 @@ const innerState: InnerState = {
   stringFromStdin: '',
   useColour: false,
   waitForEscapeCallback: undefined,
+  waitForEscapeShouldPause: false,
   logWriteStream: undefined,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const keypressHandler = (callback: () => void) => (_: any, key: any) => {
-  if (key?.name === 'escape' || key?.name === 'q') {
+const keypressHandler = (callback: () => void) => (chunk: any, key: any) => {
+  if (
+    key?.name === 'escape' ||
+    key?.name === 'q' ||
+    (key?.ctrl && key?.name === 'c') ||
+    chunk === '\u0003'
+  ) {
     displayWarning('\nInterrupting...');
     callback();
     return;
@@ -53,7 +61,10 @@ export const waitForEscape = (callback: () => void, enabled: boolean) => {
   if (!enabled) {
     return;
   }
+  emitKeypressEvents(process.stdin);
+  innerState.waitForEscapeShouldPause = process.stdin.isPaused?.() ?? false;
   process.stdin.setRawMode(true);
+  process.stdin.resume?.();
   innerState.waitForEscapeCallback = keypressHandler(callback);
   process.stdin.on('keypress', innerState.waitForEscapeCallback);
   displayInfo(`
@@ -68,6 +79,10 @@ export const stopWaitingForEscape = () => {
     process.stdin.setRawMode(false);
     process.stdin.off('keypress', innerState.waitForEscapeCallback);
     innerState.waitForEscapeCallback = undefined;
+    if (innerState.waitForEscapeShouldPause) {
+      process.stdin.pause?.();
+    }
+    innerState.waitForEscapeShouldPause = false;
   }
 };
 

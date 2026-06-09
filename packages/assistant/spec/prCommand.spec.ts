@@ -18,6 +18,7 @@ const resolversMock = {
 vi.mock('@gaunt-sloth/api/resolvers.js', () => resolversMock);
 
 const review = vi.fn();
+const runPrAutoMode = vi.fn();
 const prompt = {
   readBackstory: vi.fn(),
   readGuidelines: vi.fn(),
@@ -28,6 +29,9 @@ const prompt = {
 // Use a direct mock for the review function instead of a nested implementation
 vi.mock('#src/modules/reviewModule.js', () => ({
   review: review,
+}));
+vi.mock('#src/commands/prAutoMode.js', () => ({
+  runPrAutoMode,
 }));
 
 const utilsMock = {
@@ -98,7 +102,77 @@ describe('prCommand', () => {
     prompt.readReviewInstructions.mockReturnValue('REVIEW INSTRUCTIONS');
     prompt.readSystemPrompt.mockReturnValue('');
 
+    runPrAutoMode.mockResolvedValue({
+      requirements: 'Auto requirements',
+      diff: 'Auto PR Diff Content',
+    });
+
     resolversMock.createResolvers.mockReturnValue({ resolveTools: vi.fn(), cleanupTools: vi.fn() });
+  });
+
+  it('Should call pr auto mode when no PR id and requirements id are provided', async () => {
+    const testConfig = {
+      ...mockConfig,
+      commands: {
+        pr: {
+          contentProvider: 'github',
+          requirementsProvider: 'github',
+          auto: {
+            enabled: true,
+            deterministicDiff: true,
+          },
+        },
+        review: {},
+      },
+      streamOutput: false,
+    };
+    configMock.initConfig.mockResolvedValue(testConfig);
+
+    const { prCommand } = await import('#src/commands/prCommand.js');
+    const program = new Command();
+
+    prCommand(program, {});
+    await program.parseAsync(['na', 'na', 'pr']);
+
+    expect(runPrAutoMode).toHaveBeenCalledWith(testConfig);
+    expect(review).toHaveBeenCalledWith(
+      'PR-auto',
+      'INTERNAL BACKSTORY\nPROJECT GUIDELINES\nREVIEW INSTRUCTIONS',
+      '\nProvided requirements follows within auto-requirements-1234567 block\n<auto-requirements-1234567>\nAuto requirements\n</auto-requirements-1234567>\n\n\nProvided GitHub diff follows within auto-diff-1234567 block\n<auto-diff-1234567>\nAuto PR Diff Content\n</auto-diff-1234567>\n',
+      expect.objectContaining({
+        projectGuidelines: '.gsloth.guidelines.md',
+        projectReviewInstructions: '.gsloth.review.md',
+      }),
+      'pr',
+      expect.any(Object)
+    );
+  });
+
+  it('Should reject no-argument pr command when auto mode is disabled', async () => {
+    const testConfig = {
+      ...mockConfig,
+      commands: {
+        pr: {
+          contentProvider: 'github',
+          requirementsProvider: 'github',
+          auto: {
+            enabled: false,
+          },
+        },
+        review: {},
+      },
+      streamOutput: false,
+    };
+    configMock.initConfig.mockResolvedValue(testConfig);
+
+    const { prCommand } = await import('#src/commands/prCommand.js');
+    const program = new Command();
+
+    prCommand(program, {});
+    await program.parseAsync(['na', 'na', 'pr']);
+
+    expect(runPrAutoMode).not.toHaveBeenCalled();
+    expect(review).not.toHaveBeenCalled();
   });
 
   it('Should call pr command', async () => {
@@ -224,6 +298,9 @@ describe('prCommand', () => {
       error: vi.fn(),
       exit: vi.fn(),
       getCurrentWorkDir: vi.fn().mockReturnValue('/mock/dir'),
+      getUseColour: vi.fn().mockReturnValue(false),
+      log: vi.fn(),
+      setExitCode: vi.fn(),
     }));
 
     const { prCommand } = await import('#src/commands/prCommand.js');

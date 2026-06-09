@@ -226,6 +226,7 @@ export interface GthConfig {
       logWorkForReviewInSeconds?: number;
       rating?: RatingConfig;
       binaryFormats?: false | BinaryFormatConfig[];
+      auto?: PrAutoModeConfig;
     };
     review?: {
       contentSource?: string;
@@ -295,6 +296,28 @@ export type ConsoleLevelInput =
 export interface RawGthConfig extends Omit<GthConfig, 'llm' | 'consoleLevel'> {
   llm: LLMConfig;
   consoleLevel?: ConsoleLevelInput;
+}
+
+export interface PrAutoModeConfig {
+  /**
+   * Enable `gth pr` auto mode when neither PR id nor requirements id is provided.
+   * @default true
+   */
+  enabled?: boolean;
+  /**
+   * Fetch the current-branch PR diff with `gh pr diff` before invoking the auto agent.
+   * The auto agent can still replace it with the `set_diff` tool if needed.
+   * @default true
+   */
+  deterministicDiff?: boolean;
+  /**
+   * Optional tool overrides used only while the auto-mode discovery agent runs.
+   * When omitted, the normal configured tools remain available.
+   */
+  filesystem?: string[] | 'all' | 'read' | 'none';
+  builtInTools?: string[];
+  customTools?: CustomToolsConfig | false;
+  tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
 }
 
 export type BinaryFormatType = 'image' | 'file' | 'audio' | 'video' | 'binary';

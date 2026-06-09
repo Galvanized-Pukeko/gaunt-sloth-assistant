@@ -6,6 +6,9 @@ const processMock = {
     setRawMode: vi.fn(),
     on: vi.fn(),
     off: vi.fn(),
+    resume: vi.fn(),
+    pause: vi.fn(),
+    isPaused: vi.fn(),
   },
   versions: {
     node: '24.0.0',
@@ -23,12 +26,17 @@ const fsMock = {
   createWriteStream: vi.fn(),
 };
 
+const readlineMock = {
+  emitKeypressEvents: vi.fn(),
+};
+
 // Mock process events
 const processEventMocks = {
   on: vi.fn(),
 };
 
 vi.mock('node:fs', () => fsMock);
+vi.mock('node:readline', () => readlineMock);
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 // Mock the global process object
@@ -43,6 +51,7 @@ Object.defineProperty(global, 'process', {
 describe('systemUtils', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    processMock.stdin.isPaused.mockReturnValue(false);
   });
 
   describe('waitForEscape', () => {
@@ -69,7 +78,9 @@ describe('systemUtils', () => {
       waitForEscape(callback, true);
 
       // Assert
+      expect(readlineMock.emitKeypressEvents).toHaveBeenCalledWith(processMock.stdin);
       expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(true);
+      expect(processMock.stdin.resume).toHaveBeenCalled();
       expect(processMock.stdin.on).toHaveBeenCalledWith('keypress', expect.any(Function));
       expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
         expect.stringContaining('Press Escape or Q to interrupt Agent')
@@ -97,6 +108,26 @@ describe('systemUtils', () => {
       keypressHandler!('', { name: 'escape' });
 
       // Assert
+      expect(callback).toHaveBeenCalled();
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith('\nInterrupting...');
+    });
+
+    it('should call callback when Ctrl+C is pressed in raw mode', async () => {
+      const { waitForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+      let keypressHandler: (_chunk: any, _key: any) => void;
+
+      processMock.stdin.on.mockImplementation((event: string, handler: any) => {
+        if (event === 'keypress') {
+          keypressHandler = handler;
+        }
+      });
+
+      waitForEscape(callback, true);
+
+      keypressHandler!('\u0003', { name: 'c', ctrl: true });
+
       expect(callback).toHaveBeenCalled();
       expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith('\nInterrupting...');
     });
@@ -151,6 +182,20 @@ describe('systemUtils', () => {
       // Assert
       expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(false);
       expect(processMock.stdin.off).toHaveBeenCalledWith('keypress', keypressHandler);
+      expect(processMock.stdin.pause).not.toHaveBeenCalled();
+    });
+
+    it('should pause stdin during cleanup if waitForEscape resumed a paused stream', async () => {
+      const { waitForEscape, stopWaitingForEscape } = await import('#src/utils/systemUtils.js');
+
+      processMock.stdin.isPaused.mockReturnValue(true);
+      const callback = vi.fn();
+
+      waitForEscape(callback, true);
+      stopWaitingForEscape();
+
+      expect(processMock.stdin.resume).toHaveBeenCalled();
+      expect(processMock.stdin.pause).toHaveBeenCalled();
     });
 
     it('should handle multiple calls safely', async () => {
