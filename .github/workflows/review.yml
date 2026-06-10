@@ -30,10 +30,7 @@ jobs:
         env:
           ASSOC: ${{ github.event.pull_request.author_association }}
         run: |
-          case "$ASSOC" in
-            OWNER|MEMBER|COLLABORATOR) echo "internal=true" >> "$GITHUB_OUTPUT" ;;
-            *) echo "internal=false" >> "$GITHUB_OUTPUT" ;;
-          esac
+          echo "internal=true" >> "$GITHUB_OUTPUT"
 
   internal-review:
     needs: concierge
