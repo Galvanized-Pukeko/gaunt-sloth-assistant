@@ -176,6 +176,23 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
     };
   }
 
+  // If the discovery agent is our only chance to obtain a diff (none was set deterministically)
+  // but the allow-list filters out every diff tool, it can never set one and the command is
+  // guaranteed to fail later with "PR auto mode did not set a diff". Warn early so the
+  // misconfiguration is obvious rather than surfacing as an opaque downstream failure.
+  if (
+    !state.diff.trim() &&
+    autoConfig?.allowedTools &&
+    !autoConfig.allowedTools.includes('gh_diff') &&
+    !autoConfig.allowedTools.includes('set_diff')
+  ) {
+    displayWarning(
+      'Auto mode has no diff yet and commands.pr.auto.allowedTools excludes both "gh_diff" and ' +
+        '"set_diff", so the discovery agent cannot set one. Add "gh_diff" (or "set_diff") to the ' +
+        'allow-list, or enable deterministicDiff.'
+    );
+  }
+
   const runner = new GthAgentRunner(defaultStatusCallback, createPrAutoResolvers(config, state));
   try {
     await runner.init(undefined, getPrAutoAgentConfig(config, autoConfig), undefined);
@@ -395,13 +412,27 @@ const GITHUB_ISSUE_URL_PATTERN = /(?:https?:\/\/)?github\.com\/[\w.-]+\/[\w.-]+\
 const GITHUB_CLOSING_KEYWORD_PATTERN = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)\b/i;
 
 /**
+ * Return just the PR description body - the lines after the "Description:" marker emitted by
+ * {@link formatPrView}. The requirements-line scan must not see the structured header fields
+ * (notably "Title:"), or a title like "Clarify requirements doc, see #42" would be misread as a
+ * requirements pointer. Falls back to the full text when no marker is present.
+ */
+function getPrDescriptionBody(prMetadata: string): string {
+  const lines = prMetadata.split('\n');
+  const descriptionIndex = lines.findIndex((line) => line.trim() === 'Description:');
+  return descriptionIndex === -1 ? prMetadata : lines.slice(descriptionIndex + 1).join('\n');
+}
+
+/**
  * Extract a GitHub issue reference (a full issue URL or a bare issue number) that the PR
  * description explicitly designates as requirements. URLs are returned whole rather than as
  * extracted numbers, because a cross-repo issue URL reduced to its number would make
  * `gh issue view` fetch the same-numbered issue from the wrong (current) repository.
  */
 function extractRequirementsGithubIssueRef(prMetadata: string): string | undefined {
-  const requirementsLine = prMetadata.split('\n').find((line) => /requirements?/i.test(line));
+  const requirementsLine = getPrDescriptionBody(prMetadata)
+    .split('\n')
+    .find((line) => /requirements?/i.test(line));
 
   if (requirementsLine) {
     const urlMatch = requirementsLine.match(GITHUB_ISSUE_URL_PATTERN);
@@ -465,7 +496,9 @@ const ATLASSIAN_BROWSE_URL_PATTERN = /atlassian\.net\/browse\/([A-Z]{2}[A-Z0-9]*
 
 function extractJiraIssueKey(prMetadata: string): string | undefined {
   const lines = prMetadata.split('\n');
-  const requirementsLine = lines.find((line) => /requirements?/i.test(line));
+  const requirementsLine = getPrDescriptionBody(prMetadata)
+    .split('\n')
+    .find((line) => /requirements?/i.test(line));
 
   if (requirementsLine) {
     const urlMatch = requirementsLine.match(ATLASSIAN_BROWSE_URL_PATTERN);

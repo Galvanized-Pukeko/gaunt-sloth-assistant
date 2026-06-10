@@ -373,6 +373,36 @@ No linked ticket here`;
       expect(agentConfig.allowedTools).toBeUndefined();
     });
 
+    it('warns when no diff is set and the allow-list excludes both diff tools', async () => {
+      // Deterministic fetch yields no diff, and the allow-list filters out gh_diff/set_diff, so
+      // the discovery agent can never set one - warn instead of failing opaquely downstream.
+      ghDiffMock.mockReset();
+      ghDiffMock.mockResolvedValue('');
+      ghPrViewMock.mockResolvedValue(noLinkMetadata);
+      processMessagesMock.mockResolvedValue(undefined);
+
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      await runPrAutoMode(withAutoConfig({ deterministicDiff: false, allowedTools: ['gh_pr'] }));
+
+      expect(displayWarningMock).toHaveBeenCalledWith(expect.stringContaining('cannot set one'));
+    });
+
+    it('does not warn about diff tools when gh_diff survives the allow-list', async () => {
+      ghDiffMock.mockReset();
+      ghDiffMock.mockResolvedValue('');
+      ghPrViewMock.mockResolvedValue(noLinkMetadata);
+      processMessagesMock.mockResolvedValue(undefined);
+
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      await runPrAutoMode(
+        withAutoConfig({ deterministicDiff: false, allowedTools: ['gh_pr', 'gh_diff'] })
+      );
+
+      expect(displayWarningMock).not.toHaveBeenCalledWith(
+        expect.stringContaining('cannot set one')
+      );
+    });
+
     it('gh_diff stores the fetched diff directly instead of echoing it through the model', async () => {
       // Deterministic fetch fails, so the discovery agent has to use the gh_diff tool.
       ghDiffMock.mockReset();
@@ -411,6 +441,22 @@ Closes #359`);
     expect(ghIssueMock).toHaveBeenCalledWith(null, '359');
     expect(result.requirements).toBe('Issue #359 requirements');
     expect(initMock).not.toHaveBeenCalled();
+  });
+
+  it('does not extract a requirements ref from a "requirements" word in the Title line', async () => {
+    // The Title line is structured metadata, not the description; a title that merely mentions
+    // "requirements" must not be misread as a requirements pointer (it would pull #42 here).
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Title: Clarify requirements doc, see #42
+Description:
+No linked ticket here`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    await runPrAutoMode(config);
+
+    expect(ghIssueMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
   });
 
   it('leaves requirements to the discovery agent when several issue URLs are linked', async () => {
