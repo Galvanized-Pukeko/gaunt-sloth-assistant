@@ -1,5 +1,7 @@
 # Gaunt Sloth Assistant Internal Development Guidelines
 
+**do not merge**
+
 This file provides guidance to any AI coding agent (Claude Code, Cursor, etc.) working with this repository.
 
 ## Technologies Used
