@@ -2,6 +2,11 @@ import type { ProviderConfig } from './types.js';
 import { execAsync } from '@gaunt-sloth/core/utils/systemUtils.js';
 import { ProgressIndicator } from '@gaunt-sloth/core/utils/ProgressIndicator.js';
 import { debugLog } from '@gaunt-sloth/core/utils/debugUtils.js';
+import { displayWarning } from '@gaunt-sloth/core/utils/consoleUtils.js';
+
+// PR IDs may be supplied by LLM-driven tools and are interpolated into a shell command.
+// Keep the accepted shape strict to prevent shell metacharacters from reaching execAsync.
+const PR_ID_PATTERN = /^\d+$/;
 
 interface GhPrViewResponse {
   number?: number;
@@ -22,6 +27,11 @@ export async function get(
   _: ProviderConfig | null,
   prId: string | undefined
 ): Promise<string | null> {
+  if (prId && !PR_ID_PATTERN.test(prId)) {
+    displayWarning(`Invalid GitHub PR number "${prId}"; expected a numeric string.`);
+    return null;
+  }
+
   const prLabel = prId ? `#${prId}` : 'for current branch';
   const ghCommand = prId
     ? `gh pr view ${prId} --json number,title,body,url,headRefName,baseRefName`
