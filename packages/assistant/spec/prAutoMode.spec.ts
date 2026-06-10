@@ -176,6 +176,25 @@ No linked ticket`);
     );
   });
 
+  it('does not let a spoofed "GitHub PR: #" line in the body set the displayed PR number', async () => {
+    // The PR number is taken from the first line only, so a body echoing the label cannot spoof it.
+    ghPrViewMock.mockResolvedValue(`GitHub PR: for current branch
+Description:
+GitHub PR: #999 (this line is part of the body, not the header)`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+
+    await runPrAutoMode(config);
+
+    expect(displayInfoMock).toHaveBeenCalledWith(
+      'Auto mode retrieved current-branch PR metadata with gh.'
+    );
+    expect(displayInfoMock).not.toHaveBeenCalledWith(
+      'Auto mode retrieved current-branch PR #999 metadata with gh.'
+    );
+  });
+
   it('resolves Jira requirements from an Atlassian browse URL when the provider is jira', async () => {
     ghPrViewMock.mockResolvedValue(`GitHub PR: #360
 Description:
@@ -494,6 +513,31 @@ No linked ticket here`);
     // gh pr diff only makes sense for the github content provider; for others the discovery
     // agent fetches the diff via its tools instead.
     expect(ghDiffMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
+  });
+
+  it('downgrades the metadata-fetch failure to debug when the content provider is not github', async () => {
+    const textContentConfig = {
+      ...config,
+      contentProvider: 'text',
+      commands: {
+        pr: { contentProvider: 'text', requirementsProvider: 'github', auto: { enabled: true } },
+        review: {},
+      },
+    } as Partial<GthConfig> as GthConfig;
+    ghPrViewMock.mockRejectedValue(new Error('gh: not a GitHub repository'));
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    await runPrAutoMode(textContentConfig);
+
+    // The expected failure in a non-github setup is noise, so it is logged at debug, not warned.
+    expect(displayWarningMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('could not retrieve current-branch PR metadata')
+    );
+    expect(debugLogMock).toHaveBeenCalledWith(
+      expect.stringContaining('could not retrieve current-branch PR metadata')
+    );
     expect(initMock).toHaveBeenCalled();
   });
 

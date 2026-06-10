@@ -280,6 +280,33 @@ describe('GthLangChainAgent', () => {
       expect(toolsArg.map((t) => t.name)).toEqual(['mcp__jira__getJiraIssue']);
     });
 
+    it('retains nameless server tools when an allowedTools allow-list is set', async () => {
+      const resolveTools = vi.fn().mockResolvedValue([]);
+      const agent = new GthLangChainAgent(statusUpdateCallback, {
+        resolveTools,
+        resolveMiddleware: async (m) => m ?? [],
+      });
+
+      const config = {
+        ...mockConfig,
+        // A ServerTool (provider-native "magic object") with no name alongside a named tool.
+        tools: [
+          { type: 'web_search_20250305' },
+          { name: 'gh_pr' },
+        ] as unknown as StructuredToolInterface[],
+        allowedTools: ['gh_pr'],
+      } as GthConfig;
+
+      await agent.init(undefined, config);
+
+      const toolsArg = createAgentMock.mock.calls.at(-1)?.[0].tools as StructuredToolInterface[];
+      // The nameless server tool can never be named in the allow-list, so it is retained rather
+      // than silently dropped; the named tool is still filtered normally.
+      expect(toolsArg).toHaveLength(2);
+      expect(toolsArg.map((t) => t.name)).toContain('gh_pr');
+      expect(toolsArg.some((t) => !t.name)).toBe(true);
+    });
+
     it('should disable all tools and skip resolution when allowedTools is empty', async () => {
       const resolveTools = vi
         .fn()

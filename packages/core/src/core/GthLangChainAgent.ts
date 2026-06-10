@@ -99,7 +99,11 @@ export class GthLangChainAgent implements GthAgentInterface {
     let tools = [...resolvedTools, ...flattenedConfigTools];
     if (Array.isArray(allowedTools)) {
       const allowed = new Set(allowedTools);
-      tools = tools.filter((tool) => allowed.has(tool.name));
+      // Filter named tools by the allow-list. ServerTools (provider-native "magic objects" such
+      // as Anthropic web search) may have no `name`, so they can never be referenced in the
+      // allow-list - drop-by-default would silently remove them with no recourse. Retain such
+      // nameless tools instead; the allow-list is a name-based filter and cannot target them.
+      tools = tools.filter((tool) => !tool.name || allowed.has(tool.name));
     }
 
     if (tools.length > 0) {

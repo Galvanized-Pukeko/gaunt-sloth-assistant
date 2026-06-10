@@ -171,9 +171,16 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
       state.requirements = await discoverRequirementsFromPrMetadata(config, state.prMetadata);
     }
   } catch (error) {
-    displayWarning(
-      `Auto mode could not retrieve current-branch PR metadata: ${error instanceof Error ? error.message : String(error)}`
-    );
+    const message = `Auto mode could not retrieve current-branch PR metadata: ${error instanceof Error ? error.message : String(error)}`;
+    // The metadata fetch (gh pr view) still runs for non-github content providers, because a
+    // GitHub PR can legitimately be reviewed with a non-github diff source. But in a fully
+    // non-github setup a failure here is expected noise, so log it at debug level rather than
+    // warning - mirroring how the deterministic diff path stays quiet off GitHub.
+    if (contentProvider === 'github') {
+      displayWarning(message);
+    } else {
+      debugLog(message);
+    }
   }
 
   if (state.diff.trim() && state.requirements.trim()) {
@@ -353,6 +360,10 @@ function getGithubRequirementsProviderConfig(config: GthConfig): ProviderConfig 
 }
 
 function getJiraRequirementsProviderConfig(config: GthConfig): ProviderConfig | null {
+  // builtInToolsConfig.jira takes precedence because it is the canonical Jira credential location
+  // (shared with the Jira MCP/built-in tooling); the requirementSource/requirementsProvider
+  // entries are the older provider-scoped fallbacks. If a user sets both with different cloudIds,
+  // the deterministic fast path uses the built-in config - keep them in sync to avoid surprises.
   return getProviderConfig(
     config.builtInToolsConfig?.jira ??
       config.requirementSourceConfig?.jira ??
@@ -497,8 +508,10 @@ function formatGithubIssueRef(ref: string): string {
 }
 
 function extractGithubPrNumber(prMetadata: string): string | undefined {
-  // formatPrView emits "GitHub PR: #<number>" as the first line when the number is known.
-  return prMetadata.match(/GitHub PR:\s*#(\d+)/)?.[1];
+  // formatPrView emits "GitHub PR: #<number>" as the first line when the number is known. Anchor
+  // to that first line so a PR body that merely contains the literal "GitHub PR: #123" cannot
+  // spoof the number shown in the info message.
+  return prMetadata.split('\n', 1)[0].match(/^GitHub PR:\s*#(\d+)/)?.[1];
 }
 
 // Jira project keys are at least two letters followed by letters/digits (e.g. ABC-123,
