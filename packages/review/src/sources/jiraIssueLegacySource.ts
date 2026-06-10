@@ -18,7 +18,7 @@ interface JiraIssueResponse {
  * @returns Jira issue content
  */
 export async function get(
-  config: Partial<JiraLegacyConfig>,
+  config: Partial<JiraLegacyConfig> | null,
   issueId: string | undefined
 ): Promise<string | null> {
   if (!config) {

@@ -286,7 +286,7 @@ async function discoverRequirementsFromPrMetadata(
     try {
       const requirements =
         (requirementsProvider === 'jira-legacy'
-          ? await getJiraIssueLegacy(jiraConfig ?? {}, issueKey)
+          ? await getJiraIssueLegacy(jiraConfig, issueKey)
           : await getJiraIssue(jiraConfig, issueKey)) ?? '';
       if (requirements) {
         displayInfo(
@@ -381,26 +381,47 @@ function extractGithubPrNumber(prMetadata: string): string | undefined {
   return prMetadata.match(/GitHub PR:\s*#(\d+)/)?.[1];
 }
 
-function extractJiraIssueKey(prMetadata: string): string | undefined {
-  const requirementsLine = prMetadata.split('\n').find((line) => /requirements?/i.test(line));
-  const candidates = [requirementsLine, prMetadata].filter((value): value is string =>
-    Boolean(value)
-  );
+// Jira project keys are at least two letters followed by letters/digits (e.g. ABC-123,
+// never A-1). Kept case-sensitive for bare keys: lowercase look-alikes in branch names or
+// prose ("fix-123") are too ambiguous for the deterministic path.
+const JIRA_ISSUE_KEY_PATTERN = /\b([A-Z]{2}[A-Z0-9]*-\d+)\b/;
+// Atlassian browse URL, e.g. https://company.atlassian.net/browse/ABC-123
+const ATLASSIAN_BROWSE_URL_PATTERN = /atlassian\.net\/browse\/([A-Z]{2}[A-Z0-9]*-\d+)/i;
 
-  for (const candidate of candidates) {
-    // Atlassian browse URL, e.g. https://company.atlassian.net/browse/ABC-123
-    const urlMatch = candidate.match(/atlassian\.net\/browse\/([A-Z][A-Z0-9]+-\d+)/i);
+function extractJiraIssueKey(prMetadata: string): string | undefined {
+  const lines = prMetadata.split('\n');
+  const requirementsLine = lines.find((line) => /requirements?/i.test(line));
+
+  if (requirementsLine) {
+    const urlMatch = requirementsLine.match(ATLASSIAN_BROWSE_URL_PATTERN);
     if (urlMatch?.[1]) {
       return urlMatch[1].toUpperCase();
     }
-
     // Bare ticket key on a requirements line, e.g. "Requirements: ABC-123"
-    if (candidate === requirementsLine) {
-      const keyMatch = candidate.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
-      if (keyMatch?.[1]) {
-        return keyMatch[1];
-      }
+    const keyMatch = requirementsLine.match(JIRA_ISSUE_KEY_PATTERN);
+    if (keyMatch?.[1]) {
+      return keyMatch[1];
     }
+  }
+
+  // A key in the head branch name (feature/ABC-123-description convention) is an explicit
+  // statement of which issue the branch implements.
+  const headBranchLine = lines.find((line) => line.startsWith('Head branch:'));
+  const branchKeyMatch = headBranchLine?.match(JIRA_ISSUE_KEY_PATTERN);
+  if (branchKeyMatch?.[1]) {
+    return branchKeyMatch[1];
+  }
+
+  // Otherwise fall back to an Atlassian browse URL anywhere in the body, but - mirroring the
+  // GitHub path - only when it is unambiguous: with several distinct links (e.g. "see also"
+  // references) picking one would silently review against the wrong requirements.
+  const bodyKeys = new Set(
+    Array.from(prMetadata.matchAll(new RegExp(ATLASSIAN_BROWSE_URL_PATTERN, 'gi'))).map((match) =>
+      match[1].toUpperCase()
+    )
+  );
+  if (bodyKeys.size === 1) {
+    return bodyKeys.values().next().value;
   }
 
   return undefined;

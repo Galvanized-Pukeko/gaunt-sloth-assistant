@@ -45,27 +45,18 @@ export function getCommandSystemPrompt(command: PromptCommandType, config: GthCo
   if (command === 'review' || command === 'pr') {
     return getReviewSystemPrompt(config);
   }
-  if (command === 'pr-auto') {
-    const messages = buildSystemMessages(config, readPrAutoPrompt(config));
-    const [systemMessage] = messages;
-    const content = systemMessage?.content;
 
-    if (typeof content === 'string') {
-      return content;
-    }
+  const modePrompt =
+    command === 'pr-auto'
+      ? readPrAutoPrompt(config)
+      : command === 'chat'
+        ? readChatPrompt(config)
+        : readCodePrompt(config);
+  return flattenSystemMessageContent(config, modePrompt);
+}
 
-    if (Array.isArray(content)) {
-      return content
-        .map((item) => (typeof item === 'string' ? item : 'text' in item ? item.text : ''))
-        .join('\n');
-    }
-
-    return '';
-  }
-
-  const modePrompt = command === 'chat' ? readChatPrompt(config) : readCodePrompt(config);
-  const messages = buildSystemMessages(config, modePrompt);
-  const [systemMessage] = messages;
+function flattenSystemMessageContent(config: GthConfig, modePrompt: string): string {
+  const [systemMessage] = buildSystemMessages(config, modePrompt);
   const content = systemMessage?.content;
 
   if (typeof content === 'string') {

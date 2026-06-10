@@ -192,6 +192,64 @@ Requirement: ABC-123 must be implemented`);
     expect(jiraIssueMock).toHaveBeenCalledWith({ cloudId: 'cloud-1' }, 'ABC-123');
   });
 
+  it('resolves a Jira key from the head branch name', async () => {
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Head branch: feature/ABC-123-add-useful-feature
+Description:
+No explicit ticket link`);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+
+    const result = await runPrAutoMode(jiraConfig);
+
+    expect(result.requirements).toBe('ABC-123 requirements');
+    expect(jiraIssueMock).toHaveBeenCalledWith({ cloudId: 'cloud-1' }, 'ABC-123');
+    expect(initMock).not.toHaveBeenCalled();
+  });
+
+  it('does not treat single-letter or lowercase branch tokens as Jira keys', async () => {
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Head branch: feature/fix-123-and-A-1-cleanup
+Description:
+No linked ticket here`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+
+    await runPrAutoMode(jiraConfig);
+
+    expect(jiraIssueMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
+  });
+
+  it('uses a single Atlassian browse URL from the body when no requirements line exists', async () => {
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+Implements https://company.atlassian.net/browse/ABC-123`);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+
+    const result = await runPrAutoMode(jiraConfig);
+
+    expect(result.requirements).toBe('ABC-123 requirements');
+    expect(jiraIssueMock).toHaveBeenCalledWith({ cloudId: 'cloud-1' }, 'ABC-123');
+  });
+
+  it('leaves requirements to the discovery agent when several distinct Jira links are present', async () => {
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+See https://company.atlassian.net/browse/ABC-123 and https://company.atlassian.net/browse/XYZ-9`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+
+    await runPrAutoMode(jiraConfig);
+
+    // Picking one of several "see also" links would review against the wrong requirements.
+    expect(jiraIssueMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
+  });
+
   it('uses the legacy Jira source when the provider is jira-legacy', async () => {
     ghPrViewMock.mockResolvedValue(`GitHub PR: #360
 Description:

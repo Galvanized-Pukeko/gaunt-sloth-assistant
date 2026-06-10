@@ -1,6 +1,7 @@
 import type { ProviderConfig } from './types.js';
 import { execAsync } from '@gaunt-sloth/core/utils/systemUtils.js';
 import { ProgressIndicator } from '@gaunt-sloth/core/utils/ProgressIndicator.js';
+import { debugLog } from '@gaunt-sloth/core/utils/debugUtils.js';
 
 interface GhPrViewResponse {
   number?: number;
@@ -35,7 +36,15 @@ export async function get(
       throw new Error(`No metadata found for GitHub PR ${prLabel}`);
     }
 
-    const prView = JSON.parse(prViewJson) as GhPrViewResponse;
+    let prView: GhPrViewResponse;
+    try {
+      prView = JSON.parse(prViewJson) as GhPrViewResponse;
+    } catch (parseError) {
+      // gh can prepend warning lines to otherwise valid output; surface the raw output for
+      // debugging since the rethrown message only carries the SyntaxError text.
+      debugLog(`Failed to parse gh pr view output as JSON:\n${prViewJson}`);
+      throw parseError;
+    }
     return formatPrView(prView, prLabel);
   } catch (error) {
     progress.stop();
