@@ -1508,10 +1508,15 @@ every tool source (filesystem, built-in, custom, MCP, A2A and `tools`) has been 
 the only knob that can gate individual MCP and A2A tools (e.g. `mcp__jira__getJiraIssue`), which
 have no per-source override of their own.
 
-- **omitted**: no filtering, all resolved tools remain available
+- **omitted or `undefined`**: no filtering, all resolved tools remain available
 - **non-empty array**: only tools whose name is in the list remain available
 - **empty array `[]`**: every tool is disabled; MCP servers are not even contacted (no OAuth),
   which suits agents that only need to reason over the provided prompt, such as review agents
+
+> **Important:** `allowedTools: []` is not the same as omitting `allowedTools`. Use `[]` only
+> when you intentionally want a tool-free agent and want to skip MCP/A2A tool discovery. Remove
+> the property, or leave it `undefined` in JavaScript config, when you want all configured tools
+> to remain available.
 
 It can be set at the top level or per command via `commands.<command>.allowedTools` (the command
 value takes precedence):
@@ -1537,8 +1542,9 @@ It is configured under `commands.pr.auto`:
   only while the discovery agent runs; when omitted, the normal configured tools remain available
 - **`allowedTools`** (string[]): Allow-list of tool names for the discovery agent, applied after
   all tools are resolved. `set_requirements` is always retained so the agent can record what it
-  found; an empty array keeps only `set_requirements`. The discovery agent never inherits the
-  top-level `allowedTools`; this property is its only allow-list.
+  found; an empty array keeps only `set_requirements` and skips resolving configured tools such as
+  MCP servers. Omit the property for no filtering. The discovery agent never inherits the top-level
+  `allowedTools`; this property is its only allow-list.
 
 The discovery agent always has the auto-mode helper tools `gh_pr`, `gh_diff`, `gh_issue`,
 `set_diff` and `set_requirements` available (subject to `allowedTools`). `gh_diff` stores the

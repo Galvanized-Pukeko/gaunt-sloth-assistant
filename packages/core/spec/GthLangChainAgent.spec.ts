@@ -301,6 +301,10 @@ describe('GthLangChainAgent', () => {
       expect(resolveTools).not.toHaveBeenCalled();
       const toolsArg = createAgentMock.mock.calls.at(-1)?.[0].tools as StructuredToolInterface[];
       expect(toolsArg).toEqual([]);
+      expect(statusUpdateCallback).toHaveBeenCalledWith(
+        StatusLevel.INFO,
+        'Tool loading disabled by allowedTools: []; MCP/A2A servers will not be contacted. Omit allowedTools for no filtering.'
+      );
       expect(statusUpdateCallback).not.toHaveBeenCalledWith(
         StatusLevel.INFO,
         expect.stringContaining('Loaded tools')

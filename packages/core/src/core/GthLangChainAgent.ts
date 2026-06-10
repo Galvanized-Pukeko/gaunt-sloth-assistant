@@ -74,6 +74,12 @@ export class GthLangChainAgent implements GthAgentInterface {
     // don't contact MCP servers (and trigger OAuth) just to discard the result.
     const allowedTools = this.config.allowedTools;
     const toolsDisabled = Array.isArray(allowedTools) && allowedTools.length === 0;
+    if (toolsDisabled) {
+      this.statusUpdate(
+        StatusLevel.INFO,
+        'Tool loading disabled by allowedTools: []; MCP/A2A servers will not be contacted. Omit allowedTools for no filtering.'
+      );
+    }
 
     // Resolve tools via resolver or fall back to config tools only
     debugLog('Resolving tools...');
