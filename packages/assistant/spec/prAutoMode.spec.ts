@@ -447,6 +447,32 @@ No linked ticket here`;
       expect(processMessagesMock).toHaveBeenCalled();
       expect(result.diff).toBe('GitHub PR Diff: #360\n\ndiff body');
     });
+
+    it('gh_issue returns an actionable message instead of an empty string on a rejected ref', async () => {
+      ghPrViewMock.mockResolvedValue(noLinkMetadata);
+      // The source returns null for a rejected reference (e.g. an http:// URL) or missing issue.
+      ghIssueMock.mockResolvedValue(null);
+
+      let toolResult = '';
+      processMessagesMock.mockImplementation(async () => {
+        const { GthAgentRunner } = await import('@gaunt-sloth/core/core/GthAgentRunner.js');
+        const resolvers = vi.mocked(GthAgentRunner).mock.calls.at(-1)?.[1] as AgentResolvers;
+        const tools = await resolvers.resolveTools!(config, undefined);
+        const ghIssueTool = tools.find((t) => t.name === 'gh_issue')!;
+
+        toolResult = (await ghIssueTool.invoke({
+          issueId: 'http://github.com/owner/repo/issues/1',
+        })) as string;
+      });
+
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      await runPrAutoMode(config);
+
+      // The model gets a reason it can act on, not a silent empty result.
+      expect(toolResult).not.toBe('');
+      expect(toolResult).toContain('No issue content was returned');
+      expect(toolResult).toContain('https://github.com');
+    });
   });
 
   it('resolves requirements from a GitHub closing keyword reference', async () => {

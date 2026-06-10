@@ -50,7 +50,7 @@ gsloth get <review|pr> <content|requirements> <id>
 ```
 
 ### Arguments
-- `<command>` - Command to inspect. Supported prompt targets: `ask`, `review`, `pr`, `chat`, `code`
+- `<command>` - Command to inspect. Supported prompt targets: `ask`, `review`, `pr`, `pr-auto`, `chat`, `code`
 - `<content|requirements>` - Provider-backed input type for `review` or `pr`
 - `<id>` - Provider-backed content identifier, such as a PR number or issue key
 
@@ -63,6 +63,9 @@ Use this command to inspect what Gaunt Sloth would send before running a command
 ```bash
 # Print the effective system prompt for review
 gsloth get review prompt
+
+# Print the discovery-agent system prompt used by PR auto mode
+gsloth get pr-auto prompt
 
 # Print the wrapped PR diff that `gsloth pr 42` would use
 gsloth get pr content 42

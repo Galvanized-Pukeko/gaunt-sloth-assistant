@@ -331,7 +331,15 @@ function createPrAutoTools(config: GthConfig, state: PrAutoToolState): Structure
 
   const ghIssue = tool(
     async ({ issueId }: z.infer<typeof GhIssueArgsSchema>): Promise<string> => {
-      return (await getGhIssue(getGithubRequirementsProviderConfig(config), issueId)) ?? '';
+      const issue = await getGhIssue(getGithubRequirementsProviderConfig(config), issueId);
+      if (issue) {
+        return issue;
+      }
+      // The source returns null on a rejected reference (only a bare number or a full
+      // https://github.com/<owner>/<repo>/issues/<number> URL is accepted - note http:// and
+      // other hosts are rejected), or when the issue has no content. Surface an actionable
+      // reason instead of an empty string so the model can self-correct rather than stall.
+      return `No issue content was returned for "${issueId}". The reference may be invalid (expected an issue number or a full https://github.com/<owner>/<repo>/issues/<number> URL) or the issue may not exist.`;
     },
     {
       name: 'gh_issue',
