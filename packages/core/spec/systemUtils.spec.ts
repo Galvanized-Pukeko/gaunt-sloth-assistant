@@ -34,6 +34,7 @@ const readlineMock = {
 // Mock process events
 const processEventMocks = {
   on: vi.fn(),
+  exit: vi.fn(),
 };
 
 vi.mock('node:fs', () => fsMock);
@@ -131,6 +132,80 @@ describe('systemUtils', () => {
 
       expect(callback).toHaveBeenCalled();
       expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith('\nInterrupting...');
+    });
+
+    it('force-exits on a second Ctrl+C after the first interrupt', async () => {
+      const { waitForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+      let keypressHandler: (_chunk: any, _key: any) => void;
+
+      processMock.stdin.on.mockImplementation((event: string, handler: any) => {
+        if (event === 'keypress') {
+          keypressHandler = handler;
+        }
+      });
+
+      waitForEscape(callback, true);
+
+      // First Ctrl+C only interrupts.
+      keypressHandler!('', { name: 'c', ctrl: true });
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(processEventMocks.exit).not.toHaveBeenCalled();
+
+      // Second Ctrl+C escalates to a hard exit (130 = 128 + SIGINT).
+      keypressHandler!('', { name: 'c', ctrl: true });
+      expect(processEventMocks.exit).toHaveBeenCalledWith(130);
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('Force exiting')
+      );
+    });
+
+    it('force-exits on Ctrl+C after an Escape interrupt', async () => {
+      const { waitForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+      let keypressHandler: (_chunk: any, _key: any) => void;
+
+      processMock.stdin.on.mockImplementation((event: string, handler: any) => {
+        if (event === 'keypress') {
+          keypressHandler = handler;
+        }
+      });
+
+      waitForEscape(callback, true);
+
+      // Escape arms the interrupt without exiting.
+      keypressHandler!('', { name: 'escape' });
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(processEventMocks.exit).not.toHaveBeenCalled();
+
+      // A subsequent Ctrl+C then force-exits.
+      keypressHandler!('', { name: 'c', ctrl: true });
+      expect(processEventMocks.exit).toHaveBeenCalledWith(130);
+    });
+
+    it('does not force-exit when a fresh wait re-arms the interrupt state', async () => {
+      const { waitForEscape, stopWaitingForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+      let keypressHandler: (_chunk: any, _key: any) => void;
+
+      processMock.stdin.on.mockImplementation((event: string, handler: any) => {
+        if (event === 'keypress') {
+          keypressHandler = handler;
+        }
+      });
+
+      // First run requests an interrupt.
+      waitForEscape(callback, true);
+      keypressHandler!('', { name: 'c', ctrl: true });
+      stopWaitingForEscape();
+
+      // A new run resets the flag, so the next single Ctrl+C only interrupts.
+      waitForEscape(callback, true);
+      keypressHandler!('', { name: 'c', ctrl: true });
+      expect(processEventMocks.exit).not.toHaveBeenCalled();
     });
 
     it('should not call callback when other keys are pressed', async () => {

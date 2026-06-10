@@ -30,6 +30,7 @@ interface InnerState {
   useColour: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   waitForEscapeCallback?: (_: any, key: any) => void;
+  interruptRequested: boolean;
   logWriteStream?: WriteStream;
 }
 
@@ -38,18 +39,23 @@ const innerState: InnerState = {
   stringFromStdin: '',
   useColour: false,
   waitForEscapeCallback: undefined,
+  interruptRequested: false,
   logWriteStream: undefined,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const keypressHandler = (callback: () => void) => (chunk: any, key: any) => {
-  if (
-    key?.name === 'escape' ||
-    key?.name === 'q' ||
-    (key?.ctrl && key?.name === 'c') ||
-    chunk === '\u0003'
-  ) {
+  const isCtrlC = (key?.ctrl && key?.name === 'c') || chunk === '\u0003';
+  // Once an interrupt has been requested (Escape/Q/Ctrl+C), a Ctrl+C escalates to a
+  // hard exit. Raw mode swallows SIGINT, so if the first interrupt wedges (e.g. a stuck
+  // tool call) this is the user's only way out. 130 = 128 + SIGINT, the conventional code.
+  if (isCtrlC && innerState.interruptRequested) {
+    displayWarning('\nForce exiting...');
+    process.exit(130);
+  }
+  if (key?.name === 'escape' || key?.name === 'q' || isCtrlC) {
     displayWarning('\nInterrupting...');
+    innerState.interruptRequested = true;
     callback();
     return;
   }
@@ -59,6 +65,7 @@ export const waitForEscape = (callback: () => void, enabled: boolean) => {
   if (!enabled) {
     return;
   }
+  innerState.interruptRequested = false;
   emitKeypressEvents(process.stdin);
   process.stdin.setRawMode(true);
   // Resume stdin so keypress events fire. This refs the stdin handle, keeping the
