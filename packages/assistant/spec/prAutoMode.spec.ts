@@ -459,6 +459,44 @@ No linked ticket here`);
     expect(initMock).toHaveBeenCalled();
   });
 
+  it('does not treat a prose mention of "requirements" (no label) as a requirements pointer', async () => {
+    // Only a labelled "Requirements:" line should drive the deterministic path; prose that merely
+    // mentions the word must defer to the discovery agent rather than pulling the nearby issue.
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+This tightens the requirements validation, see #42`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    await runPrAutoMode(config);
+
+    expect(ghIssueMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
+  });
+
+  it('skips the deterministic gh diff fetch when the content provider is not github', async () => {
+    const textContentConfig = {
+      ...config,
+      contentProvider: 'text',
+      commands: {
+        pr: { contentProvider: 'text', requirementsProvider: 'github', auto: { enabled: true } },
+        review: {},
+      },
+    } as Partial<GthConfig> as GthConfig;
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+No linked ticket here`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    await runPrAutoMode(textContentConfig);
+
+    // gh pr diff only makes sense for the github content provider; for others the discovery
+    // agent fetches the diff via its tools instead.
+    expect(ghDiffMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
+  });
+
   it('does not pick up a lone issue URL from the Title via the body fallback scan', async () => {
     // The last-resort "single issue URL anywhere" fallback must scan only the description body,
     // not the structured Title line - otherwise an issue URL in the title would be misread as

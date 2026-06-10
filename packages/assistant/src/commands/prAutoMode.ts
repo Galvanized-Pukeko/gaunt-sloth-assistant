@@ -134,17 +134,27 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
     prMetadata: '',
   };
 
+  const contentProvider = config.commands?.pr?.contentProvider ?? config.contentProvider;
   if (autoConfig?.deterministicDiff !== false) {
-    try {
-      const diff = await getGhPrDiff(getGithubContentProviderConfig(config), undefined);
-      state.diff = diff ?? '';
-      if (state.diff) {
-        displayInfo('Auto mode deterministically retrieved current-branch PR diff with gh.');
-      }
-    } catch (error) {
-      displayWarning(
-        `Auto mode could not deterministically retrieve current-branch PR diff: ${error instanceof Error ? error.message : String(error)}`
+    if (contentProvider !== 'github') {
+      // The deterministic fast path uses `gh pr diff`, which only makes sense for the GitHub
+      // content provider. For any other provider, skip it (rather than emitting a spurious gh
+      // failure warning) and let the discovery agent fetch the diff via its tools.
+      debugLog(
+        `Auto mode skipped the deterministic gh diff fetch because the content provider is "${contentProvider}", not "github".`
       );
+    } else {
+      try {
+        const diff = await getGhPrDiff(getGithubContentProviderConfig(config), undefined);
+        state.diff = diff ?? '';
+        if (state.diff) {
+          displayInfo('Auto mode deterministically retrieved current-branch PR diff with gh.');
+        }
+      } catch (error) {
+        displayWarning(
+          `Auto mode could not deterministically retrieve current-branch PR diff: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
   }
 
@@ -405,6 +415,10 @@ async function discoverRequirementsFromPrMetadata(
   return requirements;
 }
 
+// Match an explicit "Requirements:" label (singular or plural) rather than any line that merely
+// mentions the word. Prose like "This tightens the requirements validation, see #42" must not be
+// treated as a requirements pointer; only a labelled line (e.g. "Requirements: <link>") is.
+const REQUIREMENTS_LABEL_PATTERN = /requirements?\s*:/i;
 // Owner/repo segments are restricted to GitHub's name charset; anything looser would let a
 // crafted PR description smuggle shell metacharacters into the `gh issue view` command line.
 const GITHUB_ISSUE_URL_PATTERN = /(?:https?:\/\/)?github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+/i;
@@ -432,7 +446,7 @@ function getPrDescriptionBody(prMetadata: string): string {
 function extractRequirementsGithubIssueRef(prMetadata: string): string | undefined {
   const requirementsLine = getPrDescriptionBody(prMetadata)
     .split('\n')
-    .find((line) => /requirements?/i.test(line));
+    .find((line) => REQUIREMENTS_LABEL_PATTERN.test(line));
 
   if (requirementsLine) {
     const urlMatch = requirementsLine.match(GITHUB_ISSUE_URL_PATTERN);
@@ -500,7 +514,7 @@ function extractJiraIssueKey(prMetadata: string): string | undefined {
   const lines = prMetadata.split('\n');
   const requirementsLine = getPrDescriptionBody(prMetadata)
     .split('\n')
-    .find((line) => /requirements?/i.test(line));
+    .find((line) => REQUIREMENTS_LABEL_PATTERN.test(line));
 
   if (requirementsLine) {
     const urlMatch = requirementsLine.match(ATLASSIAN_BROWSE_URL_PATTERN);

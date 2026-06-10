@@ -8,6 +8,7 @@ const processMock = {
     off: vi.fn(),
     resume: vi.fn(),
     pause: vi.fn(),
+    ref: vi.fn(),
     unref: vi.fn(),
     isPaused: vi.fn(),
   },
@@ -83,6 +84,8 @@ describe('systemUtils', () => {
       expect(readlineMock.emitKeypressEvents).toHaveBeenCalledWith(processMock.stdin);
       expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(true);
       expect(processMock.stdin.resume).toHaveBeenCalled();
+      // ref() keeps the handle alive even if a prior stopWaitingForEscape unref()'d it.
+      expect(processMock.stdin.ref).toHaveBeenCalled();
       expect(processMock.stdin.on).toHaveBeenCalledWith('keypress', expect.any(Function));
       expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
         expect.stringContaining('Press Escape or Q to interrupt Agent')

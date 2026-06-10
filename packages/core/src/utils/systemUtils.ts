@@ -72,9 +72,12 @@ export const waitForEscape = (callback: () => void, enabled: boolean) => {
   innerState.interruptRequested = false;
   emitKeypressEvents(process.stdin);
   process.stdin.setRawMode(true);
-  // Resume stdin so keypress events fire. This refs the stdin handle, keeping the
-  // event loop alive; stopWaitingForEscape unrefs it again so the process can exit.
+  // Resume stdin so keypress events fire, and explicitly ref the handle to keep the event loop
+  // alive during the wait. resume() refs in most Node versions, but a prior stopWaitingForEscape
+  // unref()'d the handle and resume() does not reliably re-ref it everywhere - so ref() is needed
+  // for symmetry, otherwise the process could exit mid-wait if stdin were the only live handle.
   process.stdin.resume?.();
+  process.stdin.ref?.();
   innerState.waitForEscapeCallback = keypressHandler(callback);
   process.stdin.on('keypress', innerState.waitForEscapeCallback);
   displayInfo(`
