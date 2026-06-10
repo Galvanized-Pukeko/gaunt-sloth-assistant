@@ -439,7 +439,10 @@ function extractRequirementsGithubIssueRef(prMetadata: string): string | undefin
 }
 
 function normalizeGithubIssueUrl(url: string): string {
-  return `https://${url.replace(/^https?:\/\//i, '')}`;
+  // Lowercase the host so a copied "GITHUB.COM/..." URL still satisfies the
+  // case-sensitive issue-reference check in ghIssueSource.
+  const withoutProtocol = url.replace(/^https?:\/\//i, '');
+  return `https://${withoutProtocol.replace(/^github\.com/i, 'github.com')}`;
 }
 
 function formatGithubIssueRef(ref: string): string {

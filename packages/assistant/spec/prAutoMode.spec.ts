@@ -142,6 +142,25 @@ Requirements: https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues/
     );
   });
 
+  it('lowercases the host of a GitHub issue URL so the issue source accepts it', async () => {
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+Requirements: HTTPS://GITHUB.COM/Galvanized-Pukeko/gaunt-sloth-assistant/issues/359`);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+
+    const result = await runPrAutoMode(config);
+
+    expect(result.requirements).toBe('Issue #359 requirements');
+    // The host is normalized to lowercase so the case-sensitive issue-reference
+    // check in ghIssueSource still accepts the copied URL.
+    expect(ghIssueMock).toHaveBeenCalledWith(
+      null,
+      'https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues/359'
+    );
+    expect(initMock).not.toHaveBeenCalled();
+  });
+
   it('omits the PR number from the metadata message when it cannot be parsed', async () => {
     ghPrViewMock.mockResolvedValue(`GitHub PR: for current branch
 Description:
