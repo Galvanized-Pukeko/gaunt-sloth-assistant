@@ -33,7 +33,10 @@ export function prCommand(
         'This command is similar to `review`, but default content provider is `github`. ' +
         '(assuming that GitHub CLI is installed and authenticated for current project'
     )
-    .argument('[prId]', 'Pull request ID to review. Omit with requirements ID to run PR auto mode.')
+    .argument(
+      '[prId]',
+      'Pull request ID to review. Omit both prId and requirementsId to run PR auto mode.'
+    )
     .argument(
       '[requirementsId]',
       'Optional requirements ID argument to retrieve requirements with requirements provider'
@@ -65,6 +68,18 @@ export function prCommand(
       }
 
       const isAutoMode = !prId && !requirementsId;
+      const looksLikeRequirementsOnlyMode =
+        contentProvider === 'github' && Boolean(prId) && !requirementsId && !/^\d+$/.test(prId);
+
+      if (looksLikeRequirementsOnlyMode) {
+        displayError(
+          `Unsupported PR command arguments: "${prId}" was provided as the pull request ID. ` +
+            '`gth pr <requirementsId>` requirements-only mode is not supported. ' +
+            'Use `gth pr` with no arguments for auto mode, or provide both a numeric PR ID and requirements ID: `gth pr <prId> <requirementsId>`.'
+        );
+        setExitCode(1);
+        return;
+      }
 
       if (isAutoMode) {
         if (config.commands?.pr?.auto?.enabled === false) {

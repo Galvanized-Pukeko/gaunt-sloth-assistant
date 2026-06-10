@@ -1532,8 +1532,9 @@ value takes precedence):
 
 ## PR Auto Mode Configuration
 
-Running `gth pr` without arguments enters auto mode (see [COMMANDS.md](COMMANDS.md#pr-auto-mode)).
-It is configured under `commands.pr.auto`:
+Running `gth pr` without positional arguments enters auto mode (see [COMMANDS.md](COMMANDS.md#pr-auto-mode)).
+Auto mode only runs when neither `prId` nor `requirementsId` is provided; requirements-only syntax
+such as `gth pr PROJ-123` is unsupported. It is configured under `commands.pr.auto`:
 
 - **`enabled`** (boolean, default: `true`): Allow `gth pr` without arguments to enter auto mode
 - **`deterministicDiff`** (boolean, default: `true`): Fetch the current-branch PR diff with

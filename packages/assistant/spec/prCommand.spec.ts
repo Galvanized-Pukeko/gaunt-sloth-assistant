@@ -17,6 +17,16 @@ const resolversMock = {
 };
 vi.mock('@gaunt-sloth/api/resolvers.js', () => resolversMock);
 
+const displayErrorMock = vi.fn();
+vi.mock('@gaunt-sloth/core/utils/consoleUtils.js', async () => {
+  const actual = await vi.importActual<typeof import('@gaunt-sloth/core/utils/consoleUtils.js')>(
+    '@gaunt-sloth/core/utils/consoleUtils.js'
+  );
+  return {
+    ...actual,
+    displayError: displayErrorMock,
+  };
+});
 const review = vi.fn();
 const runPrAutoMode = vi.fn();
 const prompt = {
@@ -171,6 +181,33 @@ describe('prCommand', () => {
     prCommand(program, {});
     await program.parseAsync(['na', 'na', 'pr']);
 
+    expect(runPrAutoMode).not.toHaveBeenCalled();
+    expect(review).not.toHaveBeenCalled();
+  });
+
+  it('Should reject requirements-only pr command syntax with an explicit error', async () => {
+    const testConfig = {
+      ...mockConfig,
+      commands: {
+        pr: {
+          contentProvider: 'github',
+          requirementsProvider: 'jira',
+        },
+        review: {},
+      },
+      streamOutput: false,
+    };
+    configMock.initConfig.mockResolvedValue(testConfig);
+
+    const { prCommand } = await import('#src/commands/prCommand.js');
+    const program = new Command();
+
+    prCommand(program, {});
+    await program.parseAsync(['na', 'na', 'pr', 'PROJ-123']);
+
+    expect(displayErrorMock).toHaveBeenCalledWith(
+      expect.stringContaining('requirements-only mode is not supported')
+    );
     expect(runPrAutoMode).not.toHaveBeenCalled();
     expect(review).not.toHaveBeenCalled();
   });

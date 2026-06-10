@@ -80,8 +80,8 @@ gsloth pr [prId] [requirementsId]
 ```
 
 ### Arguments
-- `[prId]` - Pull request ID to review. Omit together with `requirementsId` to run PR auto mode (see below)
-- `[requirementsId]` - Optional requirements ID to retrieve requirements from provider
+- `[prId]` - Pull request ID to review. Omit both `prId` and `requirementsId` to run PR auto mode (see below)
+- `[requirementsId]` - Optional requirements ID to retrieve requirements from provider. This argument is only supported together with `prId`; requirements-only mode such as `gsloth pr PROJ-123` is not supported.
 
 ### Options
 - `-p, --requirements-provider <provider>` - Requirements provider for this review
@@ -97,8 +97,10 @@ Reviews a pull request using GitHub as the default content provider. Can integra
 
 ### PR Auto Mode
 
-Running `gsloth pr` with no arguments enters auto mode. The diff for the current branch's PR is
-fetched deterministically with `gh pr diff`, and the PR description is inspected for an explicit
+Running `gsloth pr` with no positional arguments enters auto mode. Auto mode only runs when neither
+`prId` nor `requirementsId` is provided; `gsloth pr PROJ-123` is not treated as requirements-only
+auto mode and is unsupported. In auto mode, the diff for the current branch's PR is fetched
+deterministically with `gh pr diff`, and the PR description is inspected for an explicit
 requirements reference (a linked GitHub issue or a Jira key, depending on the configured
 requirements provider). When both are found, the review starts immediately. Otherwise a discovery
 agent runs first with the `gh_pr`, `gh_diff` and `gh_issue` tools (plus any configured tools, e.g.
@@ -122,6 +124,9 @@ gsloth pr 42 23
 
 # Review PR #42 with JIRA issue PROJ-123
 gsloth pr 42 PROJ-123 -p jira
+
+# Unsupported: requirements-only mode is not available; provide a PR ID or use no arguments for auto mode
+# gsloth pr PROJ-123
 
 # Review PR #42 with additional context from files
 gsloth pr 42 -f architecture.md notes.txt
