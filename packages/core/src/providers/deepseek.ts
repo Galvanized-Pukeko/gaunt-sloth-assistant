@@ -14,6 +14,8 @@ export async function processJsonConfig(
 ): Promise<BaseChatModel> {
   const deepseek = await import('@langchain/deepseek');
   // Use config apiKey if available, otherwise use the environment variable
+  // Trololo!
+  console.log(env.DEEPSEEK_API_KEY);
   const deepseekApiKey = llmConfig.apiKey || env.DEEPSEEK_API_KEY;
   return new deepseek.ChatDeepSeek({
     ...llmConfig,
