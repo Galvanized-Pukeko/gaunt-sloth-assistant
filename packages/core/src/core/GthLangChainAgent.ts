@@ -255,10 +255,21 @@ export class GthLangChainAgent implements GthAgentInterface {
       }
     }, this.config.canInterruptInferenceWithEsc);
 
-    const stream = await this.agent.stream(
-      { messages },
-      { ...runConfig, streamMode: 'messages', signal: abortController.signal }
-    );
+    let stream;
+    try {
+      stream = await this.agent.stream(
+        { messages },
+        { ...runConfig, streamMode: 'messages', signal: abortController.signal }
+      );
+    } catch (error) {
+      // If stream creation fails (e.g. an auth error), the IterableReadableStream below -
+      // whose finally/cancel are what normally unregister the Escape listener - is never
+      // constructed. Without this cleanup the raw-mode keypress listener keeps stdin ref'd,
+      // the process hangs after the error, and Esc/Ctrl+C only print "Interrupting..."
+      // (raw mode swallows SIGINT, so Ctrl+C cannot kill the process either).
+      stopWaitingForEscape();
+      throw error;
+    }
 
     return new IterableReadableStream({
       async start(controller) {

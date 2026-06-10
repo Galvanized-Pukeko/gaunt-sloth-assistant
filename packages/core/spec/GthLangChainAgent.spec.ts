@@ -717,6 +717,34 @@ describe('GthLangChainAgent', () => {
       expect(chunks).toEqual(['chunk1', 'chunk2']);
     });
 
+    it('should unregister the Escape listener when stream creation fails', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+
+      // E.g. an expired-auth error thrown while initiating the stream, before any chunk.
+      agentMock.stream.mockRejectedValue(new Error('invalid_grant'));
+
+      const fakeStreamingChatModel = new FakeStreamingChatModel({ chunks: [] });
+      fakeStreamingChatModel.bindTools = vi.fn().mockReturnValue(fakeStreamingChatModel);
+
+      await agent.init(undefined, {
+        ...mockConfig,
+        llm: fakeStreamingChatModel,
+        streamOutput: true,
+      });
+
+      await expect(
+        agent.stream([new HumanMessage('test message')], {
+          recursionLimit: 1000,
+          configurable: { thread_id: 'test-thread-id' },
+        })
+      ).rejects.toThrow('invalid_grant');
+
+      // Otherwise the raw-mode keypress listener keeps stdin ref'd and the process hangs
+      // after the error, with Esc/Ctrl+C only printing "Interrupting...".
+      expect(systemUtilsMock.waitForEscape).toHaveBeenCalled();
+      expect(systemUtilsMock.stopWaitingForEscape).toHaveBeenCalled();
+    });
+
     it('should materialize binary outputs after streaming completes', async () => {
       const agent = new GthLangChainAgent(statusUpdateCallback);
       const mockStreamChunks = [
