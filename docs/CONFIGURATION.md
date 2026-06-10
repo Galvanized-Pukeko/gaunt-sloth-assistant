@@ -1543,9 +1543,12 @@ such as `gth pr PROJ-123` is unsupported. It is configured under `commands.pr.au
   only while the discovery agent runs; when omitted, the normal configured tools remain available
 - **`allowedTools`** (string[]): Allow-list of tool names for the discovery agent, applied after
   all tools are resolved. `set_requirements` is always retained so the agent can record what it
-  found; an empty array keeps only `set_requirements` and skips resolving configured tools such as
-  MCP servers. Omit the property for no filtering. The discovery agent never inherits the top-level
-  `allowedTools`; this property is its only allow-list.
+  found; an empty array keeps only `set_requirements`, filtering out every other tool. Note that
+  because `set_requirements` is always retained, this allow-list never disables tool resolution
+  itself — unlike the top-level `allowedTools: []`, configured MCP/A2A servers are still contacted
+  (potentially triggering OAuth) before their tools are filtered out. Omit the property for no
+  filtering. The discovery agent never inherits the top-level `allowedTools`; this property is its
+  only allow-list.
 
 The discovery agent always has the auto-mode helper tools `gh_pr`, `gh_diff`, `gh_issue`,
 `set_diff` and `set_requirements` available (subject to `allowedTools`). `gh_diff` stores the
