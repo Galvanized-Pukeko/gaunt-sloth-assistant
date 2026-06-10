@@ -1,7 +1,7 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "anthropic/claude-sonnet-4.6"
+    "model": "anthropic/claude-fable-5"
   },
   "filesystem": "none",
   "useColour": false,
