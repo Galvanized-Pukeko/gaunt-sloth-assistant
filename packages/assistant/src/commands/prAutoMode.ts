@@ -415,7 +415,9 @@ function extractRequirementsGithubIssueRef(prMetadata: string): string | undefin
   }
 
   // A closing keyword ("Closes #123", "Fixes #123") is an explicit statement that the PR
-  // implements that issue, so it is a reliable requirements pointer.
+  // implements that issue, so it is a reliable requirements pointer. Searching the full
+  // formatted metadata is intentional: non-description fields are structured labels emitted by
+  // formatPrView, and a closing-keyword phrase in the title is still an explicit PR signal.
   const closingMatch = prMetadata.match(GITHUB_CLOSING_KEYWORD_PATTERN);
   if (closingMatch?.[1]) {
     return closingMatch[1];
@@ -453,7 +455,9 @@ function extractGithubPrNumber(prMetadata: string): string | undefined {
 // never A-1). Kept case-sensitive for bare keys: lowercase look-alikes in branch names or
 // prose ("fix-123") are too ambiguous for the deterministic path.
 const JIRA_ISSUE_KEY_PATTERN = /\b([A-Z]{2}[A-Z0-9]*-\d+)\b/;
-// Atlassian browse URL, e.g. https://company.atlassian.net/browse/ABC-123
+// Atlassian browse URL, e.g. https://company.atlassian.net/browse/ABC-123. Unlike bare keys,
+// URL-extracted keys are matched case-insensitively and normalized because the structured
+// /browse/<key> path makes the intent clear while copied URLs can vary in casing.
 const ATLASSIAN_BROWSE_URL_PATTERN = /atlassian\.net\/browse\/([A-Z]{2}[A-Z0-9]*-\d+)/i;
 
 function extractJiraIssueKey(prMetadata: string): string | undefined {
