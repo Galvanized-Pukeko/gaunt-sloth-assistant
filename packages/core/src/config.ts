@@ -343,15 +343,17 @@ export interface PrAutoModeConfig {
   customTools?: CustomToolsConfig | false;
   tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
   /**
-   * Restrict the discovery agent to this allow-list of tool names, applied after all tools
-   * are resolved. Unlike `builtInTools`/`customTools`/`filesystem` (which gate whole tool
-   * groups), this trims the final tool set by exact name, so it can pare down MCP server
-   * tools (e.g. "mcp__jira__getJiraIssue") and the auto-mode helper tools
+   * Restrict the discovery agent to this allow-list of tool names, applied after every tool
+   * source (filesystem, built-in, custom, MCP, A2A, and `tools`) is resolved. Unlike
+   * `builtInTools`/`customTools`/`filesystem` (which gate whole tool groups), this trims the
+   * final tool set by exact name, so it can pare down MCP server tools
+   * (e.g. "mcp__jira__getJiraIssue") and the auto-mode helper tools
    * ("gh_pr"/"gh_diff"/"gh_issue"/"set_diff") to the minimum needed.
    *
    * `set_requirements` is always retained regardless, since it is how the discovery agent
    * records the requirements it found. When omitted, all resolved tools remain available; an
-   * empty array keeps only `set_requirements`.
+   * empty array keeps only `set_requirements`. The discovery agent never inherits the
+   * top-level {@link GthConfig.allowedTools}; this property is its only allow-list.
    */
   allowedTools?: string[];
 }

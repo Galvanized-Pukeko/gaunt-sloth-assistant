@@ -51,7 +51,11 @@ const GhPrArgsSchema = z.object({
 });
 
 const GhIssueArgsSchema = z.object({
-  issueId: z.string().describe('GitHub issue number to retrieve.'),
+  issueId: z
+    .string()
+    .describe(
+      'GitHub issue number or full issue URL to retrieve. Use the full URL for issues in other repositories.'
+    ),
 });
 
 export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult> {
@@ -138,44 +142,29 @@ function getPrAutoAgentConfig(
     builtInTools: autoConfig?.builtInTools ?? config.builtInTools,
     customTools: customTools === false ? undefined : customTools,
     tools: baseTools,
+    // The discovery agent must never inherit the top-level allow-list (e.g. a global
+    // `allowedTools: []` meant to keep review agents tool-free would strip set_requirements
+    // and silently neuter auto mode). Only `commands.pr.auto.allowedTools` applies here,
+    // always augmented with set_requirements so the agent can record what it found. The
+    // agent applies this list after every tool source is resolved, so it also gates tools
+    // supplied via `tools` in config.
+    allowedTools: autoConfig?.allowedTools
+      ? [...new Set([...autoConfig.allowedTools, 'set_requirements'])]
+      : undefined,
   };
 }
 
-// The discovery agent records the requirements it found via set_requirements, so it must
-// always stay available even when an allowedTools allow-list is configured.
-const ALWAYS_KEEP_DISCOVERY_TOOLS = new Set(['set_requirements']);
-
 function createPrAutoResolvers(config: GthConfig, state: PrAutoToolState): AgentResolvers {
   const baseResolvers = createResolvers();
-  const allowedTools = config.commands?.pr?.auto?.allowedTools;
   return {
     ...baseResolvers,
     resolveTools: async (effectiveConfig, command) => {
       const baseTools = baseResolvers.resolveTools
         ? await baseResolvers.resolveTools(effectiveConfig, command)
         : [];
-      const tools = [...baseTools, ...createPrAutoTools(config, state)];
-      return filterDiscoveryTools(tools, allowedTools);
+      return [...baseTools, ...createPrAutoTools(config, state)];
     },
   };
-}
-
-/**
- * Trim the discovery agent's resolved tools to an allow-list of names. set_requirements is
- * always kept so the agent can record requirements. When the allow-list is omitted, all tools
- * are returned unchanged; an empty array keeps only the always-kept tools.
- */
-export function filterDiscoveryTools(
-  tools: StructuredToolInterface[],
-  allowedTools: string[] | undefined
-): StructuredToolInterface[] {
-  if (allowedTools === undefined) {
-    return tools;
-  }
-  const allowed = new Set(allowedTools);
-  return tools.filter(
-    (tool) => allowed.has(tool.name) || ALWAYS_KEEP_DISCOVERY_TOOLS.has(tool.name)
-  );
 }
 
 function createPrAutoTools(config: GthConfig, state: PrAutoToolState): StructuredToolInterface[] {
@@ -217,12 +206,23 @@ function createPrAutoTools(config: GthConfig, state: PrAutoToolState): Structure
 
   const ghDiff = tool(
     async ({ prId }: z.infer<typeof GhDiffArgsSchema>): Promise<string> => {
-      return (await getGhPrDiff(getGithubContentProviderConfig(config), prId)) ?? '';
+      const diff = (await getGhPrDiff(getGithubContentProviderConfig(config), prId)) ?? '';
+      if (!diff) {
+        return 'No diff content was returned by GitHub CLI; the review diff was not changed.';
+      }
+      // Store the diff directly instead of returning it: echoing a large diff into the
+      // model context just so the model can copy it verbatim into set_diff doubles token
+      // cost and lets weaker models truncate or corrupt the diff on the way through.
+      state.diff = diff;
+      const preview = diff.split('\n').slice(0, 10).join('\n');
+      return `Retrieved the PR diff (${diff.length} characters) and set it as the review diff; no need to call set_diff. Preview:\n${preview}`;
     },
     {
       name: 'gh_diff',
       description:
-        'Fetch a GitHub pull request diff using GitHub CLI. Omit prId to fetch the PR for the current branch.',
+        'Fetch a GitHub pull request diff using GitHub CLI and set it as the review diff. ' +
+        'Omit prId to fetch the PR for the current branch. ' +
+        'Returns a confirmation with a short preview; the full diff is stored without needing set_diff.',
       schema: GhDiffArgsSchema,
     }
   );
@@ -306,41 +306,74 @@ async function discoverRequirementsFromPrMetadata(
     }
   }
 
-  const requirementsIssueId = extractRequirementsGithubIssueId(prMetadata);
-  if (!requirementsIssueId) {
+  const requirementsIssueRef = extractRequirementsGithubIssueRef(prMetadata);
+  if (!requirementsIssueRef) {
     return '';
   }
   const requirements =
-    (await getGhIssue(getGithubRequirementsProviderConfig(config), requirementsIssueId)) ?? '';
+    (await getGhIssue(getGithubRequirementsProviderConfig(config), requirementsIssueRef)) ?? '';
   if (requirements) {
     displayInfo(
-      `Auto mode retrieved requirements from GitHub issue #${requirementsIssueId} linked in the PR description.`
+      `Auto mode retrieved requirements from GitHub issue ${formatGithubIssueRef(requirementsIssueRef)} linked in the PR description.`
     );
   }
   return requirements;
 }
 
-function extractRequirementsGithubIssueId(prMetadata: string): string | undefined {
+// Owner/repo segments are restricted to GitHub's name charset; anything looser would let a
+// crafted PR description smuggle shell metacharacters into the `gh issue view` command line.
+const GITHUB_ISSUE_URL_PATTERN = /(?:https?:\/\/)?github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+/i;
+// GitHub closing keywords (https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue)
+const GITHUB_CLOSING_KEYWORD_PATTERN = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)\b/i;
+
+/**
+ * Extract a GitHub issue reference (a full issue URL or a bare issue number) that the PR
+ * description explicitly designates as requirements. URLs are returned whole rather than as
+ * extracted numbers, because a cross-repo issue URL reduced to its number would make
+ * `gh issue view` fetch the same-numbered issue from the wrong (current) repository.
+ */
+function extractRequirementsGithubIssueRef(prMetadata: string): string | undefined {
   const requirementsLine = prMetadata.split('\n').find((line) => /requirements?/i.test(line));
-  const candidates = [requirementsLine, prMetadata].filter((value): value is string =>
-    Boolean(value)
-  );
 
-  for (const candidate of candidates) {
-    const issueUrlMatch = candidate.match(/github\.com\/[^\s/`]+\/[^\s/`]+\/issues\/(\d+)/i);
-    if (issueUrlMatch?.[1]) {
-      return issueUrlMatch[1];
+  if (requirementsLine) {
+    const urlMatch = requirementsLine.match(GITHUB_ISSUE_URL_PATTERN);
+    if (urlMatch) {
+      return normalizeGithubIssueUrl(urlMatch[0]);
     }
-
-    if (candidate === requirementsLine) {
-      const hashIssueMatch = candidate.match(/#(\d+)/);
-      if (hashIssueMatch?.[1]) {
-        return hashIssueMatch[1];
-      }
+    const hashIssueMatch = requirementsLine.match(/#(\d+)/);
+    if (hashIssueMatch?.[1]) {
+      return hashIssueMatch[1];
     }
   }
 
+  // A closing keyword ("Closes #123", "Fixes #123") is an explicit statement that the PR
+  // implements that issue, so it is a reliable requirements pointer.
+  const closingMatch = prMetadata.match(GITHUB_CLOSING_KEYWORD_PATTERN);
+  if (closingMatch?.[1]) {
+    return closingMatch[1];
+  }
+
+  // Otherwise fall back to an issue URL anywhere in the body, but only when it is
+  // unambiguous: with several distinct issue links (e.g. "see also" references) picking one
+  // would silently review against the wrong requirements, so leave it to the discovery agent.
+  const bodyUrls = new Set(
+    Array.from(prMetadata.matchAll(new RegExp(GITHUB_ISSUE_URL_PATTERN, 'gi'))).map((match) =>
+      normalizeGithubIssueUrl(match[0])
+    )
+  );
+  if (bodyUrls.size === 1) {
+    return bodyUrls.values().next().value;
+  }
+
   return undefined;
+}
+
+function normalizeGithubIssueUrl(url: string): string {
+  return `https://${url.replace(/^https?:\/\//i, '')}`;
+}
+
+function formatGithubIssueRef(ref: string): string {
+  return /^\d+$/.test(ref) ? `#${ref}` : ref;
 }
 
 function extractGithubPrNumber(prMetadata: string): string | undefined {
@@ -375,8 +408,8 @@ function extractJiraIssueKey(prMetadata: string): string | undefined {
 
 function buildPrAutoUserMessage(state: PrAutoToolState): string {
   const diffStatus = state.diff
-    ? 'A current-branch PR diff has already been deterministically retrieved and set. Verify whether it is sufficient; replace it with set_diff only if you find a better exact diff.'
-    : 'No PR diff has been set yet. Retrieve the PR diff and call set_diff.';
+    ? 'A current-branch PR diff has already been deterministically retrieved and set. Verify whether it is sufficient; replace it (gh_diff sets it automatically, or use set_diff) only if you find a better exact diff.'
+    : 'No PR diff has been set yet. Retrieve the PR diff with gh_diff, which stores it automatically; use set_diff only for a diff obtained some other way.';
 
   const requirementsStatus = state.requirements
     ? 'Requirements have already been retrieved from the PR description. Verify whether they are sufficient; replace them with set_requirements only if you find better exact requirements.'

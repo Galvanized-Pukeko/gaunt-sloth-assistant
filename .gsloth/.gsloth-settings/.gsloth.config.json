@@ -6,6 +6,11 @@
   "commands": {
     "code": {
       "filesystem": "all"
+    },
+    "pr": {
+      "auto": {
+        "allowedTools": ["gh_pr", "gh_diff", "gh_issue"]
+      }
     }
   }
 }

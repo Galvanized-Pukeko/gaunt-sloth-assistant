@@ -76,11 +76,11 @@ gsloth get review requirements PROJ-123
 Review a Pull Request in the current directory.
 
 ```bash
-gsloth pr <prId> [requirementsId]
+gsloth pr [prId] [requirementsId]
 ```
 
 ### Arguments
-- `<prId>` - Pull request ID to review (required)
+- `[prId]` - Pull request ID to review. Omit together with `requirementsId` to run PR auto mode (see below)
 - `[requirementsId]` - Optional requirements ID to retrieve requirements from provider
 
 ### Options
@@ -95,8 +95,25 @@ gsloth pr <prId> [requirementsId]
 ### Description
 Reviews a pull request using GitHub as the default content provider. Can integrate with issue tracking systems to include requirements in the review.
 
+### PR Auto Mode
+
+Running `gsloth pr` with no arguments enters auto mode. The diff for the current branch's PR is
+fetched deterministically with `gh pr diff`, and the PR description is inspected for an explicit
+requirements reference (a linked GitHub issue or a Jira key, depending on the configured
+requirements provider). When both are found, the review starts immediately. Otherwise a discovery
+agent runs first with the `gh_pr`, `gh_diff` and `gh_issue` tools (plus any configured tools, e.g.
+a Jira MCP server) to locate the diff and requirements before handing over to the review agent.
+
+The discovery agent's prompt can be customized by placing a `.gsloth.pr-auto.md` file in the
+project config directory or in an identity profile directory, the same way as other prompts.
+Auto mode behaviour is configured via `commands.pr.auto` — see
+[PR Auto Mode Configuration](CONFIGURATION.md#pr-auto-mode-configuration).
+
 ### Examples
 ```bash
+# Auto mode: review the current branch's PR, discovering requirements from its description
+gsloth pr
+
 # Review PR #42
 gsloth pr 42
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GthConfig } from '@gaunt-sloth/core/config.js';
+import type { AgentResolvers } from '@gaunt-sloth/core/core/types.js';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 const processMessagesMock = vi.hoisted(() => vi.fn());
@@ -125,7 +126,11 @@ Requirements: https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues/
     });
     expect(ghDiffMock).toHaveBeenCalledWith(null, undefined);
     expect(ghPrViewMock).toHaveBeenCalledWith(null, undefined);
-    expect(ghIssueMock).toHaveBeenCalledWith(null, '359');
+    // The full URL is passed through so cross-repo issue links resolve in the right repo.
+    expect(ghIssueMock).toHaveBeenCalledWith(
+      null,
+      'https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues/359'
+    );
     expect(initMock).not.toHaveBeenCalled();
     expect(processMessagesMock).not.toHaveBeenCalled();
     expect(cleanupMock).not.toHaveBeenCalled();
@@ -237,53 +242,112 @@ Requirements: https://company.atlassian.net/browse/ABC-123`);
     expect(debugLogMock).toHaveBeenCalledWith(expect.stringContaining('ABC-123'));
   });
 
-  describe('filterDiscoveryTools', () => {
-    const makeTools = (...names: string[]) =>
-      names.map(
-        (name) => ({ name }) as unknown as Parameters<typeof filterDiscoveryTools>[0][number]
-      );
+  describe('discovery agent configuration', () => {
+    const noLinkMetadata = `GitHub PR: #360
+Description:
+No linked ticket here`;
 
-    let filterDiscoveryTools: typeof import('#src/commands/prAutoMode.js').filterDiscoveryTools;
+    const withAutoConfig = (auto: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+      ({
+        ...config,
+        ...extra,
+        commands: {
+          pr: { contentProvider: 'github', requirementsProvider: 'github', auto },
+          review: {},
+        },
+      }) as Partial<GthConfig> as GthConfig;
 
-    beforeEach(async () => {
-      ({ filterDiscoveryTools } = await import('#src/commands/prAutoMode.js'));
-    });
+    it('augments the auto allow-list with set_requirements', async () => {
+      ghPrViewMock.mockResolvedValue(noLinkMetadata);
+      processMessagesMock.mockResolvedValue(undefined);
 
-    it('returns all tools unchanged when no allow-list is configured', () => {
-      const tools = makeTools('mcp__jira__getJiraIssue', 'gh_pr', 'gh_diff', 'set_diff');
-      expect(filterDiscoveryTools(tools, undefined)).toBe(tools);
-    });
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      await runPrAutoMode(withAutoConfig({ allowedTools: ['gh_pr', 'mcp__jira__getJiraIssue'] }));
 
-    it('keeps only the always-kept set_requirements when given an empty allow-list', () => {
-      const tools = makeTools('mcp__jira__getJiraIssue', 'gh_pr', 'set_requirements');
-      expect(filterDiscoveryTools(tools, []).map((t) => t.name)).toEqual(['set_requirements']);
-    });
-
-    it('keeps only allow-listed tools plus the always-kept set_requirements', () => {
-      const tools = makeTools(
-        'mcp__jira__getJiraIssue',
-        'mcp__jira__searchJiraIssuesUsingJql',
+      const agentConfig = initMock.mock.calls.at(-1)?.[1] as GthConfig;
+      expect(agentConfig.allowedTools).toEqual([
         'gh_pr',
-        'gh_diff',
-        'gh_issue',
-        'set_diff',
-        'set_requirements'
-      );
-
-      const filtered = filterDiscoveryTools(tools, ['mcp__jira__getJiraIssue', 'gh_pr']);
-
-      expect(filtered.map((t) => t.name)).toEqual([
         'mcp__jira__getJiraIssue',
-        'gh_pr',
         'set_requirements',
       ]);
     });
 
-    it('retains set_requirements even when it is not in the allow-list', () => {
-      const tools = makeTools('gh_pr', 'set_requirements');
-      const filtered = filterDiscoveryTools(tools, ['gh_pr']);
-      expect(filtered.map((t) => t.name)).toEqual(['gh_pr', 'set_requirements']);
+    it('keeps only set_requirements for an empty auto allow-list', async () => {
+      ghPrViewMock.mockResolvedValue(noLinkMetadata);
+      processMessagesMock.mockResolvedValue(undefined);
+
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      await runPrAutoMode(withAutoConfig({ allowedTools: [] }));
+
+      const agentConfig = initMock.mock.calls.at(-1)?.[1] as GthConfig;
+      expect(agentConfig.allowedTools).toEqual(['set_requirements']);
     });
+
+    it('never inherits the top-level allowedTools allow-list', async () => {
+      ghPrViewMock.mockResolvedValue(noLinkMetadata);
+      processMessagesMock.mockResolvedValue(undefined);
+
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      // A global empty allow-list (e.g. keeping review agents tool-free) must not strip the
+      // discovery agent's set_requirements/set_diff tools.
+      await runPrAutoMode(withAutoConfig({}, { allowedTools: [] }));
+
+      const agentConfig = initMock.mock.calls.at(-1)?.[1] as GthConfig;
+      expect(agentConfig.allowedTools).toBeUndefined();
+    });
+
+    it('gh_diff stores the fetched diff directly instead of echoing it through the model', async () => {
+      // Deterministic fetch fails, so the discovery agent has to use the gh_diff tool.
+      ghDiffMock.mockReset();
+      ghDiffMock.mockRejectedValueOnce(new Error('no PR for current branch'));
+      ghDiffMock.mockResolvedValueOnce('GitHub PR Diff: #360\n\ndiff body');
+      ghPrViewMock.mockResolvedValue(noLinkMetadata);
+
+      processMessagesMock.mockImplementation(async () => {
+        const { GthAgentRunner } = await import('@gaunt-sloth/core/core/GthAgentRunner.js');
+        const resolvers = vi.mocked(GthAgentRunner).mock.calls.at(-1)?.[1] as AgentResolvers;
+        const tools = await resolvers.resolveTools!(config, undefined);
+        const ghDiffTool = tools.find((t) => t.name === 'gh_diff')!;
+
+        const confirmation = (await ghDiffTool.invoke({})) as string;
+
+        expect(confirmation).toContain('set it as the review diff');
+        expect(confirmation).toContain('Preview');
+      });
+
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      const result = await runPrAutoMode(config);
+
+      expect(processMessagesMock).toHaveBeenCalled();
+      expect(result.diff).toBe('GitHub PR Diff: #360\n\ndiff body');
+    });
+  });
+
+  it('resolves requirements from a GitHub closing keyword reference', async () => {
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+Closes #359`);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const result = await runPrAutoMode(config);
+
+    expect(ghIssueMock).toHaveBeenCalledWith(null, '359');
+    expect(result.requirements).toBe('Issue #359 requirements');
+    expect(initMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves requirements to the discovery agent when several issue URLs are linked', async () => {
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+See https://github.com/owner/repo/issues/1 and https://github.com/owner/repo/issues/2`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    await runPrAutoMode(config);
+
+    // Picking one of several "see also" links would review against the wrong requirements.
+    expect(ghIssueMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
   });
 
   it('falls back to the discovery agent when no Jira key is present in the PR metadata', async () => {
