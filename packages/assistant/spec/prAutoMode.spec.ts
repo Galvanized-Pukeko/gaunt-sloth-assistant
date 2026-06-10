@@ -245,6 +245,22 @@ No explicit ticket link`);
     expect(initMock).not.toHaveBeenCalled();
   });
 
+  it('does not pick up a "Head branch:" line from the body when the header has none', async () => {
+    // The Head branch scan is scoped to the structured header; a body line mimicking the label
+    // (e.g. when headRefName is absent) must not inject a Jira key into the deterministic path.
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+Head branch: feature/AB-99-spoofed-in-body`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+
+    await runPrAutoMode(jiraConfig);
+
+    expect(jiraIssueMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
+  });
+
   it('does not treat single-letter or lowercase branch tokens as Jira keys', async () => {
     ghPrViewMock.mockResolvedValue(`GitHub PR: #360
 Head branch: feature/fix-123-and-A-1-cleanup

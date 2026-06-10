@@ -1540,7 +1540,10 @@ such as `gth pr PROJ-123` is unsupported. It is configured under `commands.pr.au
 - **`deterministicDiff`** (boolean, default: `true`): Fetch the current-branch PR diff with
   `gh pr diff` before invoking the discovery agent
 - **`filesystem`**, **`builtInTools`**, **`customTools`**, **`tools`**: Tool overrides applied
-  only while the discovery agent runs; when omitted, the normal configured tools remain available
+  only while the discovery agent runs; when omitted, the discovery agent falls back to the
+  **top-level** values for these settings, not the `commands.pr.*` ones. The `commands.pr.*` tool
+  overrides apply to the review agent only — the discovery agent does not inherit them, so set its
+  tools here under `commands.pr.auto` (or top-level) if it needs anything beyond the defaults
 - **`allowedTools`** (string[]): Allow-list of tool names for the discovery agent, applied after
   all tools are resolved. `set_requirements` is always retained so the agent can record what it
   found; an empty array keeps only `set_requirements`, filtering out every other tool. Note that

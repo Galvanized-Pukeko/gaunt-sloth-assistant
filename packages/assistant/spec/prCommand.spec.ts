@@ -42,6 +42,9 @@ vi.mock('#src/modules/reviewModule.js', () => ({
 }));
 vi.mock('#src/commands/prAutoMode.js', () => ({
   runPrAutoMode,
+  // commandIntrospection imports readPrAutoPrompt from the same module; stub it so this mock stays
+  // complete even if a future test path loads the introspection module.
+  readPrAutoPrompt: vi.fn(() => ''),
 }));
 
 const utilsMock = {

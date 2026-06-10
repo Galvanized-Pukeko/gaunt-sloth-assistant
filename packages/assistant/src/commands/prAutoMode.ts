@@ -457,6 +457,18 @@ function getPrDescriptionBody(prMetadata: string): string {
 }
 
 /**
+ * Return just the structured header that {@link formatPrView} emits before the "Description:"
+ * marker (PR number, Title, URL, branches). Scans for structured fields (e.g. "Head branch:")
+ * must use this rather than the full text, or a body line mimicking a header label could spoof
+ * a value. Falls back to the full text when no marker is present.
+ */
+function getPrMetadataHeader(prMetadata: string): string {
+  const lines = prMetadata.split('\n');
+  const descriptionIndex = lines.findIndex((line) => line.trim() === 'Description:');
+  return descriptionIndex === -1 ? prMetadata : lines.slice(0, descriptionIndex).join('\n');
+}
+
+/**
  * Extract a GitHub issue reference (a full issue URL or a bare issue number) that the PR
  * description explicitly designates as requirements. URLs are returned whole rather than as
  * extracted numbers, because a cross-repo issue URL reduced to its number would make
@@ -532,7 +544,6 @@ const JIRA_ISSUE_KEY_PATTERN = /\b([A-Z]{2}[A-Z0-9]*-\d+)\b/;
 const ATLASSIAN_BROWSE_URL_PATTERN = /atlassian\.net\/browse\/([A-Z]{2}[A-Z0-9]*-\d+)/i;
 
 function extractJiraIssueKey(prMetadata: string): string | undefined {
-  const lines = prMetadata.split('\n');
   const requirementsLine = getPrDescriptionBody(prMetadata)
     .split('\n')
     .find((line) => REQUIREMENTS_LABEL_PATTERN.test(line));
@@ -550,8 +561,11 @@ function extractJiraIssueKey(prMetadata: string): string | undefined {
   }
 
   // A key in the head branch name (feature/ABC-123-description convention) is an explicit
-  // statement of which issue the branch implements.
-  const headBranchLine = lines.find((line) => line.startsWith('Head branch:'));
+  // statement of which issue the branch implements. Scan only the structured header so a body
+  // line mimicking "Head branch: feature/XX-1-..." cannot inject a key when headRefName is absent.
+  const headBranchLine = getPrMetadataHeader(prMetadata)
+    .split('\n')
+    .find((line) => line.startsWith('Head branch:'));
   const branchKeyMatch = headBranchLine?.match(JIRA_ISSUE_KEY_PATTERN);
   if (branchKeyMatch?.[1]) {
     return branchKeyMatch[1];
