@@ -38,6 +38,10 @@ jobs:
   internal-review:
     needs: concierge
     if: ${{ needs.concierge.outputs.internal == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     uses: ./.github/workflows/_review-shared.yml
     with:
       environment: review-internal
@@ -47,6 +51,10 @@ jobs:
   review:
     needs: concierge
     if: ${{ needs.concierge.outputs.internal == 'false' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     uses: ./.github/workflows/_review-shared.yml
     with:
       environment: review
