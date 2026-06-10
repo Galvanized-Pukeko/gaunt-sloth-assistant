@@ -459,6 +459,23 @@ No linked ticket here`);
     expect(initMock).toHaveBeenCalled();
   });
 
+  it('does not pick up a lone issue URL from the Title via the body fallback scan', async () => {
+    // The last-resort "single issue URL anywhere" fallback must scan only the description body,
+    // not the structured Title line - otherwise an issue URL in the title would be misread as
+    // requirements even though no requirements line or closing keyword designates it.
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Title: See https://github.com/owner/repo/issues/77 for background
+Description:
+No linked ticket here`);
+    processMessagesMock.mockResolvedValue(undefined);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    await runPrAutoMode(config);
+
+    expect(ghIssueMock).not.toHaveBeenCalled();
+    expect(initMock).toHaveBeenCalled();
+  });
+
   it('leaves requirements to the discovery agent when several issue URLs are linked', async () => {
     ghPrViewMock.mockResolvedValue(`GitHub PR: #360
 Description:

@@ -159,6 +159,8 @@ describe('systemUtils', () => {
       expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
         expect.stringContaining('Force exiting')
       );
+      // Raw mode is dropped before exiting so a wedged session can't strand the user's terminal.
+      expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(false);
     });
 
     it('force-exits on Ctrl+C after an Escape interrupt', async () => {

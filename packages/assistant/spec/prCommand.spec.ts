@@ -281,14 +281,18 @@ describe('prCommand', () => {
     const program = new Command();
 
     // ghPrDiffSource returns null (with a warning) for an invalid PR number instead of throwing.
+    // Mock the exact module the github content provider imports (CONTENT_PROVIDERS.github) so the
+    // null genuinely flows through getCommandProviderInput rather than the test passing by accident.
     const ghProvider = vi.fn().mockResolvedValue(null);
-    vi.doMock('#src/sources/ghPrDiffSource.js', () => ({
+    vi.doMock('@gaunt-sloth/review/sources/ghPrDiffSource.js', () => ({
       get: ghProvider,
     }));
 
     prCommand(program, {});
     await program.parseAsync(['na', 'na', 'pr', '123']);
 
+    // Prove the mocked provider was actually exercised, then assert the guard fired.
+    expect(ghProvider).toHaveBeenCalled();
     expect(displayErrorMock).toHaveBeenCalledWith(
       'Could not retrieve PR content for "123". Cannot continue with review.'
     );

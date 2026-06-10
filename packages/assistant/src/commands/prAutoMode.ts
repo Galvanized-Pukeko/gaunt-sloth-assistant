@@ -457,10 +457,12 @@ function extractRequirementsGithubIssueRef(prMetadata: string): string | undefin
   // Otherwise fall back to an issue URL anywhere in the body, but only when it is
   // unambiguous: with several distinct issue links (e.g. "see also" references) picking one
   // would silently review against the wrong requirements, so leave it to the discovery agent.
+  // Scan only the description body (not the structured header), consistent with the
+  // requirements-line scan above - a lone issue URL in the Title is not a requirements pointer.
   const bodyUrls = new Set(
-    Array.from(prMetadata.matchAll(new RegExp(GITHUB_ISSUE_URL_PATTERN, 'gi'))).map((match) =>
-      normalizeGithubIssueUrl(match[0])
-    )
+    Array.from(
+      getPrDescriptionBody(prMetadata).matchAll(new RegExp(GITHUB_ISSUE_URL_PATTERN, 'gi'))
+    ).map((match) => normalizeGithubIssueUrl(match[0]))
   );
   if (bodyUrls.size === 1) {
     return bodyUrls.values().next().value;
@@ -522,11 +524,12 @@ function extractJiraIssueKey(prMetadata: string): string | undefined {
 
   // Otherwise fall back to an Atlassian browse URL anywhere in the body, but - mirroring the
   // GitHub path - only when it is unambiguous: with several distinct links (e.g. "see also"
-  // references) picking one would silently review against the wrong requirements.
+  // references) picking one would silently review against the wrong requirements. Scan only the
+  // description body (not the structured header), consistent with the requirements-line scan.
   const bodyKeys = new Set(
-    Array.from(prMetadata.matchAll(new RegExp(ATLASSIAN_BROWSE_URL_PATTERN, 'gi'))).map((match) =>
-      match[1].toUpperCase()
-    )
+    Array.from(
+      getPrDescriptionBody(prMetadata).matchAll(new RegExp(ATLASSIAN_BROWSE_URL_PATTERN, 'gi'))
+    ).map((match) => match[1].toUpperCase())
   );
   if (bodyKeys.size === 1) {
     return bodyKeys.values().next().value;

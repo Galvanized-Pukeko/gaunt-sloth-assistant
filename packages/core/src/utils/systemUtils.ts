@@ -51,6 +51,10 @@ const keypressHandler = (callback: () => void) => (chunk: any, key: any) => {
   // tool call) this is the user's only way out. 130 = 128 + SIGINT, the conventional code.
   if (isCtrlC && innerState.interruptRequested) {
     displayWarning('\nForce exiting...');
+    // Leave the terminal usable: drop raw mode before exiting so a wedged tool call can't
+    // strand the user's shell with echo/line-editing disabled. Node restores TTY state on a
+    // normal exit, but being explicit here is cheap insurance on the hard-exit path.
+    process.stdin.setRawMode?.(false);
     process.exit(130);
   }
   if (key?.name === 'escape' || key?.name === 'q' || isCtrlC) {
