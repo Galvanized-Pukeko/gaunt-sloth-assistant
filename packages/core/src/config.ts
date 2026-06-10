@@ -227,23 +227,7 @@ export interface GthConfig {
     patterns?: string[];
   };
   commands?: {
-    pr?: {
-      contentSource?: string;
-      requirementSource?: string;
-      /** @deprecated Use contentSource instead */
-      contentProvider?: string;
-      /** @deprecated Use requirementSource instead */
-      requirementsProvider?: string;
-      filesystem?: string[] | 'all' | 'read' | 'none';
-      builtInTools?: string[];
-      customTools?: CustomToolsConfig | false;
-      /** See {@link GthConfig.allowedTools}. Empty array disables all tools for `gth pr`'s review agent. */
-      allowedTools?: string[];
-      logWorkForReviewInSeconds?: number;
-      rating?: RatingConfig;
-      binaryFormats?: false | BinaryFormatConfig[];
-      auto?: PrAutoModeConfig;
-    };
+    pr?: PrCommandConfig;
     review?: {
       contentSource?: string;
       requirementSource?: string;
@@ -299,6 +283,32 @@ export interface GthConfig {
 }
 
 /**
+ * `gth pr` command configuration.
+ *
+ * Declared as a named interface (rather than inline in {@link GthConfig}) so that downstream
+ * packages can extend it with their own command features via TypeScript module augmentation
+ * (`declare module '@gaunt-sloth/core/config.js'`), keeping those features' types out of core.
+ * For example, the assistant package merges its PR auto mode config (`auto`) into this
+ * interface.
+ */
+export interface PrCommandConfig {
+  contentSource?: string;
+  requirementSource?: string;
+  /** @deprecated Use contentSource instead */
+  contentProvider?: string;
+  /** @deprecated Use requirementSource instead */
+  requirementsProvider?: string;
+  filesystem?: string[] | 'all' | 'read' | 'none';
+  builtInTools?: string[];
+  customTools?: CustomToolsConfig | false;
+  /** See {@link GthConfig.allowedTools}. Empty array disables all tools for `gth pr`'s review agent. */
+  allowedTools?: string[];
+  logWorkForReviewInSeconds?: number;
+  rating?: RatingConfig;
+  binaryFormats?: false | BinaryFormatConfig[];
+}
+
+/**
  * Server tools such as Anthropic Web Search.
  * These tools are meant to be magic objects like
  * `{"type": "web_search_20250305", "name": "web_search", "max_uses": 10}`,
@@ -320,42 +330,6 @@ export type ConsoleLevelInput =
 export interface RawGthConfig extends Omit<GthConfig, 'llm' | 'consoleLevel'> {
   llm: LLMConfig;
   consoleLevel?: ConsoleLevelInput;
-}
-
-export interface PrAutoModeConfig {
-  /**
-   * Enable `gth pr` auto mode when neither PR id nor requirements id is provided.
-   * @default true
-   */
-  enabled?: boolean;
-  /**
-   * Fetch the current-branch PR diff with `gh pr diff` before invoking the auto agent.
-   * The auto agent can still replace it with the `set_diff` tool if needed.
-   * @default true
-   */
-  deterministicDiff?: boolean;
-  /**
-   * Optional tool overrides used only while the auto-mode discovery agent runs.
-   * When omitted, the normal configured tools remain available.
-   */
-  filesystem?: string[] | 'all' | 'read' | 'none';
-  builtInTools?: string[];
-  customTools?: CustomToolsConfig | false;
-  tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
-  /**
-   * Restrict the discovery agent to this allow-list of tool names, applied after every tool
-   * source (filesystem, built-in, custom, MCP, A2A, and `tools`) is resolved. Unlike
-   * `builtInTools`/`customTools`/`filesystem` (which gate whole tool groups), this trims the
-   * final tool set by exact name, so it can pare down MCP server tools
-   * (e.g. "mcp__jira__getJiraIssue") and the auto-mode helper tools
-   * ("gh_pr"/"gh_diff"/"gh_issue"/"set_diff") to the minimum needed.
-   *
-   * `set_requirements` is always retained regardless, since it is how the discovery agent
-   * records the requirements it found. When omitted, all resolved tools remain available; an
-   * empty array keeps only `set_requirements`. The discovery agent never inherits the
-   * top-level {@link GthConfig.allowedTools}; this property is its only allow-list.
-   */
-  allowedTools?: string[];
 }
 
 export type BinaryFormatType = 'image' | 'file' | 'audio' | 'video' | 'binary';

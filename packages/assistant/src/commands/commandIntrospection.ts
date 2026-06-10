@@ -11,10 +11,10 @@ import {
   readChatPrompt,
   readCodePrompt,
   readGuidelines,
-  readPrAutoPrompt,
   readReviewInstructions,
   readSystemPrompt,
 } from '@gaunt-sloth/core/utils/llmUtils.js';
+import { readPrAutoPrompt } from '#src/commands/prAutoMode.js';
 
 export type PromptCommandType = 'ask' | 'review' | 'pr' | 'pr-auto' | 'chat' | 'code';
 export type ProviderCommandType = 'review' | 'pr';
