@@ -120,9 +120,24 @@ export function prCommand(
 
         // Get PR diff using the provider
         try {
-          content.push(
-            await getCommandProviderInput('pr', 'content', prId, config, contentProvider)
+          const prContent = await getCommandProviderInput(
+            'pr',
+            'content',
+            prId,
+            config,
+            contentProvider
           );
+          // A provider may resolve to an empty result instead of throwing - e.g. ghPrDiffSource
+          // returns null (with a warning) for an invalid PR number. Without this guard the review
+          // would silently proceed against no diff; fail loudly as the throwing path used to.
+          if (!prContent) {
+            displayError(
+              `Could not retrieve PR content for "${prId}". Cannot continue with review.`
+            );
+            setExitCode(1);
+            return;
+          }
+          content.push(prContent);
         } catch (error) {
           displayError(error instanceof Error ? error.message : String(error));
           setExitCode(1);

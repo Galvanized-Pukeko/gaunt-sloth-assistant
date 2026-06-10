@@ -258,6 +258,43 @@ describe('prCommand', () => {
     );
   });
 
+  it('Should fail loudly when the content provider resolves to no content', async () => {
+    const testConfig = {
+      ...mockConfig,
+      contentProvider: 'text',
+      requirementsProvider: 'text',
+      commands: {
+        pr: {
+          contentProvider: 'github',
+          requirementsProvider: 'text',
+        },
+        review: {
+          requirementsProvider: 'text',
+          contentProvider: 'text',
+        },
+      },
+      streamOutput: false,
+    };
+    configMock.initConfig.mockResolvedValue(testConfig);
+
+    const { prCommand } = await import('#src/commands/prCommand.js');
+    const program = new Command();
+
+    // ghPrDiffSource returns null (with a warning) for an invalid PR number instead of throwing.
+    const ghProvider = vi.fn().mockResolvedValue(null);
+    vi.doMock('#src/sources/ghPrDiffSource.js', () => ({
+      get: ghProvider,
+    }));
+
+    prCommand(program, {});
+    await program.parseAsync(['na', 'na', 'pr', '123']);
+
+    expect(displayErrorMock).toHaveBeenCalledWith(
+      'Could not retrieve PR content for "123". Cannot continue with review.'
+    );
+    expect(review).not.toHaveBeenCalled();
+  });
+
   it('Should call pr command with requirements', async () => {
     // Setup specific config for this test
     const testConfig = {
