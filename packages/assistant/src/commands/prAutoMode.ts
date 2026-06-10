@@ -1,4 +1,4 @@
-import type { GthConfig, PrAutoModeConfig } from '@gaunt-sloth/core/config.js';
+import type { CustomToolsConfig, GthConfig, ServerTool } from '@gaunt-sloth/core/config.js';
 import type { AgentResolvers } from '@gaunt-sloth/core/core/types.js';
 import { GthAgentRunner } from '@gaunt-sloth/core/core/GthAgentRunner.js';
 import {
@@ -6,11 +6,13 @@ import {
   displayInfo,
   displayWarning,
 } from '@gaunt-sloth/core/utils/consoleUtils.js';
-import { buildSystemMessages, readPrAutoPrompt } from '@gaunt-sloth/core/utils/llmUtils.js';
+import { buildSystemMessages, readPromptFile } from '@gaunt-sloth/core/utils/llmUtils.js';
 import { debugLog } from '@gaunt-sloth/core/utils/debugUtils.js';
 import { HumanMessage } from '@langchain/core/messages';
-import { StructuredToolInterface, tool } from '@langchain/core/tools';
+import { type BaseToolkit, StructuredToolInterface, tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createResolvers } from '@gaunt-sloth/api/resolvers.js';
 import { get as getGhPrDiff } from '@gaunt-sloth/review/sources/ghPrDiffSource.js';
 import { get as getGhPrView } from '@gaunt-sloth/review/sources/ghPrViewSource.js';
@@ -18,6 +20,72 @@ import { get as getGhIssue } from '@gaunt-sloth/review/sources/ghIssueSource.js'
 import { get as getJiraIssue } from '@gaunt-sloth/review/sources/jiraIssueSource.js';
 import { get as getJiraIssueLegacy } from '@gaunt-sloth/review/sources/jiraIssueLegacySource.js';
 import type { ProviderConfig } from '@gaunt-sloth/review/sources/types.js';
+
+export const GSLOTH_PR_AUTO_PROMPT = '.gsloth.pr-auto.md';
+
+// The assistant package root (src|dist/commands -> package root), where the packaged default
+// .gsloth.pr-auto.md ships.
+const assistantPackageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+export interface PrAutoModeConfig {
+  /**
+   * Enable `gth pr` auto mode when neither PR id nor requirements id is provided.
+   * @default true
+   */
+  enabled?: boolean;
+  /**
+   * Fetch the current-branch PR diff with `gh pr diff` before invoking the auto agent.
+   * The auto agent can still replace it with the `set_diff` tool if needed.
+   * @default true
+   */
+  deterministicDiff?: boolean;
+  /**
+   * Optional tool overrides used only while the auto-mode discovery agent runs.
+   * When omitted, the normal configured tools remain available.
+   */
+  filesystem?: string[] | 'all' | 'read' | 'none';
+  builtInTools?: string[];
+  customTools?: CustomToolsConfig | false;
+  tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
+  /**
+   * Restrict the discovery agent to this allow-list of tool names, applied after every tool
+   * source (filesystem, built-in, custom, MCP, A2A, and `tools`) is resolved. Unlike
+   * `builtInTools`/`customTools`/`filesystem` (which gate whole tool groups), this trims the
+   * final tool set by exact name, so it can pare down MCP server tools
+   * (e.g. "mcp__jira__getJiraIssue") and the auto-mode helper tools
+   * ("gh_pr"/"gh_diff"/"gh_issue"/"set_diff") to the minimum needed.
+   *
+   * `set_requirements` is always retained regardless, since it is how the discovery agent
+   * records the requirements it found. When omitted, all resolved tools remain available; an
+   * empty array keeps only `set_requirements`. The discovery agent never inherits the
+   * top-level {@link GthConfig.allowedTools}; this property is its only allow-list.
+   */
+  allowedTools?: string[];
+}
+
+// PR auto mode is an assistant feature; its config type lives here and is merged into the
+// core command config via module augmentation instead of leaking into @gaunt-sloth/core.
+declare module '@gaunt-sloth/core/config.js' {
+  interface PrCommandConfig {
+    /** PR auto mode (`gth pr` with no arguments) configuration. */
+    auto?: PrAutoModeConfig;
+  }
+}
+
+/**
+ * Read the PR auto mode discovery agent prompt, honouring project / identity-profile
+ * overrides and falling back to the default prompt shipped with the assistant package.
+ */
+export function readPrAutoPrompt(
+  config: Pick<GthConfig, 'identityProfile' | 'noDefaultPrompts'>
+): string {
+  return readPromptFile(
+    GSLOTH_PR_AUTO_PROMPT,
+    config.identityProfile,
+    config.noDefaultPrompts,
+    assistantPackageDir
+  );
+}
 
 export interface PrAutoModeResult {
   diff: string;
