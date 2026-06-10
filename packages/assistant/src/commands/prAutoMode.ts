@@ -296,7 +296,14 @@ function createPrAutoTools(config: GthConfig, state: PrAutoToolState): Structure
 
   const ghPr = tool(
     async ({ prId }: z.infer<typeof GhPrArgsSchema>): Promise<string> => {
-      return (await getGhPrView(getGithubContentProviderConfig(config), prId)) ?? '';
+      try {
+        return (await getGhPrView(getGithubContentProviderConfig(config), prId)) ?? '';
+      } catch (error) {
+        // Return the failure as text rather than throwing, so a single failed fetch (e.g. no PR
+        // for the current branch) lets the model adapt instead of aborting the whole discovery
+        // run - consistent with gh_issue's actionable-message behaviour.
+        return `Could not fetch GitHub PR metadata: ${error instanceof Error ? error.message : String(error)}`;
+      }
     },
     {
       name: 'gh_pr',
@@ -308,7 +315,14 @@ function createPrAutoTools(config: GthConfig, state: PrAutoToolState): Structure
 
   const ghDiff = tool(
     async ({ prId }: z.infer<typeof GhDiffArgsSchema>): Promise<string> => {
-      const diff = (await getGhPrDiff(getGithubContentProviderConfig(config), prId)) ?? '';
+      let diff: string;
+      try {
+        diff = (await getGhPrDiff(getGithubContentProviderConfig(config), prId)) ?? '';
+      } catch (error) {
+        // Surface the failure as text instead of throwing so the discovery run continues and the
+        // model can try another approach - consistent with gh_pr/gh_issue.
+        return `Could not fetch the GitHub PR diff: ${error instanceof Error ? error.message : String(error)}; the review diff was not changed.`;
+      }
       if (!diff) {
         return 'No diff content was returned by GitHub CLI; the review diff was not changed.';
       }
@@ -517,10 +531,13 @@ function extractRequirementsGithubIssueRef(prMetadata: string): string | undefin
 }
 
 function normalizeGithubIssueUrl(url: string): string {
-  // Lowercase the host so a copied "GITHUB.COM/..." URL still satisfies the
-  // case-sensitive issue-reference check in ghIssueSource.
+  // Lowercase the host and the "/issues/" path segment so a copied "GITHUB.COM/.../ISSUES/77"
+  // URL still satisfies the case-sensitive issue-reference check in ghIssueSource. Owner/repo
+  // segments are left untouched because they are case-sensitive on GitHub.
   const withoutProtocol = url.replace(/^https?:\/\//i, '');
-  return `https://${withoutProtocol.replace(/^github\.com/i, 'github.com')}`;
+  return `https://${withoutProtocol
+    .replace(/^github\.com/i, 'github.com')
+    .replace(/\/issues\//i, '/issues/')}`;
 }
 
 function formatGithubIssueRef(ref: string): string {

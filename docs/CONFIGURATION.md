@@ -1000,7 +1000,7 @@ you can ask Gaunt Sloth to log review time back to that issue automatically by s
 }
 ```
 
-This automation only runs when a `requirementsId` is supplied on the command line and the provider resolves to `jira`.
+This automation only runs when a `requirementsId` is supplied on the command line and the provider resolves to `jira`. It therefore does **not** apply in PR auto mode (`gsloth pr` with no arguments): the Jira key discovered automatically is used for the review but is not passed to the worklog path, so no time is logged. Pass the issue id explicitly (`gsloth pr <prId> <requirementsId>`) if you need work logging.
 
 #### 2. Legacy Jira REST API (Unscoped Token)
 

@@ -489,6 +489,65 @@ No linked ticket here`;
       expect(toolResult).toContain('No issue content was returned');
       expect(toolResult).toContain('https://github.com');
     });
+
+    it('gh_pr returns the error as text instead of throwing on a failed fetch', async () => {
+      // Deterministic metadata fetch succeeds (so the agent runs), but the tool call fails.
+      ghPrViewMock.mockResolvedValueOnce(noLinkMetadata);
+      ghPrViewMock.mockRejectedValueOnce(new Error('no PR for the current branch'));
+
+      let toolResult = '';
+      processMessagesMock.mockImplementation(async () => {
+        const { GthAgentRunner } = await import('@gaunt-sloth/core/core/GthAgentRunner.js');
+        const resolvers = vi.mocked(GthAgentRunner).mock.calls.at(-1)?.[1] as AgentResolvers;
+        const tools = await resolvers.resolveTools!(config, undefined);
+        const ghPrTool = tools.find((t) => t.name === 'gh_pr')!;
+        toolResult = (await ghPrTool.invoke({})) as string;
+      });
+
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      await runPrAutoMode(config);
+
+      expect(toolResult).toContain('Could not fetch GitHub PR metadata');
+      expect(toolResult).toContain('no PR for the current branch');
+    });
+
+    it('gh_diff returns the error as text instead of throwing on a failed fetch', async () => {
+      ghDiffMock.mockReset();
+      // Both the deterministic fetch and the tool call fail; the tool must not throw.
+      ghDiffMock.mockRejectedValue(new Error('gh exploded'));
+      ghPrViewMock.mockResolvedValue(noLinkMetadata);
+
+      let toolResult = '';
+      processMessagesMock.mockImplementation(async () => {
+        const { GthAgentRunner } = await import('@gaunt-sloth/core/core/GthAgentRunner.js');
+        const resolvers = vi.mocked(GthAgentRunner).mock.calls.at(-1)?.[1] as AgentResolvers;
+        const tools = await resolvers.resolveTools!(config, undefined);
+        const ghDiffTool = tools.find((t) => t.name === 'gh_diff')!;
+        toolResult = (await ghDiffTool.invoke({})) as string;
+      });
+
+      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      await runPrAutoMode(config);
+
+      expect(toolResult).toContain('Could not fetch the GitHub PR diff');
+      expect(toolResult).toContain('the review diff was not changed');
+    });
+  });
+
+  it('normalizes the case of the /issues/ path segment so the issue source accepts the URL', async () => {
+    ghPrViewMock.mockResolvedValue(`GitHub PR: #360
+Description:
+Requirements: https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/ISSUES/77`);
+
+    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    await runPrAutoMode(config);
+
+    // The host and the /issues/ segment are lowercased; the owner/repo case is preserved.
+    expect(ghIssueMock).toHaveBeenCalledWith(
+      null,
+      'https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues/77'
+    );
+    expect(initMock).not.toHaveBeenCalled();
   });
 
   it('resolves requirements from a GitHub closing keyword reference', async () => {
