@@ -20,5 +20,3 @@ jobs:
       # ships ./dist/*; without this step npm publishes a dist-less, broken bin.
       - run: npm run build
       - run: npm publish --provenance --access public --tag latest -w gaunt-sloth-assistant
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
