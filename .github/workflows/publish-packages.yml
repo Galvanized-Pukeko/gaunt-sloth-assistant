@@ -10,8 +10,9 @@ name: Publish packages
 #
 # Publishing uses npm Trusted Publishing (OIDC), same as publish.yml — no
 # NPM_TOKEN, just `id-token: write`. Bump and commit the library versions first
-# (`npm run release:bump`); npm refuses to republish an existing version, so
-# dispatching without a fresh version will fail at the publish stage.
+# (`npm run release:bump-and-commit -- <version>`); npm refuses to republish an
+# existing version, so dispatching without a fresh version will fail at the
+# publish stage.
 
 on:
   workflow_dispatch:

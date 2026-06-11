@@ -16,18 +16,22 @@ the `files` makes .npmignore ignored.
 ### Library packages
 
 Library packages (`@gaunt-sloth/core`, `@gaunt-sloth/tools`, `@gaunt-sloth/api`,
-`@gaunt-sloth/review`) are lock-stepped: they all carry the same version, whose
-single source of truth is `release.json` at the repo root. `npm version` does
-not work well in workspaces for scoped packages, so use the bump script:
+`@gaunt-sloth/review`) are lock-stepped: they all carry the same version, with
+`packages/core/package.json` as the source of truth. `npm version` does not
+work well in workspaces for scoped packages, so use the bump script:
 
 ```bash
-npm run release:bump            # apply the version from release.json to all four packages
-npm run release:bump -- 0.1.8   # set release.json to 0.1.8 AND apply
+npm run release:bump                # patch-increment core's version AND sync the rest
+npm run release:bump -- minor       # increment patch | minor | major AND sync
+npm run release:bump -- 0.1.8       # set an explicit version AND sync
+npm run release:bump-and-commit     # same, then refresh package-lock.json and commit
 ```
 
 The script rewrites each package's `"version"` and their exact pins on each
 other, and updates the assistant's `@gaunt-sloth/*` dependency pins (the
-assistant's own version is untouched). Commit the result before publishing.
+assistant's own version is untouched). Commit the result before publishing —
+`release:bump-and-commit` does that for you, including the lockfile refresh
+(`npm install --package-lock-only`) that keeps the next `npm ci` happy.
 
 ### Publishing library packages (CI, recommended)
 

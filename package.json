@@ -32,6 +32,7 @@
     "typedoc": "typedoc",
     "chat": "node packages/assistant/cli.js",
     "release:bump": "node bump.mjs",
+    "release:bump-and-commit": "node bump.mjs --commit",
     "release:tag": "./tag-packages.sh",
     "release:publish": "./publish-all.sh"
   },

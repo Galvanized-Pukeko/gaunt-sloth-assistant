@@ -44,7 +44,8 @@ npm run format
 ## Local Development Registry (optional)
 
 The four publishable packages — `@gaunt-sloth/{core,tools,api,review}` — release
-in lock-step from a single `release.json`. When iterating against downstream
+in lock-step (`packages/core/package.json` holds the authoritative version).
+When iterating against downstream
 consumers (`galvanized-pukeko-ai-ui`, `pukeko-robot-controller`, etc.), it is
 much faster to publish dev versions to a local [Verdaccio](https://verdaccio.org)
 registry than to rebuild tarballs each cycle.
@@ -108,14 +109,17 @@ routing those scopes to localhost:
 
 ### Release workflow
 
-`release.json` is the single source of truth for the synced version:
+`packages/core/package.json` is the single source of truth for the synced version:
 
 ```bash
-# Apply the version from release.json to all four synced package.jsons:
+# Bump like `npm version` — patch | minor | major or an explicit version;
+# no argument means patch:
 npm run release:bump
+npm run release:bump -- minor
+npm run release:bump -- 0.0.7   # passing the current version re-syncs without bumping
 
-# Or set release.json and apply in one step:
-npm run release:bump -- 0.0.7
+# Same as above, but also refreshes package-lock.json and commits the result:
+npm run release:bump-and-commit
 
 npm run build
 npm run release:publish    # publishes core → tools → api → review to Verdaccio
