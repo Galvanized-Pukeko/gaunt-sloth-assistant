@@ -35,7 +35,7 @@ export interface PrDiscoveryConfig {
   enabled?: boolean;
   /**
    * Fetch the current-branch PR diff with `gh pr diff` before invoking the discovery agent.
-   * The auto agent can still replace it with the `set_diff` tool if needed.
+   * The discovery agent can still replace it with the `set_diff` tool if needed.
    * @default true
    */
   deterministicDiff?: boolean;
@@ -127,7 +127,7 @@ const GhIssueArgsSchema = z.object({
 });
 
 export async function runPrDiscovery(config: GthConfig): Promise<PrDiscoveryResult> {
-  const autoConfig = config.commands?.pr?.discovery;
+  const discoveryConfig = config.commands?.pr?.discovery;
   const state: PrDiscoveryToolState = {
     diff: '',
     requirements: '',
@@ -135,7 +135,7 @@ export async function runPrDiscovery(config: GthConfig): Promise<PrDiscoveryResu
   };
 
   const contentProvider = config.commands?.pr?.contentProvider ?? config.contentProvider;
-  if (autoConfig?.deterministicDiff !== false) {
+  if (discoveryConfig?.deterministicDiff !== false) {
     if (contentProvider !== 'github') {
       // The deterministic fast path uses `gh pr diff`, which only makes sense for the GitHub
       // content provider. For any other provider, skip it (rather than emitting a spurious gh
@@ -199,9 +199,9 @@ export async function runPrDiscovery(config: GthConfig): Promise<PrDiscoveryResu
   // misconfiguration is obvious rather than surfacing as an opaque downstream failure.
   if (
     !state.diff.trim() &&
-    autoConfig?.allowedTools &&
-    !autoConfig.allowedTools.includes('gh_diff') &&
-    !autoConfig.allowedTools.includes('set_diff')
+    discoveryConfig?.allowedTools &&
+    !discoveryConfig.allowedTools.includes('gh_diff') &&
+    !discoveryConfig.allowedTools.includes('set_diff')
   ) {
     displayWarning(
       'No diff yet and commands.pr.discovery.allowedTools excludes both "gh_diff" and "set_diff", so the discovery agent cannot set one. Add "gh_diff" (or "set_diff") to the allow-list, or enable deterministicDiff.'
@@ -213,7 +213,7 @@ export async function runPrDiscovery(config: GthConfig): Promise<PrDiscoveryResu
     createPrDiscoveryResolvers(config, state)
   );
   try {
-    await runner.init(undefined, getPrDiscoveryAgentConfig(config, autoConfig), undefined);
+    await runner.init(undefined, getPrDiscoveryAgentConfig(config, discoveryConfig), undefined);
     await runner.processMessages([
       ...buildSystemMessages(config, readPrDiscoveryPrompt(config)),
       new HumanMessage(buildPrDiscoveryUserMessage(state)),
@@ -234,15 +234,15 @@ export async function runPrDiscovery(config: GthConfig): Promise<PrDiscoveryResu
 
 function getPrDiscoveryAgentConfig(
   config: GthConfig,
-  autoConfig: PrDiscoveryConfig | undefined
+  discoveryConfig: PrDiscoveryConfig | undefined
 ): GthConfig {
-  const baseTools = autoConfig?.tools ?? config.tools ?? [];
+  const baseTools = discoveryConfig?.tools ?? config.tools ?? [];
   const customTools =
-    autoConfig && 'customTools' in autoConfig ? autoConfig.customTools : config.customTools;
+    discoveryConfig && 'customTools' in discoveryConfig ? discoveryConfig.customTools : config.customTools;
   return {
     ...config,
-    filesystem: autoConfig?.filesystem ?? config.filesystem,
-    builtInTools: autoConfig?.builtInTools ?? config.builtInTools,
+    filesystem: discoveryConfig?.filesystem ?? config.filesystem,
+    builtInTools: discoveryConfig?.builtInTools ?? config.builtInTools,
     customTools: customTools === false ? undefined : customTools,
     tools: baseTools,
     // The discovery agent must never inherit the top-level allow-list (e.g. a global
@@ -251,8 +251,8 @@ function getPrDiscoveryAgentConfig(
     // always augmented with set_requirements so the agent can record what it found. The
     // agent applies this list after every tool source is resolved, so it also gates tools
     // supplied via `tools` in config.
-    allowedTools: autoConfig?.allowedTools
-      ? [...new Set([...autoConfig.allowedTools, 'set_requirements'])]
+    allowedTools: discoveryConfig?.allowedTools
+      ? [...new Set([...discoveryConfig.allowedTools, 'set_requirements'])]
       : undefined,
   };
 }
