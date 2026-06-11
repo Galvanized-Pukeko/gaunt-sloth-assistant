@@ -67,7 +67,7 @@ export function prCommand(
         content.push(readMultipleFilesFromProjectDir(options.file));
       }
 
-      const isAutoMode = !prId && !requirementsId;
+      const isDiscovery = !prId && !requirementsId;
       const looksLikeRequirementsOnlyMode =
         contentProvider === 'github' && Boolean(prId) && !requirementsId && !/^\d+$/.test(prId);
 
@@ -81,7 +81,7 @@ export function prCommand(
         return;
       }
 
-      if (isAutoMode) {
+      if (isDiscovery) {
         if (config.commands?.pr?.discovery?.enabled === false) {
           displayError(
             'Change requirements discovery is disabled. Provide a pull request ID to run `gth pr`.'
@@ -94,7 +94,7 @@ export function prCommand(
           const discoveryResult = await runPrDiscovery(config);
           if (discoveryResult.requirements) {
             content.push(
-              wrapContent(discoveryResult.requirements, 'auto-requirements', 'requirements')
+              wrapContent(discoveryResult.requirements, 'discovered-requirements', 'requirements')
             );
           }
           if (!discoveryResult.diff) {
@@ -104,7 +104,7 @@ export function prCommand(
             setExitCode(1);
             return;
           }
-          content.push(wrapContent(discoveryResult.diff, 'auto-diff', 'GitHub diff'));
+          content.push(wrapContent(discoveryResult.diff, 'discovered-diff', 'GitHub diff'));
         } catch (error) {
           displayError(error instanceof Error ? error.message : String(error));
           setExitCode(1);
@@ -160,7 +160,7 @@ export function prCommand(
       // TODO consider including requirements id
       // TODO sanitize prId
       await review(
-        prId ? `PR-${prId}` : 'PR-auto',
+        prId ? `PR-${prId}` : 'PR-discovery',
         getReviewSystemPrompt(config),
         content.join('\n'),
         config,

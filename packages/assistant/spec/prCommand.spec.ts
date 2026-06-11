@@ -42,9 +42,9 @@ vi.mock('#src/modules/reviewModule.js', () => ({
 }));
 vi.mock('#src/commands/prDiscovery.js', () => ({
   runPrDiscovery,
-  // commandIntrospection imports readPrAutoPrompt from the same module; stub it so this mock stays
-  // complete even if a future test path loads the introspection module.
-  readPrAutoPrompt: vi.fn(() => ''),
+  // commandIntrospection imports readPrDiscoveryPrompt from the same module; stub it so this mock
+  // stays complete even if a future test path loads the introspection module.
+  readPrDiscoveryPrompt: vi.fn(() => ''),
 }));
 
 const utilsMock = {
@@ -149,9 +149,9 @@ describe('prCommand', () => {
 
     expect(runPrDiscovery).toHaveBeenCalledWith(testConfig);
     expect(review).toHaveBeenCalledWith(
-      'PR-auto',
+      'PR-discovery',
       'INTERNAL BACKSTORY\nPROJECT GUIDELINES\nREVIEW INSTRUCTIONS',
-      '\nProvided requirements follows within auto-requirements-1234567 block\n<auto-requirements-1234567>\nAuto requirements\n</auto-requirements-1234567>\n\n\nProvided GitHub diff follows within auto-diff-1234567 block\n<auto-diff-1234567>\nAuto PR Diff Content\n</auto-diff-1234567>\n',
+      '\nProvided requirements follows within discovered-requirements-1234567 block\n<discovered-requirements-1234567>\nAuto requirements\n</discovered-requirements-1234567>\n\n\nProvided GitHub diff follows within discovered-diff-1234567 block\n<discovered-diff-1234567>\nAuto PR Diff Content\n</discovered-diff-1234567>\n',
       expect.objectContaining({
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
