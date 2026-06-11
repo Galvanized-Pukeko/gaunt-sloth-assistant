@@ -28,7 +28,7 @@ vi.mock('@gaunt-sloth/core/utils/consoleUtils.js', async () => {
   };
 });
 const review = vi.fn();
-const runPrAutoMode = vi.fn();
+const runPrDiscovery = vi.fn();
 const prompt = {
   readBackstory: vi.fn(),
   readGuidelines: vi.fn(),
@@ -40,11 +40,11 @@ const prompt = {
 vi.mock('#src/modules/reviewModule.js', () => ({
   review: review,
 }));
-vi.mock('#src/commands/prAutoMode.js', () => ({
-  runPrAutoMode,
-  // commandIntrospection imports readPrAutoPrompt from the same module; stub it so this mock stays
-  // complete even if a future test path loads the introspection module.
-  readPrAutoPrompt: vi.fn(() => ''),
+vi.mock('#src/commands/prDiscovery.js', () => ({
+  runPrDiscovery,
+  // commandIntrospection imports readPrDiscoveryPrompt from the same module; stub it so this mock
+  // stays complete even if a future test path loads the introspection module.
+  readPrDiscoveryPrompt: vi.fn(() => ''),
 }));
 
 const utilsMock = {
@@ -115,7 +115,7 @@ describe('prCommand', () => {
     prompt.readReviewInstructions.mockReturnValue('REVIEW INSTRUCTIONS');
     prompt.readSystemPrompt.mockReturnValue('');
 
-    runPrAutoMode.mockResolvedValue({
+    runPrDiscovery.mockResolvedValue({
       requirements: 'Auto requirements',
       diff: 'Auto PR Diff Content',
     });
@@ -123,14 +123,14 @@ describe('prCommand', () => {
     resolversMock.createResolvers.mockReturnValue({ resolveTools: vi.fn(), cleanupTools: vi.fn() });
   });
 
-  it('Should call pr auto mode when no PR id and requirements id are provided', async () => {
+  it('Should discover change requirements when no PR id and requirements id are provided', async () => {
     const testConfig = {
       ...mockConfig,
       commands: {
         pr: {
           contentProvider: 'github',
           requirementsProvider: 'github',
-          auto: {
+          discovery: {
             enabled: true,
             deterministicDiff: true,
           },
@@ -147,11 +147,11 @@ describe('prCommand', () => {
     prCommand(program, {});
     await program.parseAsync(['na', 'na', 'pr']);
 
-    expect(runPrAutoMode).toHaveBeenCalledWith(testConfig);
+    expect(runPrDiscovery).toHaveBeenCalledWith(testConfig);
     expect(review).toHaveBeenCalledWith(
-      'PR-auto',
+      'PR-discovery',
       'INTERNAL BACKSTORY\nPROJECT GUIDELINES\nREVIEW INSTRUCTIONS',
-      '\nProvided requirements follows within auto-requirements-1234567 block\n<auto-requirements-1234567>\nAuto requirements\n</auto-requirements-1234567>\n\n\nProvided GitHub diff follows within auto-diff-1234567 block\n<auto-diff-1234567>\nAuto PR Diff Content\n</auto-diff-1234567>\n',
+      '\nProvided requirements follows within discovered-requirements-1234567 block\n<discovered-requirements-1234567>\nAuto requirements\n</discovered-requirements-1234567>\n\n\nProvided GitHub diff follows within discovered-diff-1234567 block\n<discovered-diff-1234567>\nAuto PR Diff Content\n</discovered-diff-1234567>\n',
       expect.objectContaining({
         projectGuidelines: '.gsloth.guidelines.md',
         projectReviewInstructions: '.gsloth.review.md',
@@ -161,14 +161,14 @@ describe('prCommand', () => {
     );
   });
 
-  it('Should reject no-argument pr command when auto mode is disabled', async () => {
+  it('Should reject no-argument pr command when discovery is disabled', async () => {
     const testConfig = {
       ...mockConfig,
       commands: {
         pr: {
           contentProvider: 'github',
           requirementsProvider: 'github',
-          auto: {
+          discovery: {
             enabled: false,
           },
         },
@@ -184,7 +184,7 @@ describe('prCommand', () => {
     prCommand(program, {});
     await program.parseAsync(['na', 'na', 'pr']);
 
-    expect(runPrAutoMode).not.toHaveBeenCalled();
+    expect(runPrDiscovery).not.toHaveBeenCalled();
     expect(review).not.toHaveBeenCalled();
   });
 
@@ -211,7 +211,7 @@ describe('prCommand', () => {
     expect(displayErrorMock).toHaveBeenCalledWith(
       expect.stringContaining('requirements-only mode is not supported')
     );
-    expect(runPrAutoMode).not.toHaveBeenCalled();
+    expect(runPrDiscovery).not.toHaveBeenCalled();
     expect(review).not.toHaveBeenCalled();
   });
 

@@ -12,7 +12,7 @@ import jiraLogWork from '#src/helpers/jira/jiraLogWork.js';
 import { JiraConfig } from '@gaunt-sloth/review/sources/types.js';
 import { CommandLineConfigOverrides } from '@gaunt-sloth/core/config.js';
 import { wrapContent } from '@gaunt-sloth/core/utils/llmUtils.js';
-import { runPrAutoMode } from '#src/commands/prAutoMode.js';
+import { runPrDiscovery } from '#src/commands/prDiscovery.js';
 
 import { readMultipleFilesFromProjectDir } from '@gaunt-sloth/review/utils/fileUtils.js';
 
@@ -35,7 +35,7 @@ export function prCommand(
     )
     .argument(
       '[prId]',
-      'Pull request ID to review. Omit both prId and requirementsId to run PR auto mode.'
+      "Pull request ID to review. Omit both prId and requirementsId to discover the change requirements from the current branch's PR."
     )
     .argument(
       '[requirementsId]',
@@ -67,7 +67,7 @@ export function prCommand(
         content.push(readMultipleFilesFromProjectDir(options.file));
       }
 
-      const isAutoMode = !prId && !requirementsId;
+      const isDiscovery = !prId && !requirementsId;
       const looksLikeRequirementsOnlyMode =
         contentProvider === 'github' && Boolean(prId) && !requirementsId && !/^\d+$/.test(prId);
 
@@ -75,30 +75,36 @@ export function prCommand(
         displayError(
           `Unsupported PR command arguments: "${prId}" was provided as the pull request ID. ` +
             '`gth pr <requirementsId>` requirements-only mode is not supported. ' +
-            'Use `gth pr` with no arguments for auto mode, or provide both a numeric PR ID and requirements ID: `gth pr <prId> <requirementsId>`.'
+            'Use `gth pr` with no arguments to discover change requirements automatically, or provide both a numeric PR ID and requirements ID: `gth pr <prId> <requirementsId>`.'
         );
         setExitCode(1);
         return;
       }
 
-      if (isAutoMode) {
-        if (config.commands?.pr?.auto?.enabled === false) {
-          displayError('PR auto mode is disabled. Provide a pull request ID to run `gth pr`.');
+      if (isDiscovery) {
+        if (config.commands?.pr?.discovery?.enabled === false) {
+          displayError(
+            'Change requirements discovery is disabled. Provide a pull request ID to run `gth pr`.'
+          );
           setExitCode(1);
           return;
         }
 
         try {
-          const autoResult = await runPrAutoMode(config);
-          if (autoResult.requirements) {
-            content.push(wrapContent(autoResult.requirements, 'auto-requirements', 'requirements'));
+          const discoveryResult = await runPrDiscovery(config);
+          if (discoveryResult.requirements) {
+            content.push(
+              wrapContent(discoveryResult.requirements, 'discovered-requirements', 'requirements')
+            );
           }
-          if (!autoResult.diff) {
-            displayError('PR auto mode did not set a diff. Cannot continue with review.');
+          if (!discoveryResult.diff) {
+            displayError(
+              'Change requirements discovery did not produce a diff. Cannot continue with review.'
+            );
             setExitCode(1);
             return;
           }
-          content.push(wrapContent(autoResult.diff, 'auto-diff', 'GitHub diff'));
+          content.push(wrapContent(discoveryResult.diff, 'discovered-diff', 'GitHub diff'));
         } catch (error) {
           displayError(error instanceof Error ? error.message : String(error));
           setExitCode(1);
@@ -154,7 +160,7 @@ export function prCommand(
       // TODO consider including requirements id
       // TODO sanitize prId
       await review(
-        prId ? `PR-${prId}` : 'PR-auto',
+        prId ? `PR-${prId}` : 'PR-discovery',
         getReviewSystemPrompt(config),
         content.join('\n'),
         config,

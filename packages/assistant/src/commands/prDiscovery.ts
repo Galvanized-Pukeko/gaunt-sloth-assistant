@@ -21,26 +21,26 @@ import { get as getJiraIssue } from '@gaunt-sloth/review/sources/jiraIssueSource
 import { get as getJiraIssueLegacy } from '@gaunt-sloth/review/sources/jiraIssueLegacySource.js';
 import type { ProviderConfig } from '@gaunt-sloth/review/sources/types.js';
 
-export const GSLOTH_PR_AUTO_PROMPT = '.gsloth.pr-auto.md';
+export const GSLOTH_PR_DISCOVERY_PROMPT = '.gsloth.pr-discovery.md';
 
 // The assistant package root (src|dist/commands -> package root), where the packaged default
-// .gsloth.pr-auto.md ships.
+// .gsloth.pr-discovery.md ships.
 const assistantPackageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export interface PrAutoModeConfig {
+export interface PrDiscoveryConfig {
   /**
-   * Enable `gth pr` auto mode when neither PR id nor requirements id is provided.
+   * Enable change requirements discovery when neither PR id nor requirements id is provided.
    * @default true
    */
   enabled?: boolean;
   /**
-   * Fetch the current-branch PR diff with `gh pr diff` before invoking the auto agent.
-   * The auto agent can still replace it with the `set_diff` tool if needed.
+   * Fetch the current-branch PR diff with `gh pr diff` before invoking the discovery agent.
+   * The discovery agent can still replace it with the `set_diff` tool if needed.
    * @default true
    */
   deterministicDiff?: boolean;
   /**
-   * Optional tool overrides used only while the auto-mode discovery agent runs.
+   * Optional tool overrides used only while the discovery agent runs.
    * When omitted, the normal configured tools remain available.
    */
   filesystem?: string[] | 'all' | 'read' | 'none';
@@ -52,7 +52,7 @@ export interface PrAutoModeConfig {
    * source (filesystem, built-in, custom, MCP, A2A, and `tools`) is resolved. Unlike
    * `builtInTools`/`customTools`/`filesystem` (which gate whole tool groups), this trims the
    * final tool set by exact name, so it can pare down MCP server tools
-   * (e.g. "mcp__jira__getJiraIssue") and the auto-mode helper tools
+   * (e.g. "mcp__jira__getJiraIssue") and the discovery helper tools
    * ("gh_pr"/"gh_diff"/"gh_issue"/"set_diff") to the minimum needed.
    *
    * `set_requirements` is always retained regardless, since it is how the discovery agent
@@ -63,36 +63,36 @@ export interface PrAutoModeConfig {
   allowedTools?: string[];
 }
 
-// PR auto mode is an assistant feature; its config type lives here and is merged into the
+// PR discovery is an assistant feature; its config type lives here and is merged into the
 // core command config via module augmentation instead of leaking into @gaunt-sloth/core.
 declare module '@gaunt-sloth/core/config.js' {
   interface PrCommandConfig {
-    /** PR auto mode (`gth pr` with no arguments) configuration. */
-    auto?: PrAutoModeConfig;
+    /** Change requirements discovery (`gth pr` with no arguments) configuration. */
+    discovery?: PrDiscoveryConfig;
   }
 }
 
 /**
- * Read the PR auto mode discovery agent prompt, honouring project / identity-profile
+ * Read the PR discovery agent prompt, honouring project / identity-profile
  * overrides and falling back to the default prompt shipped with the assistant package.
  */
-export function readPrAutoPrompt(
+export function readPrDiscoveryPrompt(
   config: Pick<GthConfig, 'identityProfile' | 'noDefaultPrompts'>
 ): string {
   return readPromptFile(
-    GSLOTH_PR_AUTO_PROMPT,
+    GSLOTH_PR_DISCOVERY_PROMPT,
     config.identityProfile,
     config.noDefaultPrompts,
     assistantPackageDir
   );
 }
 
-export interface PrAutoModeResult {
+export interface PrDiscoveryResult {
   diff: string;
   requirements: string;
 }
 
-type PrAutoToolState = PrAutoModeResult & {
+type PrDiscoveryToolState = PrDiscoveryResult & {
   prMetadata: string;
 };
 
@@ -126,33 +126,33 @@ const GhIssueArgsSchema = z.object({
     ),
 });
 
-export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult> {
-  const autoConfig = config.commands?.pr?.auto;
-  const state: PrAutoToolState = {
+export async function runPrDiscovery(config: GthConfig): Promise<PrDiscoveryResult> {
+  const discoveryConfig = config.commands?.pr?.discovery;
+  const state: PrDiscoveryToolState = {
     diff: '',
     requirements: '',
     prMetadata: '',
   };
 
   const contentProvider = config.commands?.pr?.contentProvider ?? config.contentProvider;
-  if (autoConfig?.deterministicDiff !== false) {
+  if (discoveryConfig?.deterministicDiff !== false) {
     if (contentProvider !== 'github') {
       // The deterministic fast path uses `gh pr diff`, which only makes sense for the GitHub
       // content provider. For any other provider, skip it (rather than emitting a spurious gh
       // failure warning) and let the discovery agent fetch the diff via its tools.
       debugLog(
-        `Auto mode skipped the deterministic gh diff fetch because the content provider is "${contentProvider}", not "github".`
+        `Skipped the deterministic gh diff fetch because the content provider is "${contentProvider}", not "github".`
       );
     } else {
       try {
         const diff = await getGhPrDiff(getGithubContentProviderConfig(config), undefined);
         state.diff = diff ?? '';
         if (state.diff) {
-          displayInfo('Auto mode deterministically retrieved current-branch PR diff with gh.');
+          displayInfo('Retrieved current-branch PR diff with gh.');
         }
       } catch (error) {
         displayWarning(
-          `Auto mode could not deterministically retrieve current-branch PR diff: ${error instanceof Error ? error.message : String(error)}`
+          `Could not deterministically retrieve current-branch PR diff: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     }
@@ -165,13 +165,13 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
       const prNumber = extractGithubPrNumber(state.prMetadata);
       displayInfo(
         prNumber
-          ? `Auto mode retrieved current-branch PR #${prNumber} metadata with gh.`
-          : 'Auto mode retrieved current-branch PR metadata with gh.'
+          ? `Retrieved current-branch PR #${prNumber} metadata with gh.`
+          : 'Retrieved current-branch PR metadata with gh.'
       );
       state.requirements = await discoverRequirementsFromPrMetadata(config, state.prMetadata);
     }
   } catch (error) {
-    const message = `Auto mode could not retrieve current-branch PR metadata: ${error instanceof Error ? error.message : String(error)}`;
+    const message = `Could not retrieve current-branch PR metadata: ${error instanceof Error ? error.message : String(error)}`;
     // The metadata fetch (gh pr view) still runs for non-github content providers, because a
     // GitHub PR can legitimately be reviewed with a non-github diff source. But in a fully
     // non-github setup a failure here is expected noise, so log it at debug level rather than
@@ -185,7 +185,7 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
 
   if (state.diff.trim() && state.requirements.trim()) {
     displayInfo(
-      'Auto mode already has a deterministic PR diff and requirements; skipping discovery agent.'
+      'Resolved the PR diff and requirements deterministically; skipping the discovery agent.'
     );
     return {
       diff: state.diff.trim(),
@@ -195,27 +195,28 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
 
   // If the discovery agent is our only chance to obtain a diff (none was set deterministically)
   // but the allow-list filters out every diff tool, it can never set one and the command is
-  // guaranteed to fail later with "PR auto mode did not set a diff". Warn early so the
+  // guaranteed to fail later with "Change requirements discovery did not produce a diff". Warn early so the
   // misconfiguration is obvious rather than surfacing as an opaque downstream failure.
   if (
     !state.diff.trim() &&
-    autoConfig?.allowedTools &&
-    !autoConfig.allowedTools.includes('gh_diff') &&
-    !autoConfig.allowedTools.includes('set_diff')
+    discoveryConfig?.allowedTools &&
+    !discoveryConfig.allowedTools.includes('gh_diff') &&
+    !discoveryConfig.allowedTools.includes('set_diff')
   ) {
     displayWarning(
-      'Auto mode has no diff yet and commands.pr.auto.allowedTools excludes both "gh_diff" and ' +
-        '"set_diff", so the discovery agent cannot set one. Add "gh_diff" (or "set_diff") to the ' +
-        'allow-list, or enable deterministicDiff.'
+      'No diff yet and commands.pr.discovery.allowedTools excludes both "gh_diff" and "set_diff", so the discovery agent cannot set one. Add "gh_diff" (or "set_diff") to the allow-list, or enable deterministicDiff.'
     );
   }
 
-  const runner = new GthAgentRunner(defaultStatusCallback, createPrAutoResolvers(config, state));
+  const runner = new GthAgentRunner(
+    defaultStatusCallback,
+    createPrDiscoveryResolvers(config, state)
+  );
   try {
-    await runner.init(undefined, getPrAutoAgentConfig(config, autoConfig), undefined);
+    await runner.init(undefined, getPrDiscoveryAgentConfig(config, discoveryConfig), undefined);
     await runner.processMessages([
-      ...buildSystemMessages(config, readPrAutoPrompt(config)),
-      new HumanMessage(buildPrAutoUserMessage(state)),
+      ...buildSystemMessages(config, readPrDiscoveryPrompt(config)),
+      new HumanMessage(buildPrDiscoveryUserMessage(state)),
     ]);
   } finally {
     await runner.cleanup();
@@ -231,32 +232,37 @@ export async function runPrAutoMode(config: GthConfig): Promise<PrAutoModeResult
   };
 }
 
-function getPrAutoAgentConfig(
+function getPrDiscoveryAgentConfig(
   config: GthConfig,
-  autoConfig: PrAutoModeConfig | undefined
+  discoveryConfig: PrDiscoveryConfig | undefined
 ): GthConfig {
-  const baseTools = autoConfig?.tools ?? config.tools ?? [];
+  const baseTools = discoveryConfig?.tools ?? config.tools ?? [];
   const customTools =
-    autoConfig && 'customTools' in autoConfig ? autoConfig.customTools : config.customTools;
+    discoveryConfig && 'customTools' in discoveryConfig
+      ? discoveryConfig.customTools
+      : config.customTools;
   return {
     ...config,
-    filesystem: autoConfig?.filesystem ?? config.filesystem,
-    builtInTools: autoConfig?.builtInTools ?? config.builtInTools,
+    filesystem: discoveryConfig?.filesystem ?? config.filesystem,
+    builtInTools: discoveryConfig?.builtInTools ?? config.builtInTools,
     customTools: customTools === false ? undefined : customTools,
     tools: baseTools,
     // The discovery agent must never inherit the top-level allow-list (e.g. a global
     // `allowedTools: []` meant to keep review agents tool-free would strip set_requirements
-    // and silently neuter auto mode). Only `commands.pr.auto.allowedTools` applies here,
+    // and silently neuter discovery). Only `commands.pr.discovery.allowedTools` applies here,
     // always augmented with set_requirements so the agent can record what it found. The
     // agent applies this list after every tool source is resolved, so it also gates tools
     // supplied via `tools` in config.
-    allowedTools: autoConfig?.allowedTools
-      ? [...new Set([...autoConfig.allowedTools, 'set_requirements'])]
+    allowedTools: discoveryConfig?.allowedTools
+      ? [...new Set([...discoveryConfig.allowedTools, 'set_requirements'])]
       : undefined,
   };
 }
 
-function createPrAutoResolvers(config: GthConfig, state: PrAutoToolState): AgentResolvers {
+function createPrDiscoveryResolvers(
+  config: GthConfig,
+  state: PrDiscoveryToolState
+): AgentResolvers {
   const baseResolvers = createResolvers();
   return {
     ...baseResolvers,
@@ -264,12 +270,15 @@ function createPrAutoResolvers(config: GthConfig, state: PrAutoToolState): Agent
       const baseTools = baseResolvers.resolveTools
         ? await baseResolvers.resolveTools(effectiveConfig, command)
         : [];
-      return [...baseTools, ...createPrAutoTools(config, state)];
+      return [...baseTools, ...createPrDiscoveryTools(config, state)];
     },
   };
 }
 
-function createPrAutoTools(config: GthConfig, state: PrAutoToolState): StructuredToolInterface[] {
+function createPrDiscoveryTools(
+  config: GthConfig,
+  state: PrDiscoveryToolState
+): StructuredToolInterface[] {
   const setDiff = tool(
     async ({ diff }: z.infer<typeof SetDiffArgsSchema>): Promise<string> => {
       state.diff = diff;
@@ -418,7 +427,7 @@ async function discoverRequirementsFromPrMetadata(
           : await getJiraIssue(jiraConfig, issueKey)) ?? '';
       if (requirements) {
         displayInfo(
-          `Auto mode retrieved requirements from Jira issue ${issueKey} linked in the PR description.`
+          `Discovered requirements from Jira issue ${issueKey} linked in the PR description.`
         );
       }
       return requirements;
@@ -428,7 +437,7 @@ async function discoverRequirementsFromPrMetadata(
       // those aren't configured - e.g. an MCP-only setup - skip quietly and let the discovery
       // agent resolve requirements via its tools (e.g. the Jira MCP server).
       debugLog(
-        `Auto mode skipped the deterministic Jira REST lookup for ${issueKey}: ${error instanceof Error ? error.message : String(error)}`
+        `Skipped the deterministic Jira REST lookup for ${issueKey}: ${error instanceof Error ? error.message : String(error)}`
       );
       return '';
     }
@@ -442,7 +451,7 @@ async function discoverRequirementsFromPrMetadata(
     (await getGhIssue(getGithubRequirementsProviderConfig(config), requirementsIssueRef)) ?? '';
   if (requirements) {
     displayInfo(
-      `Auto mode retrieved requirements from GitHub issue ${formatGithubIssueRef(requirementsIssueRef)} linked in the PR description.`
+      `Discovered requirements from GitHub issue ${formatGithubIssueRef(requirementsIssueRef)} linked in the PR description.`
     );
   }
   return requirements;
@@ -604,7 +613,7 @@ function extractJiraIssueKey(prMetadata: string): string | undefined {
   return undefined;
 }
 
-function buildPrAutoUserMessage(state: PrAutoToolState): string {
+function buildPrDiscoveryUserMessage(state: PrDiscoveryToolState): string {
   const diffStatus = state.diff
     ? 'A current-branch PR diff has already been deterministically retrieved and set. Verify whether it is sufficient; replace it (gh_diff sets it automatically, or use set_diff) only if you find a better exact diff.'
     : 'No PR diff has been set yet. Retrieve the PR diff with gh_diff, which stores it automatically; use set_diff only for a diff obtained some other way.';

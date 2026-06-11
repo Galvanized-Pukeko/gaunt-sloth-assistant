@@ -95,7 +95,7 @@ export const stopWaitingForEscape = () => {
     // Unref stdin so it no longer keeps the event loop alive (waitForEscape resumed
     // it, which refs the handle). On a TTY stdin.isPaused() is false, so we must not
     // rely on re-pausing only "previously paused" streams - that left one-shot
-    // commands (e.g. `gth pr` auto mode) hanging after completion. unref leaves the
+    // commands (e.g. `gth pr` with no arguments) hanging after completion. unref leaves the
     // read state untouched, so interactive sessions (chat) re-ref via rl.question().
     process.stdin.unref?.();
   }

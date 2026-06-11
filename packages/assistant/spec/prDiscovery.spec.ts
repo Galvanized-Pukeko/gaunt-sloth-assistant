@@ -59,7 +59,7 @@ vi.mock('@gaunt-sloth/review/sources/jiraIssueLegacySource.js', () => ({
   get: jiraIssueLegacyMock,
 }));
 
-describe('runPrAutoMode', () => {
+describe('runPrDiscovery', () => {
   const config = {
     llm: { invoke: vi.fn() } as unknown as BaseChatModel,
     projectGuidelines: '.gsloth.guidelines.md',
@@ -80,7 +80,7 @@ describe('runPrAutoMode', () => {
       pr: {
         contentProvider: 'github',
         requirementsProvider: 'github',
-        auto: {
+        discovery: {
           enabled: true,
           deterministicDiff: true,
         },
@@ -98,7 +98,7 @@ describe('runPrAutoMode', () => {
       pr: {
         contentProvider: 'github',
         requirementsProvider: 'jira',
-        auto: { enabled: true, deterministicDiff: true },
+        discovery: { enabled: true, deterministicDiff: true },
       },
       review: {},
     },
@@ -116,9 +116,9 @@ Requirements: https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues/
   });
 
   it('skips the discovery agent when diff and requirements are deterministically resolved', async () => {
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    const result = await runPrAutoMode(config);
+    const result = await runPrDiscovery(config);
 
     expect(result).toEqual({
       diff: 'Diff from gh',
@@ -135,10 +135,10 @@ Requirements: https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues/
     expect(processMessagesMock).not.toHaveBeenCalled();
     expect(cleanupMock).not.toHaveBeenCalled();
     expect(displayInfoMock).toHaveBeenCalledWith(
-      'Auto mode retrieved current-branch PR #360 metadata with gh.'
+      'Retrieved current-branch PR #360 metadata with gh.'
     );
     expect(displayInfoMock).toHaveBeenCalledWith(
-      'Auto mode already has a deterministic PR diff and requirements; skipping discovery agent.'
+      'Resolved the PR diff and requirements deterministically; skipping the discovery agent.'
     );
   });
 
@@ -147,9 +147,9 @@ Requirements: https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/issues/
 Description:
 Requirements: HTTPS://GITHUB.COM/Galvanized-Pukeko/gaunt-sloth-assistant/issues/359`);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    const result = await runPrAutoMode(config);
+    const result = await runPrDiscovery(config);
 
     expect(result.requirements).toBe('Issue #359 requirements');
     // The host is normalized to lowercase so the case-sensitive issue-reference
@@ -167,13 +167,11 @@ Description:
 No linked ticket`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    await runPrAutoMode(config);
+    await runPrDiscovery(config);
 
-    expect(displayInfoMock).toHaveBeenCalledWith(
-      'Auto mode retrieved current-branch PR metadata with gh.'
-    );
+    expect(displayInfoMock).toHaveBeenCalledWith('Retrieved current-branch PR metadata with gh.');
   });
 
   it('does not let a spoofed "GitHub PR: #" line in the body set the displayed PR number', async () => {
@@ -183,15 +181,13 @@ Description:
 GitHub PR: #999 (this line is part of the body, not the header)`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    await runPrAutoMode(config);
+    await runPrDiscovery(config);
 
-    expect(displayInfoMock).toHaveBeenCalledWith(
-      'Auto mode retrieved current-branch PR metadata with gh.'
-    );
+    expect(displayInfoMock).toHaveBeenCalledWith('Retrieved current-branch PR metadata with gh.');
     expect(displayInfoMock).not.toHaveBeenCalledWith(
-      'Auto mode retrieved current-branch PR #999 metadata with gh.'
+      'Retrieved current-branch PR #999 metadata with gh.'
     );
   });
 
@@ -200,9 +196,9 @@ GitHub PR: #999 (this line is part of the body, not the header)`);
 Description:
 Requirements: https://company.atlassian.net/browse/ABC-123`);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    const result = await runPrAutoMode(jiraConfig);
+    const result = await runPrDiscovery(jiraConfig);
 
     expect(result).toEqual({
       diff: 'Diff from gh',
@@ -213,7 +209,7 @@ Requirements: https://company.atlassian.net/browse/ABC-123`);
     expect(ghIssueMock).not.toHaveBeenCalled();
     expect(initMock).not.toHaveBeenCalled();
     expect(displayInfoMock).toHaveBeenCalledWith(
-      'Auto mode retrieved requirements from Jira issue ABC-123 linked in the PR description.'
+      'Discovered requirements from Jira issue ABC-123 linked in the PR description.'
     );
   });
 
@@ -222,9 +218,9 @@ Requirements: https://company.atlassian.net/browse/ABC-123`);
 Description:
 Requirement: ABC-123 must be implemented`);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    const result = await runPrAutoMode(jiraConfig);
+    const result = await runPrDiscovery(jiraConfig);
 
     expect(result.requirements).toBe('ABC-123 requirements');
     expect(jiraIssueMock).toHaveBeenCalledWith({ cloudId: 'cloud-1' }, 'ABC-123');
@@ -236,9 +232,9 @@ Head branch: feature/ABC-123-add-useful-feature
 Description:
 No explicit ticket link`);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    const result = await runPrAutoMode(jiraConfig);
+    const result = await runPrDiscovery(jiraConfig);
 
     expect(result.requirements).toBe('ABC-123 requirements');
     expect(jiraIssueMock).toHaveBeenCalledWith({ cloudId: 'cloud-1' }, 'ABC-123');
@@ -253,9 +249,9 @@ Description:
 Head branch: feature/AB-99-spoofed-in-body`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    await runPrAutoMode(jiraConfig);
+    await runPrDiscovery(jiraConfig);
 
     expect(jiraIssueMock).not.toHaveBeenCalled();
     expect(initMock).toHaveBeenCalled();
@@ -268,9 +264,9 @@ Description:
 No linked ticket here`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    await runPrAutoMode(jiraConfig);
+    await runPrDiscovery(jiraConfig);
 
     expect(jiraIssueMock).not.toHaveBeenCalled();
     expect(initMock).toHaveBeenCalled();
@@ -281,9 +277,9 @@ No linked ticket here`);
 Description:
 Implements https://company.atlassian.net/browse/ABC-123`);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    const result = await runPrAutoMode(jiraConfig);
+    const result = await runPrDiscovery(jiraConfig);
 
     expect(result.requirements).toBe('ABC-123 requirements');
     expect(jiraIssueMock).toHaveBeenCalledWith({ cloudId: 'cloud-1' }, 'ABC-123');
@@ -295,9 +291,9 @@ Description:
 See https://company.atlassian.net/browse/ABC-123 and https://company.atlassian.net/browse/XYZ-9`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    await runPrAutoMode(jiraConfig);
+    await runPrDiscovery(jiraConfig);
 
     // Picking one of several "see also" links would review against the wrong requirements.
     expect(jiraIssueMock).not.toHaveBeenCalled();
@@ -316,15 +312,15 @@ Requirements: https://company.atlassian.net/browse/ABC-123`);
         pr: {
           contentProvider: 'github',
           requirementsProvider: 'jira-legacy',
-          auto: { enabled: true, deterministicDiff: true },
+          discovery: { enabled: true, deterministicDiff: true },
         },
         review: {},
       },
     } as Partial<GthConfig> as GthConfig;
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    const result = await runPrAutoMode(legacyConfig);
+    const result = await runPrDiscovery(legacyConfig);
 
     expect(result.requirements).toBe('ABC-123 legacy requirements');
     expect(jiraIssueLegacyMock).toHaveBeenCalledWith({ cloudId: 'cloud-1' }, 'ABC-123');
@@ -339,9 +335,9 @@ Requirements: https://company.atlassian.net/browse/ABC-123`);
     jiraIssueMock.mockRejectedValue(new Error('Missing JIRA username.'));
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    const result = await runPrAutoMode(jiraConfig);
+    const result = await runPrDiscovery(jiraConfig);
 
     // Deterministic requirements were not resolved, so the discovery agent runs to find them.
     expect(result.requirements).toBe('');
@@ -359,12 +355,15 @@ Requirements: https://company.atlassian.net/browse/ABC-123`);
 Description:
 No linked ticket here`;
 
-    const withAutoConfig = (auto: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+    const withDiscoveryConfig = (
+      discovery: Record<string, unknown>,
+      extra: Record<string, unknown> = {}
+    ) =>
       ({
         ...config,
         ...extra,
         commands: {
-          pr: { contentProvider: 'github', requirementsProvider: 'github', auto },
+          pr: { contentProvider: 'github', requirementsProvider: 'github', discovery },
           review: {},
         },
       }) as Partial<GthConfig> as GthConfig;
@@ -373,8 +372,10 @@ No linked ticket here`;
       ghPrViewMock.mockResolvedValue(noLinkMetadata);
       processMessagesMock.mockResolvedValue(undefined);
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-      await runPrAutoMode(withAutoConfig({ allowedTools: ['gh_pr', 'mcp__jira__getJiraIssue'] }));
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+      await runPrDiscovery(
+        withDiscoveryConfig({ allowedTools: ['gh_pr', 'mcp__jira__getJiraIssue'] })
+      );
 
       const agentConfig = initMock.mock.calls.at(-1)?.[1] as GthConfig;
       expect(agentConfig.allowedTools).toEqual([
@@ -388,8 +389,8 @@ No linked ticket here`;
       ghPrViewMock.mockResolvedValue(noLinkMetadata);
       processMessagesMock.mockResolvedValue(undefined);
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-      await runPrAutoMode(withAutoConfig({ allowedTools: [] }));
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+      await runPrDiscovery(withDiscoveryConfig({ allowedTools: [] }));
 
       const agentConfig = initMock.mock.calls.at(-1)?.[1] as GthConfig;
       expect(agentConfig.allowedTools).toEqual(['set_requirements']);
@@ -399,10 +400,10 @@ No linked ticket here`;
       ghPrViewMock.mockResolvedValue(noLinkMetadata);
       processMessagesMock.mockResolvedValue(undefined);
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
       // A global empty allow-list (e.g. keeping review agents tool-free) must not strip the
       // discovery agent's set_requirements/set_diff tools.
-      await runPrAutoMode(withAutoConfig({}, { allowedTools: [] }));
+      await runPrDiscovery(withDiscoveryConfig({}, { allowedTools: [] }));
 
       const agentConfig = initMock.mock.calls.at(-1)?.[1] as GthConfig;
       expect(agentConfig.allowedTools).toBeUndefined();
@@ -416,8 +417,10 @@ No linked ticket here`;
       ghPrViewMock.mockResolvedValue(noLinkMetadata);
       processMessagesMock.mockResolvedValue(undefined);
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-      await runPrAutoMode(withAutoConfig({ deterministicDiff: false, allowedTools: ['gh_pr'] }));
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+      await runPrDiscovery(
+        withDiscoveryConfig({ deterministicDiff: false, allowedTools: ['gh_pr'] })
+      );
 
       expect(displayWarningMock).toHaveBeenCalledWith(expect.stringContaining('cannot set one'));
     });
@@ -428,9 +431,9 @@ No linked ticket here`;
       ghPrViewMock.mockResolvedValue(noLinkMetadata);
       processMessagesMock.mockResolvedValue(undefined);
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-      await runPrAutoMode(
-        withAutoConfig({ deterministicDiff: false, allowedTools: ['gh_pr', 'gh_diff'] })
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+      await runPrDiscovery(
+        withDiscoveryConfig({ deterministicDiff: false, allowedTools: ['gh_pr', 'gh_diff'] })
       );
 
       expect(displayWarningMock).not.toHaveBeenCalledWith(
@@ -457,8 +460,8 @@ No linked ticket here`;
         expect(confirmation).toContain('Preview');
       });
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-      const result = await runPrAutoMode(config);
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+      const result = await runPrDiscovery(config);
 
       expect(processMessagesMock).toHaveBeenCalled();
       expect(result.diff).toBe('GitHub PR Diff: #360\n\ndiff body');
@@ -481,8 +484,8 @@ No linked ticket here`;
         })) as string;
       });
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-      await runPrAutoMode(config);
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+      await runPrDiscovery(config);
 
       // The model gets a reason it can act on, not a silent empty result.
       expect(toolResult).not.toBe('');
@@ -504,8 +507,8 @@ No linked ticket here`;
         toolResult = (await ghPrTool.invoke({})) as string;
       });
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-      await runPrAutoMode(config);
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+      await runPrDiscovery(config);
 
       expect(toolResult).toContain('Could not fetch GitHub PR metadata');
       expect(toolResult).toContain('no PR for the current branch');
@@ -526,8 +529,8 @@ No linked ticket here`;
         toolResult = (await ghDiffTool.invoke({})) as string;
       });
 
-      const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-      await runPrAutoMode(config);
+      const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+      await runPrDiscovery(config);
 
       expect(toolResult).toContain('Could not fetch the GitHub PR diff');
       expect(toolResult).toContain('the review diff was not changed');
@@ -539,8 +542,8 @@ No linked ticket here`;
 Description:
 Requirements: https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/ISSUES/77`);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-    await runPrAutoMode(config);
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+    await runPrDiscovery(config);
 
     // The host and the /issues/ segment are lowercased; the owner/repo case is preserved.
     expect(ghIssueMock).toHaveBeenCalledWith(
@@ -555,8 +558,8 @@ Requirements: https://github.com/Galvanized-Pukeko/gaunt-sloth-assistant/ISSUES/
 Description:
 Closes #359`);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-    const result = await runPrAutoMode(config);
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+    const result = await runPrDiscovery(config);
 
     expect(ghIssueMock).toHaveBeenCalledWith(null, '359');
     expect(result.requirements).toBe('Issue #359 requirements');
@@ -572,8 +575,8 @@ Description:
 No linked ticket here`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-    await runPrAutoMode(config);
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+    await runPrDiscovery(config);
 
     expect(ghIssueMock).not.toHaveBeenCalled();
     expect(initMock).toHaveBeenCalled();
@@ -587,8 +590,8 @@ Description:
 This tightens the requirements validation, see #42`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-    await runPrAutoMode(config);
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+    await runPrDiscovery(config);
 
     expect(ghIssueMock).not.toHaveBeenCalled();
     expect(initMock).toHaveBeenCalled();
@@ -608,8 +611,8 @@ Description:
 No linked ticket here`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-    await runPrAutoMode(textContentConfig);
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+    await runPrDiscovery(textContentConfig);
 
     // gh pr diff only makes sense for the github content provider; for others the discovery
     // agent fetches the diff via its tools instead.
@@ -629,15 +632,15 @@ No linked ticket here`);
     ghPrViewMock.mockRejectedValue(new Error('gh: not a GitHub repository'));
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-    await runPrAutoMode(textContentConfig);
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+    await runPrDiscovery(textContentConfig);
 
     // The expected failure in a non-github setup is noise, so it is logged at debug, not warned.
     expect(displayWarningMock).not.toHaveBeenCalledWith(
-      expect.stringContaining('could not retrieve current-branch PR metadata')
+      expect.stringContaining('Could not retrieve current-branch PR metadata')
     );
     expect(debugLogMock).toHaveBeenCalledWith(
-      expect.stringContaining('could not retrieve current-branch PR metadata')
+      expect.stringContaining('Could not retrieve current-branch PR metadata')
     );
     expect(initMock).toHaveBeenCalled();
   });
@@ -652,8 +655,8 @@ Description:
 No linked ticket here`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-    await runPrAutoMode(config);
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+    await runPrDiscovery(config);
 
     expect(ghIssueMock).not.toHaveBeenCalled();
     expect(initMock).toHaveBeenCalled();
@@ -665,8 +668,8 @@ Description:
 See https://github.com/owner/repo/issues/1 and https://github.com/owner/repo/issues/2`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
-    await runPrAutoMode(config);
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
+    await runPrDiscovery(config);
 
     // Picking one of several "see also" links would review against the wrong requirements.
     expect(ghIssueMock).not.toHaveBeenCalled();
@@ -679,9 +682,9 @@ Description:
 No linked ticket here`);
     processMessagesMock.mockResolvedValue(undefined);
 
-    const { runPrAutoMode } = await import('#src/commands/prAutoMode.js');
+    const { runPrDiscovery } = await import('#src/commands/prDiscovery.js');
 
-    await runPrAutoMode(jiraConfig);
+    await runPrDiscovery(jiraConfig);
 
     expect(jiraIssueMock).not.toHaveBeenCalled();
     expect(initMock).toHaveBeenCalled();

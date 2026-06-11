@@ -124,7 +124,7 @@ gsloth init anthropic    # Or specify provider directly
 gsloth pr 42 23  # Review PR #42 with GitHub issue #23
 ```
 
-Requirements-only PR mode is not supported: `gsloth pr PROJ-123` is interpreted as a PR ID, not as requirements. Use `gsloth pr` with no positional arguments for auto mode, or provide both the PR ID and requirements ID.
+Requirements-only PR mode is not supported: `gsloth pr PROJ-123` is interpreted as a PR ID, not as requirements. Use `gsloth pr` with no positional arguments for change requirements discovery, or provide both the PR ID and requirements ID.
 
 **Inspect command inputs:**
 ```bash

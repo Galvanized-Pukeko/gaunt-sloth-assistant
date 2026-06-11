@@ -1000,7 +1000,7 @@ you can ask Gaunt Sloth to log review time back to that issue automatically by s
 }
 ```
 
-This automation only runs when a `requirementsId` is supplied on the command line and the provider resolves to `jira`. It therefore does **not** apply in PR auto mode (`gsloth pr` with no arguments): the Jira key discovered automatically is used for the review but is not passed to the worklog path, so no time is logged. Pass the issue id explicitly (`gsloth pr <prId> <requirementsId>`) if you need work logging.
+This automation only runs when a `requirementsId` is supplied on the command line and the provider resolves to `jira`. It therefore does **not** apply when running `gsloth pr` with no arguments (change requirements discovery): the Jira key discovered automatically is used for the review but is not passed to the worklog path, so no time is logged. Pass the issue id explicitly (`gsloth pr <prId> <requirementsId>`) if you need work logging.
 
 #### 2. Legacy Jira REST API (Unscoped Token)
 
@@ -1530,20 +1530,20 @@ value takes precedence):
 }
 ```
 
-## PR Auto Mode Configuration
+## Change Requirements Discovery Configuration
 
-Running `gth pr` without positional arguments enters auto mode (see [COMMANDS.md](COMMANDS.md#pr-auto-mode)).
-Auto mode only runs when neither `prId` nor `requirementsId` is provided; requirements-only syntax
-such as `gth pr PROJ-123` is unsupported. It is configured under `commands.pr.auto`:
+Running `gth pr` without positional arguments triggers change requirements discovery (see [COMMANDS.md](COMMANDS.md#change-requirements-discovery)).
+Discovery only runs when neither `prId` nor `requirementsId` is provided; requirements-only syntax
+such as `gth pr PROJ-123` is unsupported. It is configured under `commands.pr.discovery`:
 
-- **`enabled`** (boolean, default: `true`): Allow `gth pr` without arguments to enter auto mode
+- **`enabled`** (boolean, default: `true`): Allow `gth pr` without arguments to trigger change requirements discovery
 - **`deterministicDiff`** (boolean, default: `true`): Fetch the current-branch PR diff with
   `gh pr diff` before invoking the discovery agent
 - **`filesystem`**, **`builtInTools`**, **`customTools`**, **`tools`**: Tool overrides applied
   only while the discovery agent runs; when omitted, the discovery agent falls back to the
   **top-level** values for these settings, not the `commands.pr.*` ones. The `commands.pr.*` tool
   overrides apply to the review agent only — the discovery agent does not inherit them, so set its
-  tools here under `commands.pr.auto` (or top-level) if it needs anything beyond the defaults
+  tools here under `commands.pr.discovery` (or top-level) if it needs anything beyond the defaults
 - **`allowedTools`** (string[]): Allow-list of tool names for the discovery agent, applied after
   all tools are resolved. `set_requirements` is always retained so the agent can record what it
   found; an empty array keeps only `set_requirements`, filtering out every other tool. Note that
@@ -1553,7 +1553,7 @@ such as `gth pr PROJ-123` is unsupported. It is configured under `commands.pr.au
   filtering. The discovery agent never inherits the top-level `allowedTools`; this property is its
   only allow-list.
 
-The discovery agent always has the auto-mode helper tools `gh_pr`, `gh_diff`, `gh_issue`,
+The discovery agent always has the discovery helper tools `gh_pr`, `gh_diff`, `gh_issue`,
 `set_diff` and `set_requirements` available (subject to `allowedTools`). `gh_diff` stores the
 fetched diff directly as the review diff; `set_diff` exists for diffs assembled some other way.
 
@@ -1564,7 +1564,7 @@ A minimal, tight configuration for GitHub-issue-based requirements:
   "commands": {
     "pr": {
       "allowedTools": [],
-      "auto": {
+      "discovery": {
         "allowedTools": ["gh_pr", "gh_diff", "gh_issue"]
       }
     }
@@ -1572,7 +1572,7 @@ A minimal, tight configuration for GitHub-issue-based requirements:
 }
 ```
 
-The discovery agent's prompt can be replaced by placing a `.gsloth.pr-auto.md` file in
+The discovery agent's prompt can be replaced by placing a `.gsloth.pr-discovery.md` file in
 `.gsloth/.gsloth-settings/` (or the project root when not using the `.gsloth` directory), or in an
 identity profile directory, the same way as other prompts.
 
