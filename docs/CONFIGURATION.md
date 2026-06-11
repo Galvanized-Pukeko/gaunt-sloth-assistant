@@ -1000,7 +1000,7 @@ you can ask Gaunt Sloth to log review time back to that issue automatically by s
 }
 ```
 
-This automation only runs when a `requirementsId` is supplied on the command line and the provider resolves to `jira`.
+This automation only runs when a `requirementsId` is supplied on the command line and the provider resolves to `jira`. It therefore does **not** apply in PR auto mode (`gsloth pr` with no arguments): the Jira key discovered automatically is used for the review but is not passed to the worklog path, so no time is logged. Pass the issue id explicitly (`gsloth pr <prId> <requirementsId>`) if you need work logging.
 
 #### 2. Legacy Jira REST API (Unscoped Token)
 
@@ -1500,6 +1500,81 @@ export async function configure() {
   };
 }
 ```
+
+## Tool Allow-List (allowedTools)
+
+`allowedTools` restricts an agent to an explicit allow-list of tool names. It is applied after
+every tool source (filesystem, built-in, custom, MCP, A2A and `tools`) has been resolved, so it is
+the only knob that can gate individual MCP and A2A tools (e.g. `mcp__jira__getJiraIssue`), which
+have no per-source override of their own.
+
+- **omitted or `undefined`**: no filtering, all resolved tools remain available
+- **non-empty array**: only tools whose name is in the list remain available
+- **empty array `[]`**: every tool is disabled; MCP servers are not even contacted (no OAuth),
+  which suits agents that only need to reason over the provided prompt, such as review agents
+
+> **Important:** `allowedTools: []` is not the same as omitting `allowedTools`. Use `[]` only
+> when you intentionally want a tool-free agent and want to skip MCP/A2A tool discovery. Remove
+> the property, or leave it `undefined` in JavaScript config, when you want all configured tools
+> to remain available.
+
+It can be set at the top level or per command via `commands.<command>.allowedTools` (the command
+value takes precedence):
+
+```json
+{
+  "commands": {
+    "review": { "allowedTools": [] },
+    "pr": { "allowedTools": [] }
+  }
+}
+```
+
+## PR Auto Mode Configuration
+
+Running `gth pr` without positional arguments enters auto mode (see [COMMANDS.md](COMMANDS.md#pr-auto-mode)).
+Auto mode only runs when neither `prId` nor `requirementsId` is provided; requirements-only syntax
+such as `gth pr PROJ-123` is unsupported. It is configured under `commands.pr.auto`:
+
+- **`enabled`** (boolean, default: `true`): Allow `gth pr` without arguments to enter auto mode
+- **`deterministicDiff`** (boolean, default: `true`): Fetch the current-branch PR diff with
+  `gh pr diff` before invoking the discovery agent
+- **`filesystem`**, **`builtInTools`**, **`customTools`**, **`tools`**: Tool overrides applied
+  only while the discovery agent runs; when omitted, the discovery agent falls back to the
+  **top-level** values for these settings, not the `commands.pr.*` ones. The `commands.pr.*` tool
+  overrides apply to the review agent only — the discovery agent does not inherit them, so set its
+  tools here under `commands.pr.auto` (or top-level) if it needs anything beyond the defaults
+- **`allowedTools`** (string[]): Allow-list of tool names for the discovery agent, applied after
+  all tools are resolved. `set_requirements` is always retained so the agent can record what it
+  found; an empty array keeps only `set_requirements`, filtering out every other tool. Note that
+  because `set_requirements` is always retained, this allow-list never disables tool resolution
+  itself — unlike the top-level `allowedTools: []`, configured MCP/A2A servers are still contacted
+  (potentially triggering OAuth) before their tools are filtered out. Omit the property for no
+  filtering. The discovery agent never inherits the top-level `allowedTools`; this property is its
+  only allow-list.
+
+The discovery agent always has the auto-mode helper tools `gh_pr`, `gh_diff`, `gh_issue`,
+`set_diff` and `set_requirements` available (subject to `allowedTools`). `gh_diff` stores the
+fetched diff directly as the review diff; `set_diff` exists for diffs assembled some other way.
+
+A minimal, tight configuration for GitHub-issue-based requirements:
+
+```json
+{
+  "commands": {
+    "pr": {
+      "allowedTools": [],
+      "auto": {
+        "allowedTools": ["gh_pr", "gh_diff", "gh_issue"]
+      }
+    }
+  }
+}
+```
+
+The discovery agent's prompt can be replaced by placing a `.gsloth.pr-auto.md` file in
+`.gsloth/.gsloth-settings/` (or the project root when not using the `.gsloth` directory), or in an
+identity profile directory, the same way as other prompts.
 
 ## Review Rating Configuration
 

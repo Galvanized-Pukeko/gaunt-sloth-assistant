@@ -102,6 +102,20 @@ export interface GthConfig {
   builtInTools?: string[];
   tools?: StructuredToolInterface[] | BaseToolkit[] | ServerTool[];
   /**
+   * Restrict the agent to this allow-list of tool names, applied after every tool source
+   * (filesystem, built-in, custom, MCP, A2A, and `tools`) is resolved. This is the only knob
+   * that can gate MCP and A2A tools, which have no per-source override of their own.
+   *
+   * - omitted/undefined: no filtering, all resolved tools remain available.
+   * - non-empty array: keep only tools whose name is in the list.
+   * - empty array `[]`: disable every tool. MCP servers are not even contacted (no OAuth),
+   *   which is useful for agents that only need to reason over the prompt (e.g. the review
+   *   agent).
+   *
+   * Can be overridden per command via `commands.<command>.allowedTools`.
+   */
+  allowedTools?: string[];
+  /**
    * Middleware configuration for LangChain v1.
    * Middleware provides hooks to intercept and control agent execution at critical points.
    *
@@ -213,20 +227,7 @@ export interface GthConfig {
     patterns?: string[];
   };
   commands?: {
-    pr?: {
-      contentSource?: string;
-      requirementSource?: string;
-      /** @deprecated Use contentSource instead */
-      contentProvider?: string;
-      /** @deprecated Use requirementSource instead */
-      requirementsProvider?: string;
-      filesystem?: string[] | 'all' | 'read' | 'none';
-      builtInTools?: string[];
-      customTools?: CustomToolsConfig | false;
-      logWorkForReviewInSeconds?: number;
-      rating?: RatingConfig;
-      binaryFormats?: false | BinaryFormatConfig[];
-    };
+    pr?: PrCommandConfig;
     review?: {
       contentSource?: string;
       requirementSource?: string;
@@ -237,6 +238,8 @@ export interface GthConfig {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. Empty array disables all tools for the review agent. */
+      allowedTools?: string[];
       rating?: RatingConfig;
       binaryFormats?: false | BinaryFormatConfig[];
     };
@@ -244,18 +247,24 @@ export interface GthConfig {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. */
+      allowedTools?: string[];
       binaryFormats?: false | BinaryFormatConfig[];
     };
     chat?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. */
+      allowedTools?: string[];
       binaryFormats?: false | BinaryFormatConfig[];
     };
     code?: {
       filesystem?: string[] | 'all' | 'read' | 'none';
       builtInTools?: string[];
       customTools?: CustomToolsConfig | false;
+      /** See {@link GthConfig.allowedTools}. */
+      allowedTools?: string[];
       devTools?: GthDevToolsConfig;
       binaryFormats?: false | BinaryFormatConfig[];
     };
@@ -271,6 +280,32 @@ export interface GthConfig {
     };
   };
   modelDisplayName?: string;
+}
+
+/**
+ * `gth pr` command configuration.
+ *
+ * Declared as a named interface (rather than inline in {@link GthConfig}) so that downstream
+ * packages can extend it with their own command features via TypeScript module augmentation
+ * (`declare module '@gaunt-sloth/core/config.js'`), keeping those features' types out of core.
+ * For example, the assistant package merges its PR auto mode config (`auto`) into this
+ * interface.
+ */
+export interface PrCommandConfig {
+  contentSource?: string;
+  requirementSource?: string;
+  /** @deprecated Use contentSource instead */
+  contentProvider?: string;
+  /** @deprecated Use requirementSource instead */
+  requirementsProvider?: string;
+  filesystem?: string[] | 'all' | 'read' | 'none';
+  builtInTools?: string[];
+  customTools?: CustomToolsConfig | false;
+  /** See {@link GthConfig.allowedTools}. Empty array disables all tools for `gth pr`'s review agent. */
+  allowedTools?: string[];
+  logWorkForReviewInSeconds?: number;
+  rating?: RatingConfig;
+  binaryFormats?: false | BinaryFormatConfig[];
 }
 
 /**

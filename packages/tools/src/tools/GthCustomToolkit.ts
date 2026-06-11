@@ -175,6 +175,13 @@ export default class GthCustomToolkit extends BaseToolkit {
         'Available values: "absolute-paths", "directory-traversal", "shell-injection", "null-bytes"'
     );
 
+    // The agent stream may have stdin in raw mode for Escape/Q interruption.
+    // Readline needs canonical line mode for y/N to be delivered after Enter.
+    const shouldRestoreRawMode = stdin.isTTY && stdin.isRaw;
+    if (shouldRestoreRawMode) {
+      stdin.setRawMode(false);
+    }
+
     // Write prompt manually to avoid double-echo when readline echoes input
     stdout.write('Do you want to allow this execution (one-time)? (y/N): ');
 
@@ -184,6 +191,9 @@ export default class GthCustomToolkit extends BaseToolkit {
       return answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes';
     } finally {
       rl.close();
+      if (shouldRestoreRawMode) {
+        stdin.setRawMode(true);
+      }
     }
   }
 

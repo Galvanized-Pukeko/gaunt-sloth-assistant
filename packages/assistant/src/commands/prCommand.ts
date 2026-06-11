@@ -12,6 +12,7 @@ import jiraLogWork from '#src/helpers/jira/jiraLogWork.js';
 import { JiraConfig } from '@gaunt-sloth/review/sources/types.js';
 import { CommandLineConfigOverrides } from '@gaunt-sloth/core/config.js';
 import { wrapContent } from '@gaunt-sloth/core/utils/llmUtils.js';
+import { runPrAutoMode } from '#src/commands/prAutoMode.js';
 
 import { readMultipleFilesFromProjectDir } from '@gaunt-sloth/review/utils/fileUtils.js';
 
@@ -32,7 +33,10 @@ export function prCommand(
         'This command is similar to `review`, but default content provider is `github`. ' +
         '(assuming that GitHub CLI is installed and authenticated for current project'
     )
-    .argument('<prId>', 'Pull request ID to review.')
+    .argument(
+      '[prId]',
+      'Pull request ID to review. Omit both prId and requirementsId to run PR auto mode.'
+    )
     .argument(
       '[requirementsId]',
       'Optional requirements ID argument to retrieve requirements with requirements provider'
@@ -63,26 +67,82 @@ export function prCommand(
         content.push(readMultipleFilesFromProjectDir(options.file));
       }
 
-      // Handle requirements
-      const requirements = await getCommandProviderInput(
-        'pr',
-        'requirements',
-        requirementsId,
-        config,
-        requirementsProvider
-      );
+      const isAutoMode = !prId && !requirementsId;
+      const looksLikeRequirementsOnlyMode =
+        contentProvider === 'github' && Boolean(prId) && !requirementsId && !/^\d+$/.test(prId);
 
-      if (requirements) {
-        content.push(requirements);
-      }
-
-      // Get PR diff using the provider
-      try {
-        content.push(await getCommandProviderInput('pr', 'content', prId, config, contentProvider));
-      } catch (error) {
-        displayError(error instanceof Error ? error.message : String(error));
+      if (looksLikeRequirementsOnlyMode) {
+        displayError(
+          `Unsupported PR command arguments: "${prId}" was provided as the pull request ID. ` +
+            '`gth pr <requirementsId>` requirements-only mode is not supported. ' +
+            'Use `gth pr` with no arguments for auto mode, or provide both a numeric PR ID and requirements ID: `gth pr <prId> <requirementsId>`.'
+        );
         setExitCode(1);
         return;
+      }
+
+      if (isAutoMode) {
+        if (config.commands?.pr?.auto?.enabled === false) {
+          displayError('PR auto mode is disabled. Provide a pull request ID to run `gth pr`.');
+          setExitCode(1);
+          return;
+        }
+
+        try {
+          const autoResult = await runPrAutoMode(config);
+          if (autoResult.requirements) {
+            content.push(wrapContent(autoResult.requirements, 'auto-requirements', 'requirements'));
+          }
+          if (!autoResult.diff) {
+            displayError('PR auto mode did not set a diff. Cannot continue with review.');
+            setExitCode(1);
+            return;
+          }
+          content.push(wrapContent(autoResult.diff, 'auto-diff', 'GitHub diff'));
+        } catch (error) {
+          displayError(error instanceof Error ? error.message : String(error));
+          setExitCode(1);
+          return;
+        }
+      } else {
+        // Handle requirements
+        const requirements = await getCommandProviderInput(
+          'pr',
+          'requirements',
+          requirementsId,
+          config,
+          requirementsProvider
+        );
+
+        if (requirements) {
+          content.push(requirements);
+        }
+
+        // Get PR diff using the provider
+        try {
+          const prContent = await getCommandProviderInput(
+            'pr',
+            'content',
+            prId,
+            config,
+            contentProvider
+          );
+          // A provider may resolve to an empty result instead of throwing - e.g. ghPrDiffSource
+          // returns null (with a warning) for an invalid PR number. Without this guard the review
+          // would silently proceed against no diff; fail loudly as the throwing path used to.
+          if (!prContent) {
+            displayError(
+              `Could not retrieve PR content for "${prId}". Cannot continue with review.`
+            );
+            setExitCode(1);
+            return;
+          }
+          content.push(prContent);
+        } catch (error) {
+          displayError(error instanceof Error ? error.message : String(error));
+          setExitCode(1);
+          return;
+        }
       }
 
       if (options.message) {
@@ -94,7 +154,7 @@ export function prCommand(
       // TODO consider including requirements id
       // TODO sanitize prId
       await review(
-        `PR-${prId}`,
+        prId ? `PR-${prId}` : 'PR-auto',
         getReviewSystemPrompt(config),
         content.join('\n'),
         config,

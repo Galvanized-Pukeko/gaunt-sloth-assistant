@@ -1,0 +1,27 @@
+{
+  "llm": {
+    "type": "vertexai",
+    "model": "gemini-3.1-pro-preview",
+    "location": "global"
+  },
+  "mcpServers": {
+    "jira": {
+      "url": "https://mcp.atlassian.com/v1/sse",
+      "authProvider": "OAuth",
+      "transport": "sse"
+    }
+  },
+  "requirementsProviderConfig": {
+    "jira": {
+      "cloudId": "00000000-0000-0000-0000-000000000000",
+      "displayUrl": "https://YOURBUSINESS.atlassian.net/browse/"
+    }
+  },
+  "commands": {
+    "pr": {
+      "contentProvider": "github",
+      "requirementsProvider": "jira"
+    }
+  },
+  "projectGuidelines": "AGENTS.md"
+}

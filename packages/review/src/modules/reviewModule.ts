@@ -69,7 +69,10 @@ export async function review(
     await runner.processMessages(messages);
   } catch (error) {
     displayDebug(error instanceof Error ? error : String(error));
-    displayError('Failed to run review with agent.');
+    const reason = error instanceof Error ? error.message : String(error);
+    displayError(
+      reason ? `Failed to run review with agent.\n\n${reason}` : 'Failed to run review with agent.'
+    );
   } finally {
     await runner.cleanup();
   }

@@ -254,6 +254,89 @@ describe('GthLangChainAgent', () => {
 
       await agent.init(undefined, configWithTools);
     });
+
+    it('should filter resolved tools by the allowedTools allow-list', async () => {
+      const resolveTools = vi
+        .fn()
+        .mockResolvedValue([
+          { name: 'mcp__jira__getJiraIssue' },
+          { name: 'mcp__jira__searchJiraIssuesUsingJql' },
+          { name: 'gh_pr' },
+        ] as StructuredToolInterface[]);
+      const agent = new GthLangChainAgent(statusUpdateCallback, {
+        resolveTools,
+        resolveMiddleware: async (m) => m ?? [],
+      });
+
+      const config = {
+        ...mockConfig,
+        allowedTools: ['mcp__jira__getJiraIssue'],
+      } as GthConfig;
+
+      await agent.init(undefined, config);
+
+      expect(resolveTools).toHaveBeenCalled();
+      const toolsArg = createAgentMock.mock.calls.at(-1)?.[0].tools as StructuredToolInterface[];
+      expect(toolsArg.map((t) => t.name)).toEqual(['mcp__jira__getJiraIssue']);
+    });
+
+    it('retains nameless server tools when an allowedTools allow-list is set', async () => {
+      const resolveTools = vi.fn().mockResolvedValue([]);
+      const agent = new GthLangChainAgent(statusUpdateCallback, {
+        resolveTools,
+        resolveMiddleware: async (m) => m ?? [],
+      });
+
+      const config = {
+        ...mockConfig,
+        // A ServerTool (provider-native "magic object") with no name alongside a named tool.
+        tools: [
+          { type: 'web_search_20250305' },
+          { name: 'gh_pr' },
+        ] as unknown as StructuredToolInterface[],
+        allowedTools: ['gh_pr'],
+      } as GthConfig;
+
+      await agent.init(undefined, config);
+
+      const toolsArg = createAgentMock.mock.calls.at(-1)?.[0].tools as StructuredToolInterface[];
+      // The nameless server tool can never be named in the allow-list, so it is retained rather
+      // than silently dropped; the named tool is still filtered normally.
+      expect(toolsArg).toHaveLength(2);
+      expect(toolsArg.map((t) => t.name)).toContain('gh_pr');
+      expect(toolsArg.some((t) => !t.name)).toBe(true);
+    });
+
+    it('should disable all tools and skip resolution when allowedTools is empty', async () => {
+      const resolveTools = vi
+        .fn()
+        .mockResolvedValue([{ name: 'gh_pr' }] as StructuredToolInterface[]);
+      const agent = new GthLangChainAgent(statusUpdateCallback, {
+        resolveTools,
+        resolveMiddleware: async (m) => m ?? [],
+      });
+
+      const config = {
+        ...mockConfig,
+        tools: [{ name: 'cfg_tool' } as StructuredToolInterface],
+        allowedTools: [],
+      } as GthConfig;
+
+      await agent.init(undefined, config);
+
+      // Empty allow-list must not contact MCP / trigger OAuth, so resolveTools is skipped.
+      expect(resolveTools).not.toHaveBeenCalled();
+      const toolsArg = createAgentMock.mock.calls.at(-1)?.[0].tools as StructuredToolInterface[];
+      expect(toolsArg).toEqual([]);
+      expect(statusUpdateCallback).toHaveBeenCalledWith(
+        StatusLevel.INFO,
+        'Tool loading disabled by allowedTools: []; MCP/A2A servers will not be contacted. Omit allowedTools for no filtering.'
+      );
+      expect(statusUpdateCallback).not.toHaveBeenCalledWith(
+        StatusLevel.INFO,
+        expect.stringContaining('Loaded tools')
+      );
+    });
   });
 
   describe('invoke', () => {
@@ -663,6 +746,34 @@ describe('GthLangChainAgent', () => {
       }
 
       expect(chunks).toEqual(['chunk1', 'chunk2']);
+    });
+
+    it('should unregister the Escape listener when stream creation fails', async () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+
+      // E.g. an expired-auth error thrown while initiating the stream, before any chunk.
+      agentMock.stream.mockRejectedValue(new Error('invalid_grant'));
+
+      const fakeStreamingChatModel = new FakeStreamingChatModel({ chunks: [] });
+      fakeStreamingChatModel.bindTools = vi.fn().mockReturnValue(fakeStreamingChatModel);
+
+      await agent.init(undefined, {
+        ...mockConfig,
+        llm: fakeStreamingChatModel,
+        streamOutput: true,
+      });
+
+      await expect(
+        agent.stream([new HumanMessage('test message')], {
+          recursionLimit: 1000,
+          configurable: { thread_id: 'test-thread-id' },
+        })
+      ).rejects.toThrow('invalid_grant');
+
+      // Otherwise the raw-mode keypress listener keeps stdin ref'd and the process hangs
+      // after the error, with Esc/Ctrl+C only printing "Interrupting...".
+      expect(systemUtilsMock.waitForEscape).toHaveBeenCalled();
+      expect(systemUtilsMock.stopWaitingForEscape).toHaveBeenCalled();
     });
 
     it('should materialize binary outputs after streaming completes', async () => {
@@ -1229,6 +1340,22 @@ describe('GthLangChainAgent', () => {
 
       expect(result.filesystem).toBe('read');
       expect(result.builtInTools).toEqual(['general']);
+    });
+
+    it('should merge command-specific allowedTools and fall back to the top-level value', () => {
+      const agent = new GthLangChainAgent(statusUpdateCallback);
+      const config = {
+        ...mockConfig,
+        allowedTools: ['global_tool'],
+        commands: {
+          pr: { allowedTools: [] },
+        },
+      } as GthConfig;
+
+      // Command-level empty array overrides the top-level allow-list.
+      expect(agent.getEffectiveConfig(config, 'pr').allowedTools).toEqual([]);
+      // Commands without their own allowedTools fall back to the top-level value.
+      expect(agent.getEffectiveConfig(config, 'code').allowedTools).toEqual(['global_tool']);
     });
 
     it('should warn when model does not support tools', () => {

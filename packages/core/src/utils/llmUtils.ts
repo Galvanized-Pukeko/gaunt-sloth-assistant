@@ -126,10 +126,17 @@ export function readCodePrompt(
   return readPromptFile(GSLOTH_CODE_PROMPT, config.identityProfile, config.noDefaultPrompts);
 }
 
-function readPromptFile(
+/**
+ * Read a prompt file from the project config dir (honouring identity profiles), falling back
+ * to a packaged default unless `noDefaultPrompts` is set. Downstream packages owning their own
+ * prompt files (e.g. the assistant's PR auto mode prompt) pass `defaultPromptDir` pointing at
+ * their package root; when omitted, the default is read from the core package.
+ */
+export function readPromptFile(
   filename: string,
   identityProfile: string | undefined,
-  noDefaultPrompts?: boolean
+  noDefaultPrompts?: boolean,
+  defaultPromptDir?: string
 ): string {
   const path = getGslothConfigReadPath(filename, identityProfile);
   if (existsSync(path)) {
@@ -138,7 +145,7 @@ function readPromptFile(
   if (noDefaultPrompts) {
     return '';
   }
-  return readFileFromInstallDir(filename);
+  return readFileFromInstallDir(filename, defaultPromptDir);
 }
 
 /**

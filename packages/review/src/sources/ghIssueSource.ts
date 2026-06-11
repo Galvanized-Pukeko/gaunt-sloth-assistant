@@ -3,10 +3,15 @@ import type { ProviderConfig } from './types.js';
 import { execAsync } from '@gaunt-sloth/core/utils/systemUtils.js';
 import { ProgressIndicator } from '@gaunt-sloth/core/utils/ProgressIndicator.js';
 
+// Either a bare issue number or a full issue URL. The strict shape matters because the value
+// is interpolated into a shell command; URLs with a loose charset could smuggle shell
+// metacharacters (issue references may originate from untrusted PR descriptions).
+const ISSUE_REF_PATTERN = /^(?:\d+|https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+)$/;
+
 /**
  * Gets GitHub issue using GitHub CLI
  * @param _ config (unused in this source)
- * @param issueId GitHub issue number
+ * @param issueId GitHub issue number or full issue URL (for issues in other repositories)
  * @returns GitHub issue content or null if not found
  */
 export async function get(
@@ -18,21 +23,30 @@ export async function get(
     return null;
   }
 
+  if (!ISSUE_REF_PATTERN.test(issueId)) {
+    displayWarning(
+      `Invalid GitHub issue reference "${issueId}"; expected an issue number or a full https://github.com/<owner>/<repo>/issues/<number> URL.`
+    );
+    return null;
+  }
+
+  const issueLabel = /^\d+$/.test(issueId) ? `#${issueId}` : issueId;
+
   try {
     // Use the GitHub CLI to fetch issue details
-    const progress = new ProgressIndicator(`Fetching GitHub issue #${issueId}`);
+    const progress = new ProgressIndicator(`Fetching GitHub issue ${issueLabel}`);
     const issueContent = await execAsync(`gh issue view ${issueId}`);
     progress.stop();
 
     if (!issueContent) {
-      displayWarning(`No content found for GitHub issue #${issueId}`);
+      displayWarning(`No content found for GitHub issue ${issueLabel}`);
       return null;
     }
 
-    return `GitHub Issue: #${issueId}\n\n${issueContent}`;
+    return `GitHub Issue: ${issueLabel}\n\n${issueContent}`;
   } catch (error) {
     displayWarning(`
-Failed to get GitHub issue #${issueId}: ${error instanceof Error ? error.message : String(error)}
+Failed to get GitHub issue ${issueLabel}: ${error instanceof Error ? error.message : String(error)}
 Consider checking if gh cli (https://cli.github.com/) is installed and authenticated.
     `);
     return null;

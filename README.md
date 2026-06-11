@@ -23,7 +23,9 @@ The promise of Gaunt Sloth:
 - **Extensibility**. Feel free to write some JS and create your Tool, Provider or connect to the MCP server of your choice.
 - **No vendor lock-in**. Just BYO API keys.
 - **Easy installation via NPM**.
-- **All prompts are editable** via markdown files. 
+- **All prompts are editable** via markdown files, you are in full control.
+- **Stateless code reviews** — developers can't argue it into changing its mind.
+- **Run on premises** with local models on your terms.
 
 ## Workspace Packages
 
@@ -121,6 +123,8 @@ gsloth init anthropic    # Or specify provider directly
 ```bash
 gsloth pr 42 23  # Review PR #42 with GitHub issue #23
 ```
+
+Requirements-only PR mode is not supported: `gsloth pr PROJ-123` is interpreted as a PR ID, not as requirements. Use `gsloth pr` with no positional arguments for auto mode, or provide both the PR ID and requirements ID.
 
 **Inspect command inputs:**
 ```bash

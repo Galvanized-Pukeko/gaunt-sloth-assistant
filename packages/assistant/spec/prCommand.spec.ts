@@ -17,7 +17,18 @@ const resolversMock = {
 };
 vi.mock('@gaunt-sloth/api/resolvers.js', () => resolversMock);
 
+const displayErrorMock = vi.fn();
+vi.mock('@gaunt-sloth/core/utils/consoleUtils.js', async () => {
+  const actual = await vi.importActual<typeof import('@gaunt-sloth/core/utils/consoleUtils.js')>(
+    '@gaunt-sloth/core/utils/consoleUtils.js'
+  );
+  return {
+    ...actual,
+    displayError: displayErrorMock,
+  };
+});
 const review = vi.fn();
+const runPrAutoMode = vi.fn();
 const prompt = {
   readBackstory: vi.fn(),
   readGuidelines: vi.fn(),
@@ -28,6 +39,12 @@ const prompt = {
 // Use a direct mock for the review function instead of a nested implementation
 vi.mock('#src/modules/reviewModule.js', () => ({
   review: review,
+}));
+vi.mock('#src/commands/prAutoMode.js', () => ({
+  runPrAutoMode,
+  // commandIntrospection imports readPrAutoPrompt from the same module; stub it so this mock stays
+  // complete even if a future test path loads the introspection module.
+  readPrAutoPrompt: vi.fn(() => ''),
 }));
 
 const utilsMock = {
@@ -98,7 +115,104 @@ describe('prCommand', () => {
     prompt.readReviewInstructions.mockReturnValue('REVIEW INSTRUCTIONS');
     prompt.readSystemPrompt.mockReturnValue('');
 
+    runPrAutoMode.mockResolvedValue({
+      requirements: 'Auto requirements',
+      diff: 'Auto PR Diff Content',
+    });
+
     resolversMock.createResolvers.mockReturnValue({ resolveTools: vi.fn(), cleanupTools: vi.fn() });
+  });
+
+  it('Should call pr auto mode when no PR id and requirements id are provided', async () => {
+    const testConfig = {
+      ...mockConfig,
+      commands: {
+        pr: {
+          contentProvider: 'github',
+          requirementsProvider: 'github',
+          auto: {
+            enabled: true,
+            deterministicDiff: true,
+          },
+        },
+        review: {},
+      },
+      streamOutput: false,
+    };
+    configMock.initConfig.mockResolvedValue(testConfig);
+
+    const { prCommand } = await import('#src/commands/prCommand.js');
+    const program = new Command();
+
+    prCommand(program, {});
+    await program.parseAsync(['na', 'na', 'pr']);
+
+    expect(runPrAutoMode).toHaveBeenCalledWith(testConfig);
+    expect(review).toHaveBeenCalledWith(
+      'PR-auto',
+      'INTERNAL BACKSTORY\nPROJECT GUIDELINES\nREVIEW INSTRUCTIONS',
+      '\nProvided requirements follows within auto-requirements-1234567 block\n<auto-requirements-1234567>\nAuto requirements\n</auto-requirements-1234567>\n\n\nProvided GitHub diff follows within auto-diff-1234567 block\n<auto-diff-1234567>\nAuto PR Diff Content\n</auto-diff-1234567>\n',
+      expect.objectContaining({
+        projectGuidelines: '.gsloth.guidelines.md',
+        projectReviewInstructions: '.gsloth.review.md',
+      }),
+      'pr',
+      expect.any(Object)
+    );
+  });
+
+  it('Should reject no-argument pr command when auto mode is disabled', async () => {
+    const testConfig = {
+      ...mockConfig,
+      commands: {
+        pr: {
+          contentProvider: 'github',
+          requirementsProvider: 'github',
+          auto: {
+            enabled: false,
+          },
+        },
+        review: {},
+      },
+      streamOutput: false,
+    };
+    configMock.initConfig.mockResolvedValue(testConfig);
+
+    const { prCommand } = await import('#src/commands/prCommand.js');
+    const program = new Command();
+
+    prCommand(program, {});
+    await program.parseAsync(['na', 'na', 'pr']);
+
+    expect(runPrAutoMode).not.toHaveBeenCalled();
+    expect(review).not.toHaveBeenCalled();
+  });
+
+  it('Should reject requirements-only pr command syntax with an explicit error', async () => {
+    const testConfig = {
+      ...mockConfig,
+      commands: {
+        pr: {
+          contentProvider: 'github',
+          requirementsProvider: 'jira',
+        },
+        review: {},
+      },
+      streamOutput: false,
+    };
+    configMock.initConfig.mockResolvedValue(testConfig);
+
+    const { prCommand } = await import('#src/commands/prCommand.js');
+    const program = new Command();
+
+    prCommand(program, {});
+    await program.parseAsync(['na', 'na', 'pr', 'PROJ-123']);
+
+    expect(displayErrorMock).toHaveBeenCalledWith(
+      expect.stringContaining('requirements-only mode is not supported')
+    );
+    expect(runPrAutoMode).not.toHaveBeenCalled();
+    expect(review).not.toHaveBeenCalled();
   });
 
   it('Should call pr command', async () => {
@@ -145,6 +259,47 @@ describe('prCommand', () => {
       'pr',
       expect.any(Object)
     );
+  });
+
+  it('Should fail loudly when the content provider resolves to no content', async () => {
+    const testConfig = {
+      ...mockConfig,
+      contentProvider: 'text',
+      requirementsProvider: 'text',
+      commands: {
+        pr: {
+          contentProvider: 'github',
+          requirementsProvider: 'text',
+        },
+        review: {
+          requirementsProvider: 'text',
+          contentProvider: 'text',
+        },
+      },
+      streamOutput: false,
+    };
+    configMock.initConfig.mockResolvedValue(testConfig);
+
+    const { prCommand } = await import('#src/commands/prCommand.js');
+    const program = new Command();
+
+    // ghPrDiffSource returns null (with a warning) for an invalid PR number instead of throwing.
+    // Mock the exact module the github content provider imports (CONTENT_PROVIDERS.github) so the
+    // null genuinely flows through getCommandProviderInput rather than the test passing by accident.
+    const ghProvider = vi.fn().mockResolvedValue(null);
+    vi.doMock('@gaunt-sloth/review/sources/ghPrDiffSource.js', () => ({
+      get: ghProvider,
+    }));
+
+    prCommand(program, {});
+    await program.parseAsync(['na', 'na', 'pr', '123']);
+
+    // Prove the mocked provider was actually exercised, then assert the guard fired.
+    expect(ghProvider).toHaveBeenCalled();
+    expect(displayErrorMock).toHaveBeenCalledWith(
+      'Could not retrieve PR content for "123". Cannot continue with review.'
+    );
+    expect(review).not.toHaveBeenCalled();
   });
 
   it('Should call pr command with requirements', async () => {
@@ -224,6 +379,9 @@ describe('prCommand', () => {
       error: vi.fn(),
       exit: vi.fn(),
       getCurrentWorkDir: vi.fn().mockReturnValue('/mock/dir'),
+      getUseColour: vi.fn().mockReturnValue(false),
+      log: vi.fn(),
+      setExitCode: vi.fn(),
     }));
 
     const { prCommand } = await import('#src/commands/prCommand.js');

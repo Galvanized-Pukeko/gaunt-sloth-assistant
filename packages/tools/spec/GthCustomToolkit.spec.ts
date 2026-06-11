@@ -22,7 +22,11 @@ const systemUtilsMock = {
   stdout: {
     write: vi.fn(),
   },
-  stdin: {},
+  stdin: {
+    isTTY: false,
+    isRaw: false,
+    setRawMode: vi.fn(),
+  },
   createInterface: vi.fn(),
 };
 vi.mock('#src/utils/systemUtils.js', () => systemUtilsMock);
@@ -56,6 +60,9 @@ describe('GthCustomToolkit', () => {
       },
     };
     childProcessMock.spawn.mockReturnValue(mockChild as any);
+
+    systemUtilsMock.stdin.isTTY = false;
+    systemUtilsMock.stdin.isRaw = false;
 
     // Default readline mock - reject by default
     mockRlQuestion.mockResolvedValue('n');
@@ -546,6 +553,42 @@ describe('GthCustomToolkit', () => {
       );
       // Verify rl.question is called with empty string (prompt written separately)
       expect(mockRlQuestion).toHaveBeenCalledWith('');
+    });
+
+    it('should temporarily disable raw mode while asking for approval', async () => {
+      systemUtilsMock.stdin.isTTY = true;
+      systemUtilsMock.stdin.isRaw = true;
+      mockRlQuestion.mockResolvedValue('y');
+
+      const result = await toolkit.promptUserForValidationOverride('cmd', 'tool', 'error');
+
+      expect(result).toBe(true);
+      expect(systemUtilsMock.stdin.setRawMode).toHaveBeenNthCalledWith(1, false);
+      expect(systemUtilsMock.stdin.setRawMode).toHaveBeenNthCalledWith(2, true);
+    });
+
+    it('should not change raw mode when stdin is not currently raw', async () => {
+      systemUtilsMock.stdin.isTTY = true;
+      systemUtilsMock.stdin.isRaw = false;
+      mockRlQuestion.mockResolvedValue('y');
+
+      await toolkit.promptUserForValidationOverride('cmd', 'tool', 'error');
+
+      expect(systemUtilsMock.stdin.setRawMode).not.toHaveBeenCalled();
+    });
+
+    it('should restore raw mode even if question throws', async () => {
+      systemUtilsMock.stdin.isTTY = true;
+      systemUtilsMock.stdin.isRaw = true;
+      mockRlQuestion.mockRejectedValue(new Error('readline error'));
+
+      await expect(toolkit.promptUserForValidationOverride('cmd', 'tool', 'error')).rejects.toThrow(
+        'readline error'
+      );
+
+      expect(mockRlClose).toHaveBeenCalled();
+      expect(systemUtilsMock.stdin.setRawMode).toHaveBeenNthCalledWith(1, false);
+      expect(systemUtilsMock.stdin.setRawMode).toHaveBeenNthCalledWith(2, true);
     });
 
     it('should close readline interface even if question throws', async () => {
