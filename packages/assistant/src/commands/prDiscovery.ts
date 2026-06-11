@@ -238,7 +238,9 @@ function getPrDiscoveryAgentConfig(
 ): GthConfig {
   const baseTools = discoveryConfig?.tools ?? config.tools ?? [];
   const customTools =
-    discoveryConfig && 'customTools' in discoveryConfig ? discoveryConfig.customTools : config.customTools;
+    discoveryConfig && 'customTools' in discoveryConfig
+      ? discoveryConfig.customTools
+      : config.customTools;
   return {
     ...config,
     filesystem: discoveryConfig?.filesystem ?? config.filesystem,
