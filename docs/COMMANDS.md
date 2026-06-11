@@ -50,7 +50,7 @@ gsloth get <review|pr> <content|requirements> <id>
 ```
 
 ### Arguments
-- `<command>` - Command to inspect. Supported prompt targets: `ask`, `review`, `pr`, `pr-auto`, `chat`, `code`
+- `<command>` - Command to inspect. Supported prompt targets: `ask`, `review`, `pr`, `pr-discovery`, `chat`, `code`
 - `<content|requirements>` - Provider-backed input type for `review` or `pr`
 - `<id>` - Provider-backed content identifier, such as a PR number or issue key
 
@@ -64,8 +64,8 @@ Use this command to inspect what Gaunt Sloth would send before running a command
 # Print the effective system prompt for review
 gsloth get review prompt
 
-# Print the discovery-agent system prompt used by PR auto mode
-gsloth get pr-auto prompt
+# Print the discovery-agent system prompt used by change requirements discovery
+gsloth get pr-discovery prompt
 
 # Print the wrapped PR diff that `gsloth pr 42` would use
 gsloth get pr content 42
@@ -83,8 +83,8 @@ gsloth pr [prId] [requirementsId]
 ```
 
 ### Arguments
-- `[prId]` - Pull request ID to review. Omit both `prId` and `requirementsId` to run PR auto mode (see below)
-- `[requirementsId]` - Optional requirements ID to retrieve requirements from provider. This argument is only supported together with `prId`; requirements-only mode such as `gsloth pr PROJ-123` is not supported.
+- `[prId]` - Pull request ID to review. Omit both `prId` and `requirementsId` to discover the change requirements from the current branch's PR (see below)
+- `[requirementsId]` - Optional requirements ID to retrieve requirements from provider. This argument is only supported together with `prId`; requirements-only syntax such as `gsloth pr PROJ-123` is not supported.
 
 ### Options
 - `-p, --requirements-provider <provider>` - Requirements provider for this review
@@ -98,25 +98,25 @@ gsloth pr [prId] [requirementsId]
 ### Description
 Reviews a pull request using GitHub as the default content provider. Can integrate with issue tracking systems to include requirements in the review.
 
-### PR Auto Mode
+### Change Requirements Discovery
 
-Running `gsloth pr` with no positional arguments enters auto mode. Auto mode only runs when neither
+Running `gsloth pr` with no positional arguments triggers change requirements discovery. Discovery only runs when neither
 `prId` nor `requirementsId` is provided; `gsloth pr PROJ-123` is not treated as requirements-only
-auto mode and is unsupported. In auto mode, the diff for the current branch's PR is fetched
+discovery and is unsupported. The diff for the current branch's PR is fetched
 deterministically with `gh pr diff`, and the PR description is inspected for an explicit
 requirements reference (a linked GitHub issue or a Jira key, depending on the configured
 requirements provider). When both are found, the review starts immediately. Otherwise a discovery
 agent runs first with the `gh_pr`, `gh_diff` and `gh_issue` tools (plus any configured tools, e.g.
 a Jira MCP server) to locate the diff and requirements before handing over to the review agent.
 
-The discovery agent's prompt can be customized by placing a `.gsloth.pr-auto.md` file in the
+The discovery agent's prompt can be customized by placing a `.gsloth.pr-discovery.md` file in the
 project config directory or in an identity profile directory, the same way as other prompts.
-Auto mode behaviour is configured via `commands.pr.auto` — see
-[PR Auto Mode Configuration](CONFIGURATION.md#pr-auto-mode-configuration).
+Discovery behaviour is configured via `commands.pr.discovery` — see
+[Change Requirements Discovery Configuration](CONFIGURATION.md#change-requirements-discovery-configuration).
 
 ### Examples
 ```bash
-# Auto mode: review the current branch's PR, discovering requirements from its description
+# Discover change requirements from the current branch's PR and review it
 gsloth pr
 
 # Review PR #42
@@ -128,7 +128,7 @@ gsloth pr 42 23
 # Review PR #42 with JIRA issue PROJ-123
 gsloth pr 42 PROJ-123 -p jira
 
-# Unsupported: requirements-only mode is not available; provide a PR ID or use no arguments for auto mode
+# Unsupported: requirements-only mode is not available; provide a PR ID or use no arguments for change requirements discovery
 # gsloth pr PROJ-123
 
 # Review PR #42 with additional context from files

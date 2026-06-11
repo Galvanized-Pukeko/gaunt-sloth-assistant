@@ -288,7 +288,7 @@ export interface GthConfig {
  * Declared as a named interface (rather than inline in {@link GthConfig}) so that downstream
  * packages can extend it with their own command features via TypeScript module augmentation
  * (`declare module '@gaunt-sloth/core/config.js'`), keeping those features' types out of core.
- * For example, the assistant package merges its PR auto mode config (`auto`) into this
+ * For example, the assistant package merges its PR discovery config (`discovery`) into this
  * interface.
  */
 export interface PrCommandConfig {

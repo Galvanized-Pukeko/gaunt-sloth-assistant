@@ -129,7 +129,7 @@ export function readCodePrompt(
 /**
  * Read a prompt file from the project config dir (honouring identity profiles), falling back
  * to a packaged default unless `noDefaultPrompts` is set. Downstream packages owning their own
- * prompt files (e.g. the assistant's PR auto mode prompt) pass `defaultPromptDir` pointing at
+ * prompt files (e.g. the assistant's PR discovery prompt) pass `defaultPromptDir` pointing at
  * their package root; when omitted, the default is read from the core package.
  */
 export function readPromptFile(

@@ -14,9 +14,9 @@ import {
   readReviewInstructions,
   readSystemPrompt,
 } from '@gaunt-sloth/core/utils/llmUtils.js';
-import { readPrAutoPrompt } from '#src/commands/prAutoMode.js';
+import { readPrDiscoveryPrompt } from '#src/commands/prDiscovery.js';
 
-export type PromptCommandType = 'ask' | 'review' | 'pr' | 'pr-auto' | 'chat' | 'code';
+export type PromptCommandType = 'ask' | 'review' | 'pr' | 'pr-discovery' | 'chat' | 'code';
 export type ProviderCommandType = 'review' | 'pr';
 export type ProviderInputType = 'content' | 'requirements';
 
@@ -47,8 +47,8 @@ export function getCommandSystemPrompt(command: PromptCommandType, config: GthCo
   }
 
   const modePrompt =
-    command === 'pr-auto'
-      ? readPrAutoPrompt(config)
+    command === 'pr-discovery'
+      ? readPrDiscoveryPrompt(config)
       : command === 'chat'
         ? readChatPrompt(config)
         : readCodePrompt(config);
