@@ -1,7 +1,7 @@
 {
   "llm": {
     "type": "openrouter",
-    "model": "z-ai/glm-4.5-air"
+    "model": "mistralai/mistral-medium-3-5"
   },
   "commands": {
     "api": {
