@@ -276,6 +276,27 @@ describe('reviewModule', () => {
     expect(consoleUtilsMock.display).not.toHaveBeenCalled();
   });
 
+  it('should surface the underlying error message when the agent run fails', async () => {
+    const failure = new Error(
+      'Agent processing failed: 401 Unauthorized\nVertex AI authentication failed (401). ' +
+        'If you use ADC, run `gcloud auth application-default login`.'
+    );
+    gthAgentRunnerInstanceMock.processMessages.mockRejectedValueOnce(failure);
+
+    const { review } = await import('#src/modules/reviewModule.js');
+    await review('test-source', 'test-preamble', 'test-diff', mockConfig);
+
+    expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to run review with agent.')
+    );
+    expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
+      expect.stringContaining('gcloud auth application-default login')
+    );
+    // Full error (with stack) still goes to debug.
+    expect(consoleUtilsMock.displayDebug).toHaveBeenCalledWith(failure);
+    expect(gthAgentRunnerInstanceMock.cleanup).toHaveBeenCalled();
+  });
+
   describe('Rating functionality', () => {
     it('should display PASS rating when review passes threshold', async () => {
       const configWithRating: GthConfig = {
