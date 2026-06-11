@@ -96,7 +96,8 @@ export const stopWaitingForEscape = () => {
     // it, which refs the handle). On a TTY stdin.isPaused() is false, so we must not
     // rely on re-pausing only "previously paused" streams - that left one-shot
     // commands (e.g. `gth pr` with no arguments) hanging after completion. unref leaves the
-    // read state untouched, so interactive sessions (chat) re-ref via rl.question().
+    // read state untouched; interactive sessions (chat/code) re-ref via setRawMode(true)
+    // before the next rl.question(), so they keep prompting after each agent response.
     process.stdin.unref?.();
   }
 };
@@ -104,6 +105,14 @@ export const stopWaitingForEscape = () => {
 export const setRawMode = (rawMode: boolean) => {
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(rawMode);
+    if (rawMode) {
+      // Re-ref stdin when (re)entering raw mode for interactive input.
+      // stopWaitingForEscape() unref's stdin after each agent run so one-shot commands
+      // can exit; without re-reffing here the chat/code loop's next rl.question() would
+      // not keep the event loop alive and the process would exit after the first
+      // response (v1.5.5 regression).
+      process.stdin.ref?.();
+    }
   }
 };
 

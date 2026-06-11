@@ -11,6 +11,7 @@ const processMock = {
     ref: vi.fn(),
     unref: vi.fn(),
     isPaused: vi.fn(),
+    isTTY: true,
   },
   versions: {
     node: '24.0.0',
@@ -298,6 +299,43 @@ describe('systemUtils', () => {
       // Assert - should not throw errors
       expect(processMock.stdin.setRawMode).not.toHaveBeenCalled();
       expect(processMock.stdin.off).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setRawMode', () => {
+    it('should re-ref stdin when entering raw mode so interactive sessions keep prompting', async () => {
+      const { setRawMode } = await import('#src/utils/systemUtils.js');
+
+      setRawMode(true);
+
+      // The chat/code loop calls setRawMode(true) before each rl.question(); a prior
+      // stopWaitingForEscape() unref'd stdin, so without this re-ref the event loop would
+      // drain and the process would exit after the first response (v1.5.5 regression).
+      expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(true);
+      expect(processMock.stdin.ref).toHaveBeenCalled();
+    });
+
+    it('should not ref stdin when disabling raw mode', async () => {
+      const { setRawMode } = await import('#src/utils/systemUtils.js');
+
+      setRawMode(false);
+
+      expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(false);
+      expect(processMock.stdin.ref).not.toHaveBeenCalled();
+    });
+
+    it('should be a no-op when stdin is not a TTY (piped input)', async () => {
+      const { setRawMode } = await import('#src/utils/systemUtils.js');
+
+      processMock.stdin.isTTY = false;
+      try {
+        setRawMode(true);
+
+        expect(processMock.stdin.setRawMode).not.toHaveBeenCalled();
+        expect(processMock.stdin.ref).not.toHaveBeenCalled();
+      } finally {
+        processMock.stdin.isTTY = true;
+      }
     });
   });
 
