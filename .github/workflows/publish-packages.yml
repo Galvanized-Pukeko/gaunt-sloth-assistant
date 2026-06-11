@@ -27,9 +27,9 @@ jobs:
       matrix:
         node-version: [24.x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
@@ -51,9 +51,9 @@ jobs:
       matrix:
         node-version: [24.x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
@@ -82,9 +82,9 @@ jobs:
         provider: [openrouter]
       max-parallel: 2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
@@ -107,12 +107,12 @@ jobs:
       contents: write # push the @gaunt-sloth/<pkg>@<version> git tags
       id-token: write # npm Trusted Publishing (OIDC) + provenance
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # full history + tags so tag-packages.sh can skip already-tagged versions
           fetch-depth: 0
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24.x'
           # no registry-url: it writes an .npmrc referencing ${NODE_AUTH_TOKEN},
