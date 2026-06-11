@@ -16,33 +16,44 @@ the `files` makes .npmignore ignored.
 ### Library packages
 
 Library packages (`@gaunt-sloth/core`, `@gaunt-sloth/tools`, `@gaunt-sloth/api`,
-`@gaunt-sloth/review`) are versioned independently. `npm version` does not work
-well in workspaces for scoped packages, so bump versions manually:
-
-1. Edit the `"version"` field in each package's `package.json`
-2. Update cross-references (e.g. `@gaunt-sloth/core` dependency in review)
-3. Commit and create annotated tags for each package:
+`@gaunt-sloth/review`) are lock-stepped: they all carry the same version, whose
+single source of truth is `release.json` at the repo root. `npm version` does
+not work well in workspaces for scoped packages, so use the bump script:
 
 ```bash
-git tag -a "@gaunt-sloth/core@0.0.3" -m "Release @gaunt-sloth/core@0.0.3"
-git tag -a "@gaunt-sloth/review@0.0.3" -m "Release @gaunt-sloth/review@0.0.3"
-git push --follow-tags
+npm run release:bump            # apply the version from release.json to all four packages
+npm run release:bump -- 0.1.8   # set release.json to 0.1.8 AND apply
 ```
 
-Tags follow the `@scope/name@version` convention (same as npm).
+The script rewrites each package's `"version"` and their exact pins on each
+other, and updates the assistant's `@gaunt-sloth/*` dependency pins (the
+assistant's own version is untouched). Commit the result before publishing.
 
-Use annotated tags (`-a`) — lightweight tags are not pushed by `--follow-tags`.
+### Publishing library packages (CI, recommended)
 
-Or use the helper, which reads each library's current `package.json` version and
-tags all four (`core`, `tools`, `api`, `review`) — the assistant is excluded.
-Existing tags are skipped, so it's safe to re-run:
+Dispatch the **Publish packages** workflow
+([publish-packages.yml](../.github/workflows/publish-packages.yml)) from the
+Actions tab. It runs lint + unit tests, integration tests (Linux, then
+macOS/Windows), pushes the `@gaunt-sloth/<pkg>@<version>` git tags via
+`tag-packages.sh`, and publishes all four packages to npmjs using npm Trusted
+Publishing (OIDC) — no token involved. Each package's Trusted Publisher on
+npmjs must point at this repo and `publish-packages.yml`.
+
+Bump and commit first (see above): npm refuses to republish an existing
+version, so dispatching without a fresh version fails at the publish stage.
+
+### Publishing library packages (manually)
+
+Tags follow the `@scope/name@version` convention (same as npm) and must be
+annotated (`-a`) — lightweight tags are not pushed by `--follow-tags`. The
+helper reads each library's current `package.json` version and tags all four
+(`core`, `tools`, `api`, `review`) — the assistant is excluded. Existing tags
+are skipped, so it's safe to re-run:
 
 ```bash
 ./tag-packages.sh            # create the tags locally
 ./tag-packages.sh --push     # create and push them (PUSH=1 ./tag-packages.sh also works)
 ```
-
-### Publishing library packages
 
 Preview what will be included in each package:
 
@@ -53,14 +64,17 @@ npm pack --dry-run -w @gaunt-sloth/api
 npm pack --dry-run -w @gaunt-sloth/review
 ```
 
-Publish all library packages:
+Publish all four in dependency order (core → tools → api → review). The script
+defaults to a local Verdaccio at `http://localhost:4873`
+(see [CONTRIBUTING.md](../CONTRIBUTING.md#local-development-registry-optional));
+set `REGISTRY` to target npmjs:
 
 ```bash
-npm publish -w @gaunt-sloth/core -w @gaunt-sloth/tools -w @gaunt-sloth/api -w @gaunt-sloth/review
+REGISTRY=https://registry.npmjs.org npm run release:publish
 ```
 
-Note: the first ever publish of a scoped package requires `--access public`.
-After that it's not needed.
+Note: the first ever publish of a scoped package requires `--access public`
+(pass it via `NPM_PUBLISH_ARGS="--access public"`). After that it's not needed.
 
 ### Test-deploying library packages
 
