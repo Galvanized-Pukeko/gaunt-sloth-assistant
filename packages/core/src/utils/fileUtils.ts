@@ -163,8 +163,16 @@ export function readFileFromProjectDir(fileName: string): string {
 
 const corePackageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export function readFileFromInstallDir(filePath: string): string {
-  const installFilePath = resolve(corePackageDir, filePath);
+/**
+ * Read a file shipped with an installed package. Defaults to the core package dir;
+ * downstream packages shipping their own default files (e.g. prompts) pass their own
+ * package dir.
+ */
+export function readFileFromInstallDir(
+  filePath: string,
+  packageDir: string = corePackageDir
+): string {
+  const installFilePath = resolve(packageDir, filePath);
   try {
     return readFileSync(installFilePath, { encoding: 'utf8' });
   } catch (readFromInstallDirError) {

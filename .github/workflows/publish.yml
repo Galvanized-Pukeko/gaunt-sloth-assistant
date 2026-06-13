@@ -9,8 +9,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
@@ -20,5 +20,3 @@ jobs:
       # ships ./dist/*; without this step npm publishes a dist-less, broken bin.
       - run: npm run build
       - run: npm publish --provenance --access public --tag latest -w gaunt-sloth-assistant
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

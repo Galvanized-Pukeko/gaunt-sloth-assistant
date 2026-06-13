@@ -1,5 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'url';
+import { emitKeypressEvents } from 'node:readline';
 import { createInterface, type Interface as ReadLineInterface } from 'node:readline/promises';
 import { displayInfo, displayWarning } from './consoleUtils.js';
 import { createWriteStream, readFileSync, type WriteStream } from 'node:fs';
@@ -29,6 +30,7 @@ interface InnerState {
   useColour: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   waitForEscapeCallback?: (_: any, key: any) => void;
+  interruptRequested: boolean;
   logWriteStream?: WriteStream;
 }
 
@@ -37,13 +39,27 @@ const innerState: InnerState = {
   stringFromStdin: '',
   useColour: false,
   waitForEscapeCallback: undefined,
+  interruptRequested: false,
   logWriteStream: undefined,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const keypressHandler = (callback: () => void) => (_: any, key: any) => {
-  if (key?.name === 'escape' || key?.name === 'q') {
+const keypressHandler = (callback: () => void) => (chunk: any, key: any) => {
+  const isCtrlC = (key?.ctrl && key?.name === 'c') || chunk === '\u0003';
+  // Once an interrupt has been requested (Escape/Q/Ctrl+C), a Ctrl+C escalates to a
+  // hard exit. Raw mode swallows SIGINT, so if the first interrupt wedges (e.g. a stuck
+  // tool call) this is the user's only way out. 130 = 128 + SIGINT, the conventional code.
+  if (isCtrlC && innerState.interruptRequested) {
+    displayWarning('\nForce exiting...');
+    // Leave the terminal usable: drop raw mode before exiting so a wedged tool call can't
+    // strand the user's shell with echo/line-editing disabled. Node restores TTY state on a
+    // normal exit, but being explicit here is cheap insurance on the hard-exit path.
+    process.stdin.setRawMode?.(false);
+    process.exit(130);
+  }
+  if (key?.name === 'escape' || key?.name === 'q' || isCtrlC) {
     displayWarning('\nInterrupting...');
+    innerState.interruptRequested = true;
     callback();
     return;
   }
@@ -53,7 +69,15 @@ export const waitForEscape = (callback: () => void, enabled: boolean) => {
   if (!enabled) {
     return;
   }
+  innerState.interruptRequested = false;
+  emitKeypressEvents(process.stdin);
   process.stdin.setRawMode(true);
+  // Resume stdin so keypress events fire, and explicitly ref the handle to keep the event loop
+  // alive during the wait. resume() refs in most Node versions, but a prior stopWaitingForEscape
+  // unref()'d the handle and resume() does not reliably re-ref it everywhere - so ref() is needed
+  // for symmetry, otherwise the process could exit mid-wait if stdin were the only live handle.
+  process.stdin.resume?.();
+  process.stdin.ref?.();
   innerState.waitForEscapeCallback = keypressHandler(callback);
   process.stdin.on('keypress', innerState.waitForEscapeCallback);
   displayInfo(`
@@ -68,12 +92,27 @@ export const stopWaitingForEscape = () => {
     process.stdin.setRawMode(false);
     process.stdin.off('keypress', innerState.waitForEscapeCallback);
     innerState.waitForEscapeCallback = undefined;
+    // Unref stdin so it no longer keeps the event loop alive (waitForEscape resumed
+    // it, which refs the handle). On a TTY stdin.isPaused() is false, so we must not
+    // rely on re-pausing only "previously paused" streams - that left one-shot
+    // commands (e.g. `gth pr` with no arguments) hanging after completion. unref leaves the
+    // read state untouched; interactive sessions (chat/code) re-ref via setRawMode(true)
+    // before the next rl.question(), so they keep prompting after each agent response.
+    process.stdin.unref?.();
   }
 };
 
 export const setRawMode = (rawMode: boolean) => {
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(rawMode);
+    if (rawMode) {
+      // Re-ref stdin when (re)entering raw mode for interactive input.
+      // stopWaitingForEscape() unref's stdin after each agent run so one-shot commands
+      // can exit; without re-reffing here the chat/code loop's next rl.question() would
+      // not keep the event loop alive and the process would exit after the first
+      // response (v1.5.5 regression).
+      process.stdin.ref?.();
+    }
   }
 };
 

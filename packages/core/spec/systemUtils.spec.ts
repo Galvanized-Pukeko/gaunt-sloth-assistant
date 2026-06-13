@@ -6,6 +6,12 @@ const processMock = {
     setRawMode: vi.fn(),
     on: vi.fn(),
     off: vi.fn(),
+    resume: vi.fn(),
+    pause: vi.fn(),
+    ref: vi.fn(),
+    unref: vi.fn(),
+    isPaused: vi.fn(),
+    isTTY: true,
   },
   versions: {
     node: '24.0.0',
@@ -23,12 +29,18 @@ const fsMock = {
   createWriteStream: vi.fn(),
 };
 
+const readlineMock = {
+  emitKeypressEvents: vi.fn(),
+};
+
 // Mock process events
 const processEventMocks = {
   on: vi.fn(),
+  exit: vi.fn(),
 };
 
 vi.mock('node:fs', () => fsMock);
+vi.mock('node:readline', () => readlineMock);
 vi.mock('#src/utils/consoleUtils.js', () => consoleUtilsMock);
 
 // Mock the global process object
@@ -43,6 +55,7 @@ Object.defineProperty(global, 'process', {
 describe('systemUtils', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    processMock.stdin.isPaused.mockReturnValue(false);
   });
 
   describe('waitForEscape', () => {
@@ -69,7 +82,11 @@ describe('systemUtils', () => {
       waitForEscape(callback, true);
 
       // Assert
+      expect(readlineMock.emitKeypressEvents).toHaveBeenCalledWith(processMock.stdin);
       expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(true);
+      expect(processMock.stdin.resume).toHaveBeenCalled();
+      // ref() keeps the handle alive even if a prior stopWaitingForEscape unref()'d it.
+      expect(processMock.stdin.ref).toHaveBeenCalled();
       expect(processMock.stdin.on).toHaveBeenCalledWith('keypress', expect.any(Function));
       expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
         expect.stringContaining('Press Escape or Q to interrupt Agent')
@@ -99,6 +116,102 @@ describe('systemUtils', () => {
       // Assert
       expect(callback).toHaveBeenCalled();
       expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith('\nInterrupting...');
+    });
+
+    it('should call callback when Ctrl+C is pressed in raw mode', async () => {
+      const { waitForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+      let keypressHandler: (_chunk: any, _key: any) => void;
+
+      processMock.stdin.on.mockImplementation((event: string, handler: any) => {
+        if (event === 'keypress') {
+          keypressHandler = handler;
+        }
+      });
+
+      waitForEscape(callback, true);
+
+      keypressHandler!('\u0003', { name: 'c', ctrl: true });
+
+      expect(callback).toHaveBeenCalled();
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith('\nInterrupting...');
+    });
+
+    it('force-exits on a second Ctrl+C after the first interrupt', async () => {
+      const { waitForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+      let keypressHandler: (_chunk: any, _key: any) => void;
+
+      processMock.stdin.on.mockImplementation((event: string, handler: any) => {
+        if (event === 'keypress') {
+          keypressHandler = handler;
+        }
+      });
+
+      waitForEscape(callback, true);
+
+      // First Ctrl+C only interrupts.
+      keypressHandler!('', { name: 'c', ctrl: true });
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(processEventMocks.exit).not.toHaveBeenCalled();
+
+      // Second Ctrl+C escalates to a hard exit (130 = 128 + SIGINT).
+      keypressHandler!('', { name: 'c', ctrl: true });
+      expect(processEventMocks.exit).toHaveBeenCalledWith(130);
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('Force exiting')
+      );
+      // Raw mode is dropped before exiting so a wedged session can't strand the user's terminal.
+      expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(false);
+    });
+
+    it('force-exits on Ctrl+C after an Escape interrupt', async () => {
+      const { waitForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+      let keypressHandler: (_chunk: any, _key: any) => void;
+
+      processMock.stdin.on.mockImplementation((event: string, handler: any) => {
+        if (event === 'keypress') {
+          keypressHandler = handler;
+        }
+      });
+
+      waitForEscape(callback, true);
+
+      // Escape arms the interrupt without exiting.
+      keypressHandler!('', { name: 'escape' });
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(processEventMocks.exit).not.toHaveBeenCalled();
+
+      // A subsequent Ctrl+C then force-exits.
+      keypressHandler!('', { name: 'c', ctrl: true });
+      expect(processEventMocks.exit).toHaveBeenCalledWith(130);
+    });
+
+    it('does not force-exit when a fresh wait re-arms the interrupt state', async () => {
+      const { waitForEscape, stopWaitingForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+      let keypressHandler: (_chunk: any, _key: any) => void;
+
+      processMock.stdin.on.mockImplementation((event: string, handler: any) => {
+        if (event === 'keypress') {
+          keypressHandler = handler;
+        }
+      });
+
+      // First run requests an interrupt.
+      waitForEscape(callback, true);
+      keypressHandler!('', { name: 'c', ctrl: true });
+      stopWaitingForEscape();
+
+      // A new run resets the flag, so the next single Ctrl+C only interrupts.
+      waitForEscape(callback, true);
+      keypressHandler!('', { name: 'c', ctrl: true });
+      expect(processEventMocks.exit).not.toHaveBeenCalled();
     });
 
     it('should not call callback when other keys are pressed', async () => {
@@ -153,6 +266,28 @@ describe('systemUtils', () => {
       expect(processMock.stdin.off).toHaveBeenCalledWith('keypress', keypressHandler);
     });
 
+    it('should unref stdin during cleanup so the process can exit', async () => {
+      const { waitForEscape, stopWaitingForEscape } = await import('#src/utils/systemUtils.js');
+
+      const callback = vi.fn();
+
+      waitForEscape(callback, true);
+      stopWaitingForEscape();
+
+      // waitForEscape resumes stdin (refs the handle); stopWaitingForEscape must
+      // unref it again, otherwise one-shot commands hang after completion on a TTY.
+      expect(processMock.stdin.resume).toHaveBeenCalled();
+      expect(processMock.stdin.unref).toHaveBeenCalled();
+    });
+
+    it('should not unref stdin when no escape handler is active', async () => {
+      const { stopWaitingForEscape } = await import('#src/utils/systemUtils.js');
+
+      stopWaitingForEscape();
+
+      expect(processMock.stdin.unref).not.toHaveBeenCalled();
+    });
+
     it('should handle multiple calls safely', async () => {
       // Import the function after mocks are set up
       const { stopWaitingForEscape } = await import('#src/utils/systemUtils.js');
@@ -164,6 +299,43 @@ describe('systemUtils', () => {
       // Assert - should not throw errors
       expect(processMock.stdin.setRawMode).not.toHaveBeenCalled();
       expect(processMock.stdin.off).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setRawMode', () => {
+    it('should re-ref stdin when entering raw mode so interactive sessions keep prompting', async () => {
+      const { setRawMode } = await import('#src/utils/systemUtils.js');
+
+      setRawMode(true);
+
+      // The chat/code loop calls setRawMode(true) before each rl.question(); a prior
+      // stopWaitingForEscape() unref'd stdin, so without this re-ref the event loop would
+      // drain and the process would exit after the first response (v1.5.5 regression).
+      expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(true);
+      expect(processMock.stdin.ref).toHaveBeenCalled();
+    });
+
+    it('should not ref stdin when disabling raw mode', async () => {
+      const { setRawMode } = await import('#src/utils/systemUtils.js');
+
+      setRawMode(false);
+
+      expect(processMock.stdin.setRawMode).toHaveBeenCalledWith(false);
+      expect(processMock.stdin.ref).not.toHaveBeenCalled();
+    });
+
+    it('should be a no-op when stdin is not a TTY (piped input)', async () => {
+      const { setRawMode } = await import('#src/utils/systemUtils.js');
+
+      processMock.stdin.isTTY = false;
+      try {
+        setRawMode(true);
+
+        expect(processMock.stdin.setRawMode).not.toHaveBeenCalled();
+        expect(processMock.stdin.ref).not.toHaveBeenCalled();
+      } finally {
+        processMock.stdin.isTTY = true;
+      }
     });
   });
 

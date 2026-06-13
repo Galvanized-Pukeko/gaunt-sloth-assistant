@@ -354,14 +354,16 @@ which expects full interface. Even better option is to provide all properties.
 ## Releasing the Synced Packages
 
 The four publishable packages — `@gaunt-sloth/{core,tools,api,review}` — share
-a single version pulled from `release.json`. The `assistant` workspace has its
-own user-facing version (1.5.x) and only its `@gaunt-sloth/*` dep pins are
-rewritten by the release script.
+a single version; `packages/core/package.json` is the source of truth. The
+`assistant` workspace has its own user-facing version (1.5.x) and only its
+`@gaunt-sloth/*` dep pins are rewritten by the release script.
 
 ```
-npm run release:bump            # apply release.json
-npm run release:bump -- 0.0.7   # set release.json + apply
-npm run release:publish         # publish core → tools → api → review
+npm run release:bump                # patch-increment core's version + sync everything
+npm run release:bump -- minor       # increment (patch | minor | major) + sync
+npm run release:bump -- 0.0.7       # set explicit version + sync
+npm run release:bump-and-commit     # same, then refresh lockfile + git commit
+npm run release:publish             # publish core → tools → api → review
 ```
 
 Defaults to a local Verdaccio at `http://localhost:4873`. To target npmjs:

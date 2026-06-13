@@ -70,19 +70,41 @@ export class GthLangChainAgent implements GthAgentInterface {
       this.statusUpdate(StatusLevel.INFO, `Model: ${this.config.modelDisplayName}`);
     }
 
+    // An empty allowedTools allow-list disables every tool. Skip resolution entirely so we
+    // don't contact MCP servers (and trigger OAuth) just to discard the result.
+    const allowedTools = this.config.allowedTools;
+    const toolsDisabled = Array.isArray(allowedTools) && allowedTools.length === 0;
+    if (toolsDisabled) {
+      this.statusUpdate(
+        StatusLevel.INFO,
+        'Tool loading disabled by allowedTools: []; MCP/A2A servers will not be contacted. Omit allowedTools for no filtering.'
+      );
+    }
+
     // Resolve tools via resolver or fall back to config tools only
     debugLog('Resolving tools...');
-    const resolvedTools = this.resolvers?.resolveTools
-      ? await this.resolvers.resolveTools(this.config, command)
-      : [];
+    const resolvedTools =
+      !toolsDisabled && this.resolvers?.resolveTools
+        ? await this.resolvers.resolveTools(this.config, command)
+        : [];
     debugLog(`Resolved tools loaded: ${resolvedTools.length}`);
 
     // Get user config tools
-    const flattenedConfigTools = this.extractAndFlattenTools(this.config.tools || []);
+    const flattenedConfigTools = toolsDisabled
+      ? []
+      : this.extractAndFlattenTools(this.config.tools || []);
     debugLog(`User config tools loaded: ${flattenedConfigTools.length}`);
 
-    // Combine all tools
-    const tools = [...resolvedTools, ...flattenedConfigTools];
+    // Combine all tools, then apply the allowedTools name allow-list when configured.
+    let tools = [...resolvedTools, ...flattenedConfigTools];
+    if (Array.isArray(allowedTools)) {
+      const allowed = new Set(allowedTools);
+      // Filter named tools by the allow-list. ServerTools (provider-native "magic objects" such
+      // as Anthropic web search) may have no `name`, so they can never be referenced in the
+      // allow-list - drop-by-default would silently remove them with no recourse. Retain such
+      // nameless tools instead; the allow-list is a name-based filter and cannot target them.
+      tools = tools.filter((tool) => !tool.name || allowed.has(tool.name));
+    }
 
     if (tools.length > 0) {
       const toolNames = tools
@@ -243,10 +265,21 @@ export class GthLangChainAgent implements GthAgentInterface {
       }
     }, this.config.canInterruptInferenceWithEsc);
 
-    const stream = await this.agent.stream(
-      { messages },
-      { ...runConfig, streamMode: 'messages', signal: abortController.signal }
-    );
+    let stream;
+    try {
+      stream = await this.agent.stream(
+        { messages },
+        { ...runConfig, streamMode: 'messages', signal: abortController.signal }
+      );
+    } catch (error) {
+      // If stream creation fails (e.g. an auth error), the IterableReadableStream below -
+      // whose finally/cancel are what normally unregister the Escape listener - is never
+      // constructed. Without this cleanup the raw-mode keypress listener keeps stdin ref'd,
+      // the process hangs after the error, and Esc/Ctrl+C only print "Interrupting..."
+      // (raw mode swallows SIGINT, so Ctrl+C cannot kill the process either).
+      stopWaitingForEscape();
+      throw error;
+    }
 
     return new IterableReadableStream({
       async start(controller) {
@@ -557,6 +590,8 @@ export class GthLangChainAgent implements GthAgentInterface {
       filesystem: cmdConfig?.filesystem !== undefined ? cmdConfig.filesystem : config.filesystem,
       builtInTools:
         cmdConfig?.builtInTools !== undefined ? cmdConfig.builtInTools : config.builtInTools,
+      allowedTools:
+        cmdConfig?.allowedTools !== undefined ? cmdConfig.allowedTools : config.allowedTools,
       binaryFormats:
         cmdConfig?.binaryFormats !== undefined ? cmdConfig.binaryFormats : config.binaryFormats,
     };
