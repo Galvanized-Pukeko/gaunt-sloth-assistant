@@ -20,9 +20,15 @@ import { StatusBar, approvalsBadgeSpellings, statusBarRow } from '#src/tui/compo
  * counter — and it is asserted whole at every width down to the floor, the width that holds mode +
  * model + badge. Below that floor the model itself is clipped and the badge still holds.
  *
+ * The debug hint is the lowest priority on the row at every rung: the decision reserves its width
+ * while it still has a provider or a profile to drop, and once those are spent the hint is the
+ * first thing to give way — clipped to the room left, or left out — before the badge (other rungs)
+ * or the segments' tail (`bypass`) shrink. That is arithmetic in `statusBarRow`, so it is asserted
+ * on the decision and on the row.
+ *
  * Widths are chosen from the measured strings: the segments with the provider are 69 cells and
  * without it 56, of which the mode and the `model: ` label are 16; the full badge is 37, the short
- * one 24, the bypass badge 10.
+ * one 24, the bypass badge 10, the hint 27.
  */
 
 /** A stdout with a width, so the row's fit is decided at the width the spec names. */
@@ -75,16 +81,23 @@ const BARE = 'code  ·  model: claude-sonnet-4-5  ·  turns: 2  ·  ready';
 const FULL_BADGE = '  ·  approvals: Assisted (auto-rater)';
 const SHORT_BADGE = '  ·  approvals: Assisted';
 const BYPASS = ' ⚡ Bypass';
+const DEBUG_HINT = '  ·  Tab: focus debug panel';
 
 const assisted = { rung: 'assisted' as const };
 const bypass = { rung: 'bypass' as const };
 
-const bar = (columns: number, approvals: { rung: 'assisted' | 'bypass' }) => (
-  <StatusBar running={false} {...input} columns={columns} approvals={approvals} />
+const bar = (columns: number, approvals: { rung: 'assisted' | 'bypass' }, debugHint = false) => (
+  <StatusBar
+    running={false}
+    {...input}
+    columns={columns}
+    approvals={approvals}
+    debugHint={debugHint}
+  />
 );
 
 /** An idle bypass session on a long openrouter-style id, whose `provider/` prefix is ordinary. */
-const bypassBar = (columns: number, modelDisplayName: string) => (
+const bypassBar = (columns: number, modelDisplayName: string, debugHint = false) => (
   <StatusBar
     running={false}
     mode="chat"
@@ -93,6 +106,7 @@ const bypassBar = (columns: number, modelDisplayName: string) => (
     turnCount={0}
     columns={columns}
     approvals={bypass}
+    debugHint={debugHint}
   />
 );
 
@@ -245,27 +259,65 @@ describe('the status bar gives way in order and stays one row (TUI-C92)', () => 
     expect(runningBypassRows(30)[0]).toMatch(/^. Thinking… \(Esc to… ⚡ Bypass$/);
   });
 
-  it('reserves the debug hint in the decision, and truncates it too', () => {
+  it('reserves the debug hint in the decision, then gives it up first once the drops are spent', () => {
     // 93 cells of segments and full badge fit 110 columns alone; with the 27-cell hint they are
-    // 120 and do not, so the profile goes — the decision sees the hint.
-    expect(statusBarRow({ ...input, columns: 110, approvals: assisted, debugHint: true })).toEqual({
+    // 120 and do not, so the profile goes — the decision sees the hint, and keeps it whole.
+    const decide = (columns: number) =>
+      statusBarRow({ ...input, columns, approvals: assisted, debugHint: true });
+    expect(decide(110)).toEqual({ segments: BARE, badge: SHORT_BADGE, hint: DEBUG_HINT });
+    expect(barRowsAt(110, bar(110, assisted, true))).toEqual([
+      `${BARE}${SHORT_BADGE}${DEBUG_HINT}`,
+    ]);
+    // Nothing left to drop at 100: the hint — the least informative element — is clipped to the
+    // 20 cells the segments and the badge leave it, and the badge stays whole.
+    expect(decide(100)).toEqual({
       segments: BARE,
       badge: SHORT_BADGE,
+      hint: '  ·  Tab: focus deb…',
     });
-    expect(
-      barRowsAt(
-        110,
-        <StatusBar running={false} {...input} columns={110} approvals={assisted} debugHint />
-      )
-    ).toEqual([`${BARE}${SHORT_BADGE}  ·  Tab: focus debug panel`]);
-    // Narrower still: the badge and the hint share the shrink; the row is still one row.
-    const rows = barRowsAt(
-      70,
-      <StatusBar running={false} {...input} columns={70} approvals={assisted} debugHint />
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toHaveLength(70);
-    expect(rows[0].startsWith(BARE)).toBe(true);
+    expect(barRowsAt(100, bar(100, assisted, true))).toEqual([
+      `${BARE}${SHORT_BADGE}  ·  Tab: focus deb…`,
+    ]);
+    // One cell of room draws the ellipsis alone; none leaves the hint out, and the row is then
+    // exactly the segments and the badge — which fit 80 to the cell.
+    expect(decide(81).hint).toBe('…');
+    expect(decide(80).hint).toBeUndefined();
+    expect(decide(80)).toEqual({ segments: BARE, badge: SHORT_BADGE });
+    expect(barRowsAt(80, bar(80, assisted, true))).toEqual([`${BARE}${SHORT_BADGE}`]);
+    // Only below that does the badge give way, exactly as it does with no hint at all.
+    expect(barRowsAt(70, bar(70, assisted, true))).toEqual([`${BARE}  ·  approval…`]);
+  });
+
+  it('80 columns, bypass, a 36-cell id, the debug hint open: the hint goes first, the badge and model hold', () => {
+    const id = 'anthropic/claude-3-5-sonnet-20241022';
+    const decide = (columns: number) =>
+      statusBarRow({
+        mode: 'chat',
+        modelDisplayName: id,
+        modelProviderType: 'openrouter',
+        turnCount: 0,
+        columns,
+        approvals: bypass,
+        debugHint: true,
+      });
+    // 75 cells of segments and the 10-cell badge leave the hint no room at 80: it is out, and the
+    // row is the one the hint-less cell pins — model whole, `…` in the tail, the badge whole.
+    expect(decide(80)).toEqual({
+      segments: `chat  ·  model: ${id}  ·  turns: 0  ·  ready`,
+      badge: BYPASS,
+    });
+    const rows = barRowsAt(80, bypassBar(80, id, true));
+    expect(rows).toEqual([`chat  ·  model: ${id}  ·  turns: 0  · …${BYPASS}`]);
+    expect(rows[0].endsWith(BYPASS)).toBe(true);
+    expect(rows[0]).toContain(`model: ${id}  ·  turns: 0`);
+    // Wider, it is the hint that is clipped and the segments stay whole: 85 holds the segments
+    // and the badge exactly, 100 leaves the hint fifteen cells.
+    expect(barRowsAt(85, bypassBar(85, id, true))).toEqual([
+      `chat  ·  model: ${id}  ·  turns: 0  ·  ready${BYPASS}`,
+    ]);
+    expect(barRowsAt(100, bypassBar(100, id, true))).toEqual([
+      `chat  ·  model: ${id}  ·  turns: 0  ·  ready${BYPASS}  ·  Tab: focu…`,
+    ]);
   });
 
   it('keeps the running row to one row by the same means', () => {

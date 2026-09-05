@@ -12,6 +12,26 @@ const SEPARATOR = '  ·  ';
 /** The trailing hint, as its own sibling `<Text>`; a constant so its width can be reserved. */
 const DEBUG_HINT_TEXT = '  ·  Tab: focus debug panel';
 
+/**
+ * The hint as the row draws it, given the columns left beside the segments and the badge: whole
+ * when it fits, its first `room - 1` cells and `…` when it does not, nothing when there is not a
+ * cell to draw it in.
+ *
+ * Arithmetic rather than layout, because the hint is the FIRST thing on the row to give way, at
+ * every rung — it is the least informative element there (Tab focuses the panel whether or not
+ * the hint is drawn) — and a layout engine cannot be told "this one first": Yoga shares an
+ * overflow between shrinkable siblings in proportion to their widths, and skewing that with a
+ * large `flexShrink` on the hint leaves the others a fraction of a cell short, which a `<Text>`
+ * inside a box renders as a lost character, and draws a stray `…` at the width where the hint's
+ * share drops below one cell. The hint is single-cell characters throughout, so a string slice is
+ * a cell slice.
+ */
+function hintAsDrawn(room: number): string | undefined {
+  if (room < 1) return undefined;
+  if (displayWidth(DEBUG_HINT_TEXT) <= room) return DEBUG_HINT_TEXT;
+  return `${DEBUG_HINT_TEXT.slice(0, room - 1)}…`;
+}
+
 /** Width assumed when the terminal width is unknown (non-TTY / tests) — as in `ruleWidth`. */
 const DEFAULT_COLUMNS = 80;
 
@@ -109,10 +129,12 @@ export function approvalsBadgeSpellings(
   return { full, short };
 }
 
-/** The texts the bar's row is drawn from: the dim segment run, and the badge if there is one. */
+/** The texts the bar's row is drawn from: the dim segment run, the badge and the hint if drawn. */
 export interface StatusBarRow {
   segments: string;
   badge?: string;
+  /** The debug hint as drawn — whole, clipped to the room left with `…`, or absent (no room). */
+  hint?: string;
 }
 
 /**
@@ -126,7 +148,12 @@ export interface StatusBarRow {
  *    so the same width arithmetic makes every step;
  * 2. the rater profile on the badge — `approvals: Assisted (auto-rater)` becomes
  *    `approvals: Assisted`;
- * 3. only then truncation with `…` at the row's end, which is the RENDER's: every `<Text>` on the
+ * 3. the debug hint, when it is drawn: steps 1 and 2 reserve its width so it stays whole while
+ *    they have something to drop, but once they are spent it is the first thing on the row to give
+ *    way, at every rung — clipped to the room the segments and the badge leave it, or not drawn at
+ *    all (`hintAsDrawn`). It is the least informative element there, and this step is arithmetic
+ *    because a layout engine cannot put one sibling first;
+ * 4. only then truncation with `…` at the row's end, which is the RENDER's: every `<Text>` on the
  *    row is `wrap="truncate-end"`, and exactly one part of the row refuses to shrink. At every
  *    rung but `bypass` that part is the segments, and the badge gives way first. At `bypass` it is
  *    the badge, and the segments' tail gives way instead: `⚡ Bypass` is the one badge whose
@@ -134,6 +161,9 @@ export interface StatusBarRow {
  *    turn counter and — below the width that holds mode + model + badge — the model itself are
  *    clipped. That step is by construction rather than by arithmetic, which is what makes the
  *    one-row count true at a width narrower than the segments themselves.
+ *
+ * So the row's priority, highest first: the badge (`bypass` only) → the model → the rest of the
+ * segments → the badge (every other rung) → the hint.
  *
  * So the strings returned here can still be wider than the row together; what this function
  * promises is that the least is sacrificed that the arithmetic can tell will fit, and that the
@@ -160,9 +190,16 @@ export function statusBarRow(input: {
     reservedColumns: displayWidth(full) + hintColumns,
     columns,
   });
-  if (!spellings) return { segments };
-  const fullFits = displayWidth(segments) + displayWidth(full) + hintColumns <= columns;
-  return { segments, badge: fullFits ? full : spellings.short };
+  const row: StatusBarRow = { segments };
+  if (spellings) {
+    const fullFits = displayWidth(segments) + displayWidth(full) + hintColumns <= columns;
+    row.badge = fullFits ? full : spellings.short;
+  }
+  if (input.debugHint) {
+    const hint = hintAsDrawn(columns - displayWidth(segments) - displayWidth(row.badge ?? ''));
+    if (hint !== undefined) row.hint = hint;
+  }
+  return row;
 }
 
 /**
@@ -176,8 +213,10 @@ export function statusBarRow(input: {
  * instead of wrapping (DL-7), and one part of the row sits in a `flexShrink={0}` box so that the
  * rest gives way to it. That part is the leading text — so the badge, not the model, is what
  * shrinks — except at `bypass`, where it is the `⚡ Bypass` badge and the leading text's tail
- * shrinks instead: a badge clipped to `⚡ …` would hide the one posture with no gate at all. Which
- * spelling of the badge is drawn is `statusBarRow`'s decision.
+ * shrinks instead: a badge clipped to `⚡ …` would hide the one posture with no gate at all. The
+ * debug hint gives way before either: `statusBarRow` clips it to the room left, or leaves it out,
+ * so it is never in an overflowing row. Which spelling of the badge is drawn, and how much of the
+ * hint, is `statusBarRow`'s decision.
  */
 export function StatusBar({
   running,
@@ -265,11 +304,11 @@ export function StatusBar({
         </Text>
       </Box>
       {approvalsBadge}
-      {debugHint ? (
+      {row.hint === undefined ? null : (
         <Text dimColor wrap="truncate-end">
-          {DEBUG_HINT_TEXT}
+          {row.hint}
         </Text>
-      ) : null}
+      )}
     </Box>
   );
 }
