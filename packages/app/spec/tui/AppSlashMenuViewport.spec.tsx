@@ -189,9 +189,11 @@ describe('<App> bounds the slash menu to the terminal (TUI-C92)', () => {
 
       let lines = frameRows(stdout);
       // The frame is always exactly the terminal: the frame box is `height={terminalRows}` and
-      // Ink clamps a taller frame by dropping its top rows (`AppFullScreen.spec.tsx` pins that),
-      // so this cannot see an overflow. It pins the clamp; the LIVE assertion is the prompt-row
-      // one below, which is what fails when the menu takes rows it does not have.
+      // Ink clamps a taller frame by dropping the rows past its height — the BOTTOM of whatever
+      // overflows, so a dock that outgrows its budget loses its prompt row, not the transcript's
+      // top (`AppFullScreen.spec.tsx` pins the clamp) — so this cannot see an overflow. It pins
+      // the clamp; the LIVE assertion is the prompt-row one below, which is what fails when the
+      // menu takes rows it does not have.
       expect(lines).toHaveLength(rows);
       // The prompt row, with what was typed, in the frame's bottom rows.
       expect(lines[rows - PROMPT_ROW_FROM_BOTTOM]).toMatch(/^ {2}> \//);

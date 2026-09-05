@@ -629,9 +629,12 @@ because those are signal, not chatter (DL-1 no important action is silent). Plai
   display spelling, and at `bypass` additionally carries the yellow **`⚡ Bypass`** badge in both
   states (see `/approvals`). **One line is enforced, not assumed (DL-7):** the dock's row budget in
   `App.tsx` counts the bar as one row, so every `<Text>` on it truncates with `…` rather than
-  wrapping, and the leading text sits in a `flexShrink={0}` box so that the badge, not the model,
-  is what gives way. The same rule holds the hint row at the foot of the dock to one line: it
-  truncates from the end of the scroll note, keeping the exit instruction at the front.
+  wrapping, and exactly one part of the row sits in a `flexShrink={0}` box so the rest gives way
+  to it. That part is the leading text, so that the badge, not the model, is what shrinks — except
+  at `bypass`, where the **`⚡ Bypass`** badge is the part that holds and the leading text's tail
+  shrinks instead: a badge clipped to `⚡ …` would hide the one posture with no gate at all. The
+  same rule holds the hint row at the foot of the dock to one line: it truncates from the end of
+  the scroll note, keeping the exit instruction at the front.
 - **The bar gives things up in a fixed order before it truncates (DL-6 consistency, DL-7 graceful
   degradation).** The model half is the shared `modelProviderLabel` spelling the run header and
   launch banner use, so all three say `model (provider)` and none of them invents a second one.
@@ -642,9 +645,14 @@ because those are signal, not chatter (DL-1 no important action is silent). Plai
   then the **rater profile** on the approvals badge (`approvals: Assisted (auto-rater)` becomes
   `approvals: Assisted`), and only then does the render truncate — the badge first, and the
   segments only on a terminal narrower than the bare segments themselves. The model is never
-  clipped to make room for the badge: it is the half the user chose, and a clipped `openrou…` or
-  `claude-sonnet-4…` misleads rather than merely shortens, which is the same reason the banner
-  drops a version it cannot fit. The budget counts the badge and the hint, because they are
+  clipped to make room for a badge that can shrink: it is the half the user chose, and a clipped
+  `openrou…` or `claude-sonnet-4…` misleads rather than merely shortens, which is the same reason
+  the banner drops a version it cannot fit. At `bypass` the row's priority, highest first, is the
+  `⚡ Bypass` badge whole, then the model whole, then the rest of the segments — `ready`, then the
+  turn counter — clipped from the end with `…`. Below the width that holds the mode, the whole
+  model and the badge, the model is the last thing left on the segments' side and is clipped
+  itself; that is the stated floor, not a defect — a clipped model beside a whole `⚡ Bypass` still
+  tells the truth about the gate. The budget counts the badge and the hint, because they are
   separate `<Text>` nodes on the row the terminal wraps as a whole. Both drop decisions live in
   pure exported functions taking `columns` as a parameter (`statusBarSegments`, `statusBarRow`),
   not in the render — a rule that only exists inside a component can only be tested by driving a

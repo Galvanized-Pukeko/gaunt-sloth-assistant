@@ -3,7 +3,7 @@ import React from 'react';
 import { EventEmitter } from 'node:events';
 import { render as inkRender } from 'ink';
 import stripAnsi from 'strip-ansi';
-import { StatusBar, statusBarRow } from '#src/tui/components/StatusBar.js';
+import { StatusBar, approvalsBadgeSpellings, statusBarRow } from '#src/tui/components/StatusBar.js';
 
 /**
  * TUI-C92 — **the status bar is one row at every width, and it gives things up in a fixed order.**
@@ -12,12 +12,17 @@ import { StatusBar, statusBarRow } from '#src/tui/components/StatusBar.js';
  * of the conversation's floor without the budget knowing. So the bar is made unable to wrap
  * (DL-7): the render truncates, and the pure `statusBarRow` decides what to sacrifice first so
  * that truncation is the last resort rather than the first. The order — provider, then the rater
- * profile on the approvals badge, then `…` — is asserted at four widths, each one step narrower,
- * and the `⚡ Bypass` badge is asserted intact at every width the bar is designed for, because it
- * is the one badge whose absence would misreport a posture with no gate at all.
+ * profile on the approvals badge, then `…` — is asserted at four widths, each one step narrower.
+ *
+ * The `⚡ Bypass` badge is the exception to "the badge gives way first": it is the one badge whose
+ * absence would misreport a posture with no gate at all, so at `bypass` the badge is the part of
+ * the row that refuses to shrink and the segments' tail gives way to it — `ready`, then the turn
+ * counter — and it is asserted whole at every width down to the floor, the width that holds mode +
+ * model + badge. Below that floor the model itself is clipped and the badge still holds.
  *
  * Widths are chosen from the measured strings: the segments with the provider are 69 cells and
- * without it 56; the full badge is 37, the short one 24, the bypass badge 10.
+ * without it 56, of which the mode and the `model: ` label are 16; the full badge is 37, the short
+ * one 24, the bypass badge 10.
  */
 
 /** A stdout with a width, so the row's fit is decided at the width the spec names. */
@@ -77,6 +82,25 @@ const bypass = { rung: 'bypass' as const };
 const bar = (columns: number, approvals: { rung: 'assisted' | 'bypass' }) => (
   <StatusBar running={false} {...input} columns={columns} approvals={approvals} />
 );
+
+/** An idle bypass session on a long openrouter-style id, whose `provider/` prefix is ordinary. */
+const bypassBar = (columns: number, modelDisplayName: string) => (
+  <StatusBar
+    running={false}
+    mode="chat"
+    modelDisplayName={modelDisplayName}
+    modelProviderType="openrouter"
+    turnCount={0}
+    columns={columns}
+    approvals={bypass}
+  />
+);
+
+const runningBypassRows = (columns: number) =>
+  barRowsAt(
+    columns,
+    <StatusBar running mode="code" turnCount={2} columns={columns} approvals={bypass} />
+  );
 
 describe('the status bar gives way in order and stays one row (TUI-C92)', () => {
   it('120 columns: everything fits, nothing is sacrificed', () => {
@@ -149,6 +173,78 @@ describe('the status bar gives way in order and stays one row (TUI-C92)', () => 
     ]);
   });
 
+  it('93 columns keeps the full badge at exactly the width it fits, and 92 drops the profile', () => {
+    // The bare segments (56) and the full badge (37) are 93 cells: the boundary is `<=`, and a
+    // `<` would drop the profile one width too early.
+    expect(`${BARE}${FULL_BADGE}`).toHaveLength(93);
+    expect(statusBarRow({ ...input, columns: 93, approvals: assisted })).toEqual({
+      segments: BARE,
+      badge: FULL_BADGE,
+    });
+    expect(barRowsAt(93, bar(93, assisted))).toEqual([`${BARE}${FULL_BADGE}`]);
+    expect(statusBarRow({ ...input, columns: 92, approvals: assisted })).toEqual({
+      segments: BARE,
+      badge: SHORT_BADGE,
+    });
+    expect(barRowsAt(92, bar(92, assisted))).toEqual([`${BARE}${SHORT_BADGE}`]);
+  });
+
+  it.each([
+    [
+      'anthropic/claude-3-5-sonnet-20241022',
+      'chat  ·  model: anthropic/claude-3-5-sonnet-20241022  ·  turns: 0  · …',
+    ],
+    [
+      'google/gemini-2.5-flash-preview-05-20',
+      'chat  ·  model: google/gemini-2.5-flash-preview-05-20  ·  turns: 0  ·…',
+    ],
+  ])(
+    '80 columns, bypass, a long openrouter id (%s): the badge holds, the segments give way',
+    (id, segments) => {
+      // The segments are 75 and 76 cells beside a 10-cell badge; the badge is the part that
+      // refuses to shrink, so the `…` lands in the segments' tail and the model stays whole.
+      const rows = barRowsAt(80, bypassBar(80, id));
+      expect(rows).toEqual([`${segments}${BYPASS}`]);
+      // Each of the three named, so a failure says which one went.
+      expect(rows[0].endsWith(BYPASS)).toBe(true);
+      expect(rows[0]).toContain(`model: ${id}  ·  turns: 0`);
+      expect(rows[0].slice(0, -BYPASS.length)).toMatch(/…$/);
+    }
+  );
+
+  it.each([
+    [65, 'code  ·  model: claude-sonnet-4-5  ·  turns: 2  ·  rea…'],
+    [60, 'code  ·  model: claude-sonnet-4-5  ·  turns: 2  ·…'],
+    [50, 'code  ·  model: claude-sonnet-4-5  ·  t…'],
+  ])(
+    '%i columns, bypass: the badge and the model whole, `ready` then the turn counter give way',
+    (columns, segments) => {
+      const rows = barRowsAt(columns, bar(columns, bypass));
+      expect(rows).toEqual([`${segments}${BYPASS}`]);
+      expect(rows[0]).toContain('model: claude-sonnet-4-5  ·');
+    }
+  );
+
+  it('40 columns, bypass — the stated floor: below mode + model + badge the model is clipped', () => {
+    // 16 cells of mode and label, 17 of model, 10 of badge: 43 is the narrowest width that holds
+    // all three. Below it the model is the last thing left on the segments' side and truncates;
+    // the badge still does not. That is the floor the bar is designed to, not a defect.
+    const rows = barRowsAt(40, bar(40, bypass));
+    expect(rows).toEqual([`code  ·  model: claude-sonnet…${BYPASS}`]);
+    expect(rows[0].endsWith(BYPASS)).toBe(true);
+  });
+
+  it('keeps the ⚡ Bypass badge whole on the running row, and truncates the interrupt hint', () => {
+    // 40 columns hold the spinner and hint (30 cells) beside the badge (10) exactly; below that
+    // the hint is the part that gives way, never the badge.
+    expect(runningBypassRows(40)).toHaveLength(1);
+    expect(runningBypassRows(40)[0]).toMatch(/^. Thinking… \(Esc to interrupt\) ⚡ Bypass$/);
+    expect(runningBypassRows(39)).toHaveLength(1);
+    expect(runningBypassRows(39)[0]).toMatch(/^. Thinking… \(Esc to interrup… ⚡ Bypass$/);
+    expect(runningBypassRows(30)).toHaveLength(1);
+    expect(runningBypassRows(30)[0]).toMatch(/^. Thinking… \(Esc to… ⚡ Bypass$/);
+  });
+
   it('reserves the debug hint in the decision, and truncates it too', () => {
     // 93 cells of segments and full badge fit 110 columns alone; with the 27-cell hint they are
     // 120 and do not, so the profile goes — the decision sees the hint.
@@ -213,6 +309,8 @@ describe('the status bar gives way in order and stays one row (TUI-C92)', () => 
       statusBarRow({ ...input, columns: 200, approvals: { rung: 'auto', raterProfile: 'strict' } })
         .badge
     ).toBe('  ·  approvals: Auto (strict)');
+    // `bypass` has no profile either, and one spelling: both halves are the badge, exactly.
+    expect(approvalsBadgeSpellings(bypass)).toEqual({ full: BYPASS, short: BYPASS });
     // No approvals surface at all: no badge, and the decision degrades to the segments alone.
     expect(statusBarRow({ ...input, columns: 200 })).toEqual({ segments: WITH_PROVIDER });
   });

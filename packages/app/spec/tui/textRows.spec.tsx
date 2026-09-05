@@ -61,6 +61,9 @@ const BATTERY: Array<[string, string]> = [
   ['an emoji with a variation selector', 'fire 🔥 and ❤️ heart and ✂️ scissors'],
   ['a decomposed accent', long('café latte ', 5).trim()],
   ['a zero-width space at the end of a word', 'ab​cd​ ef'],
+  // Nothing follows the zero-width cluster here, so the row it would start on its own has to fold
+  // back into the row before it; a following word re-creates that row and hides the fold.
+  ['a zero-width space ending an over-wide word', 'wwww​'],
   ['a zero-width joiner on its own', 'ab‍'],
   ['a tab-separated line', 'col\tcol\tcol\tcol\tcol'],
   ['two lines', 'first line\nsecond line'],

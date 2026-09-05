@@ -127,9 +127,13 @@ export interface StatusBarRow {
  * 2. the rater profile on the badge — `approvals: Assisted (auto-rater)` becomes
  *    `approvals: Assisted`;
  * 3. only then truncation with `…` at the row's end, which is the RENDER's: every `<Text>` on the
- *    row is `wrap="truncate-end"`, the segments refuse to shrink, and the badge gives way first.
- *    That step is by construction rather than by arithmetic, which is what makes the one-row count
- *    true at a width narrower than the segments themselves.
+ *    row is `wrap="truncate-end"`, and exactly one part of the row refuses to shrink. At every
+ *    rung but `bypass` that part is the segments, and the badge gives way first. At `bypass` it is
+ *    the badge, and the segments' tail gives way instead: `⚡ Bypass` is the one badge whose
+ *    absence misreports a posture with no gate at all, so it holds whole while `ready`, then the
+ *    turn counter and — below the width that holds mode + model + badge — the model itself are
+ *    clipped. That step is by construction rather than by arithmetic, which is what makes the
+ *    one-row count true at a width narrower than the segments themselves.
  *
  * So the strings returned here can still be wider than the row together; what this function
  * promises is that the least is sacrificed that the arithmetic can tell will fit, and that the
@@ -168,9 +172,12 @@ export function statusBarRow(input: {
  * turn, not here, so this bar stays stable (one line) and does not flicker.
  *
  * **One row by construction, in both states.** The dock's row budget counts this bar as one row,
- * so it cannot be allowed to wrap at any width: the leading text sits in a `flexShrink={0}` box so
- * the badge — not the model — gives way, and every `<Text>` on the row truncates with `…` instead
- * of wrapping (DL-7). Which spelling of the badge is drawn is `statusBarRow`'s decision.
+ * so it cannot be allowed to wrap at any width: every `<Text>` on the row truncates with `…`
+ * instead of wrapping (DL-7), and one part of the row sits in a `flexShrink={0}` box so that the
+ * rest gives way to it. That part is the leading text — so the badge, not the model, is what
+ * shrinks — except at `bypass`, where it is the `⚡ Bypass` badge and the leading text's tail
+ * shrinks instead: a badge clipped to `⚡ …` would hide the one posture with no gate at all. Which
+ * spelling of the badge is drawn is `statusBarRow`'s decision.
  */
 export function StatusBar({
   running,
@@ -219,11 +226,18 @@ export function StatusBar({
   // idle). Only `bypass` is warn-styled: it is the one rung with NO gate at all. The rest are dim
   // like the rest of the status line — `assisted` is the default and recommended posture, and
   // shouting at the user about the default trains them to ignore the colour that matters.
+  //
+  // `bypass` is also the one badge that never gives way: its box refuses to shrink, and the
+  // leading text — the segments when idle, the interrupt hint while running — is what truncates
+  // instead. Every other badge shrinks first, and the leading text is what holds.
+  const badgeHolds = approvals?.rung === 'bypass';
   const approvalsBadge =
-    row.badge === undefined ? null : approvals?.rung === 'bypass' ? (
-      <Text color="yellow" bold wrap="truncate-end">
-        {row.badge}
-      </Text>
+    row.badge === undefined ? null : badgeHolds ? (
+      <Box flexShrink={0}>
+        <Text color="yellow" bold wrap="truncate-end">
+          {row.badge}
+        </Text>
+      </Box>
     ) : (
       <Text dimColor wrap="truncate-end">
         {row.badge}
@@ -233,7 +247,7 @@ export function StatusBar({
   if (running) {
     return (
       <Box>
-        <Box flexShrink={0}>
+        <Box flexShrink={badgeHolds ? 1 : 0}>
           <Text color="yellow" wrap="truncate-end">
             <Spinner type="dots" /> Thinking… (Esc to interrupt)
           </Text>
@@ -245,7 +259,7 @@ export function StatusBar({
 
   return (
     <Box>
-      <Box flexShrink={0}>
+      <Box flexShrink={badgeHolds ? 1 : 0}>
         <Text dimColor wrap="truncate-end">
           {row.segments}
         </Text>
