@@ -14,6 +14,10 @@ import { wrappedRows } from '#src/tui/textRows.js';
  * IS the row count, which also handles the two edges a `split('\n')` cannot — an empty `<Text>`
  * measures zero rows, and a row of nothing but spaces is trimmed to an empty string in the frame
  * but is still a row.
+ *
+ * One Ink render per cell — a (string, width) pair each. A cell that rendered every width in a
+ * loop would carry a thirteenth of the per-test headroom a normal cell has, and be the first thing
+ * to time out on a loaded CI runner; the per-test ceiling is not raised for it.
  */
 const MARKER = '<<END>>';
 
@@ -73,16 +77,20 @@ const BATTERY: Array<[string, string]> = [
 ];
 
 describe('wrappedRows mirrors the rows Ink draws (TUI-C92)', () => {
-  it.each(BATTERY)('%s', (_name, text) => {
-    for (const width of WIDTHS) {
+  describe.each(BATTERY)('%s', (_name, text) => {
+    it.each(WIDTHS)('at width %i', (width) => {
       expect(wrappedRows(text, width), `at width ${width}`).toBe(rowsInkDraws(text, width));
-    }
+    });
   });
 
-  it.each(WIDTHS)('a word exactly the width, and one cell over, at %i', (width) => {
-    for (const text of [long('w', width), long('w', width + 1), `${long('w', width)} next`]) {
+  describe.each(WIDTHS)('a word exactly the width, and one cell over, at %i', (width) => {
+    it.each([
+      ['exactly the width', long('w', width)],
+      ['one cell over', long('w', width + 1)],
+      ['exactly the width, then a word', `${long('w', width)} next`],
+    ])('%s', (_name, text) => {
       expect(wrappedRows(text, width), JSON.stringify(text)).toBe(rowsInkDraws(text, width));
-    }
+    });
   });
 
   /**
