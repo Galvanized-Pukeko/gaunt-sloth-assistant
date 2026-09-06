@@ -74,9 +74,10 @@ export function statusBarSegments(input: {
   modelProviderType?: string;
   turnCount?: number;
   /**
-   * Columns already spoken for by the sibling `<Text>` nodes on this same line (the approvals
-   * badge, the debug hint). They are separate nodes so they can carry their own colour, but the
-   * terminal wraps the row as a whole, so the budget has to know about them.
+   * Columns already spoken for by a sibling `<Text>` on this same line (the approvals badge). It
+   * is a separate node so it can carry its own colour, but the terminal wraps the row as a whole,
+   * so the budget has to know about it. The debug hint is deliberately NOT reserved: it takes
+   * what is left (`statusBarRow`).
    */
   reservedColumns?: number;
   /** Live `stdout.columns`; `undefined` (non-TTY / tests) falls back to 80, as `ruleWidth` does. */
@@ -148,19 +149,20 @@ export interface StatusBarRow {
  *    so the same width arithmetic makes every step;
  * 2. the rater profile on the badge — `approvals: Assisted (auto-rater)` becomes
  *    `approvals: Assisted`;
- * 3. the debug hint, when it is drawn: steps 1 and 2 reserve its width so it stays whole while
- *    they have something to drop, but once they are spent it is the first thing on the row to give
- *    way, at every rung — clipped to the room the segments and the badge leave it, or not drawn at
- *    all (`hintAsDrawn`). It is the least informative element there, and this step is arithmetic
- *    because a layout engine cannot put one sibling first;
+ * 3. the debug hint, when it is drawn: it gets only the room the segments and the badge leave it
+ *    — clipped with `…`, or not drawn at all (`hintAsDrawn`) — and neither step above reserves a
+ *    cell for it, so it is the first thing on the row to give way at every rung, before the
+ *    profile and before the provider. It is the least informative element there, and this step
+ *    is arithmetic because a layout engine cannot put one sibling first;
  * 4. only then truncation with `…` at the row's end, which is the RENDER's: every `<Text>` on the
  *    row is `wrap="truncate-end"`, and exactly one part of the row refuses to shrink. At every
  *    rung but `bypass` that part is the segments, and the badge gives way first. At `bypass` it is
  *    the badge, and the segments' tail gives way instead: `⚡ Bypass` is the one badge whose
  *    absence misreports a posture with no gate at all, so it holds whole while `ready`, then the
- *    turn counter and — below the width that holds mode + model + badge — the model itself are
- *    clipped. That step is by construction rather than by arithmetic, which is what makes the
- *    one-row count true at a width narrower than the segments themselves.
+ *    turn counter and — below the width that holds mode + model + the `…` the clipped segments
+ *    end in + badge — the model itself are clipped. That step is by construction rather than by
+ *    arithmetic, which is what makes the one-row count true at a width narrower than the segments
+ *    themselves.
  *
  * So the row's priority, highest first: the badge (`bypass` only) → the model → the rest of the
  * segments → the badge (every other rung) → the hint.
@@ -179,20 +181,21 @@ export function statusBarRow(input: {
   approvals?: StatusBarApprovals;
 }): StatusBarRow {
   const columns = resolveColumns(input.columns);
-  const hintColumns = input.debugHint ? displayWidth(DEBUG_HINT_TEXT) : 0;
   const spellings = approvalsBadgeSpellings(input.approvals);
   const full = spellings?.full ?? '';
+  // Neither drop sees the hint: it ranks below the provider and the profile, so reserving its
+  // width here would sacrifice one of them to keep a hint the row then clips anyway.
   const segments = statusBarSegments({
     mode: input.mode,
     modelDisplayName: input.modelDisplayName,
     modelProviderType: input.modelProviderType,
     turnCount: input.turnCount,
-    reservedColumns: displayWidth(full) + hintColumns,
+    reservedColumns: displayWidth(full),
     columns,
   });
   const row: StatusBarRow = { segments };
   if (spellings) {
-    const fullFits = displayWidth(segments) + displayWidth(full) + hintColumns <= columns;
+    const fullFits = displayWidth(segments) + displayWidth(full) <= columns;
     row.badge = fullFits ? full : spellings.short;
   }
   if (input.debugHint) {

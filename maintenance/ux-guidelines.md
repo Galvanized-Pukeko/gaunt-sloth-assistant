@@ -650,17 +650,18 @@ because those are signal, not chatter (DL-1 no important action is silent). Plai
   the banner drops a version it cannot fit. At `bypass` the row's priority, highest first, is the
   `⚡ Bypass` badge whole, then the model whole, then the rest of the segments — `ready`, then the
   turn counter — clipped from the end with `…`. Below the width that holds the mode, the whole
-  model and the badge, the model is the last thing left on the segments' side and is clipped
-  itself; that is the stated floor, not a defect — a clipped model beside a whole `⚡ Bypass` still
-  tells the truth about the gate. The **debug hint** (`Tab: focus debug panel`, drawn while the
-  panel is open and unfocused) is the lowest priority on the row at every rung: the two drops
-  reserve its width, but once they are spent it is the first thing to give way — clipped with `…`
-  to the room the segments and the badge leave it, or left off the row — because it is the least
-  informative element there (Tab focuses the panel whether or not the hint is drawn). So the row's
-  priority, highest first, is: at `bypass` the badge, the model, the rest of the segments, the
-  hint; at every other rung the segments (the model first among them), the badge, the hint. The
-  budget counts the badge and the hint, because they are separate `<Text>` nodes on the row the
-  terminal wraps as a whole. The drop decisions and the hint's give-way live in pure exported
+  model, the `…` the clipped segments end in, and the badge, the model is the last thing left on
+  the segments' side and is clipped itself; that is the stated floor, not a defect — a clipped
+  model beside a whole `⚡ Bypass` still tells the truth about the gate. The **debug hint**
+  (`Tab: focus debug panel`, drawn while the panel is open and unfocused) is the lowest priority
+  on the row at every rung: neither drop reserves a cell for it, so it gets only the room the
+  segments and the badge leave — clipped with `…`, or left off the row — before the profile goes
+  and before the provider goes, because it is the least informative element there (Tab focuses the
+  panel whether or not the hint is drawn). So the row's priority, highest first, is: at `bypass`
+  the badge, the model, the rest of the segments, the hint; at every other rung the segments (the
+  model first among them), the badge, the hint. The budget counts the badge, because it is a
+  separate `<Text>` node on the row the terminal wraps as a whole; the hint takes what is left.
+  The drop decisions and the hint's give-way live in pure exported
   functions taking `columns` as a parameter (`statusBarSegments`, `statusBarRow`), not in the
   render — a rule that only exists inside a component can only be tested by driving a terminal,
   and a layout engine cannot be told which sibling gives way first.

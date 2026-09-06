@@ -18,13 +18,14 @@ import { StatusBar, approvalsBadgeSpellings, statusBarRow } from '#src/tui/compo
  * absence would misreport a posture with no gate at all, so at `bypass` the badge is the part of
  * the row that refuses to shrink and the segments' tail gives way to it — `ready`, then the turn
  * counter — and it is asserted whole at every width down to the floor, the width that holds mode +
- * model + badge. Below that floor the model itself is clipped and the badge still holds.
+ * model + the `…` the clipped segments end in + badge. Below that floor the model itself is
+ * clipped and the badge still holds.
  *
- * The debug hint is the lowest priority on the row at every rung: the decision reserves its width
- * while it still has a provider or a profile to drop, and once those are spent the hint is the
- * first thing to give way — clipped to the room left, or left out — before the badge (other rungs)
- * or the segments' tail (`bypass`) shrink. That is arithmetic in `statusBarRow`, so it is asserted
- * on the decision and on the row.
+ * The debug hint is the lowest priority on the row at every rung: neither drop reserves a cell for
+ * it, so it gets only the room the segments and the badge leave — clipped, or left out — before
+ * the profile goes, before the provider goes, and before the badge (other rungs) or the segments'
+ * tail (`bypass`) shrink. That is arithmetic in `statusBarRow`, so it is asserted on the decision
+ * and on the row.
  *
  * Widths are chosen from the measured strings: the segments with the provider are 69 cells and
  * without it 56, of which the mode and the `model: ` label are 16; the full badge is 37, the short
@@ -239,10 +240,14 @@ describe('the status bar gives way in order and stays one row (TUI-C92)', () => 
     }
   );
 
-  it('40 columns, bypass — the stated floor: below mode + model + badge the model is clipped', () => {
-    // 16 cells of mode and label, 17 of model, 10 of badge: 43 is the narrowest width that holds
-    // all three. Below it the model is the last thing left on the segments' side and truncates;
-    // the badge still does not. That is the floor the bar is designed to, not a defect.
+  it('40 columns, bypass — the stated floor: below mode + model + … + badge the model is clipped', () => {
+    // 16 cells of mode and label, 17 of model, one for the `…` the clipped segments end in, 10 of
+    // badge: 44 is the narrowest width that holds the model whole, and at 43 the ellipsis takes
+    // the model's last character. Below that the model is the last thing left on the segments'
+    // side and truncates; the badge still does not. That is the floor the bar is designed to,
+    // not a defect.
+    expect(barRowsAt(44, bar(44, bypass))).toEqual([`code  ·  model: claude-sonnet-4-5…${BYPASS}`]);
+    expect(barRowsAt(43, bar(43, bypass))).toEqual([`code  ·  model: claude-sonnet-4-…${BYPASS}`]);
     const rows = barRowsAt(40, bar(40, bypass));
     expect(rows).toEqual([`code  ·  model: claude-sonnet…${BYPASS}`]);
     expect(rows[0].endsWith(BYPASS)).toBe(true);
@@ -259,25 +264,33 @@ describe('the status bar gives way in order and stays one row (TUI-C92)', () => 
     expect(runningBypassRows(30)[0]).toMatch(/^. Thinking… \(Esc to… ⚡ Bypass$/);
   });
 
-  it('reserves the debug hint in the decision, then gives it up first once the drops are spent', () => {
-    // 93 cells of segments and full badge fit 110 columns alone; with the 27-cell hint they are
-    // 120 and do not, so the profile goes — the decision sees the hint, and keeps it whole.
+  it('gives the debug hint only the room the segments and the badge leave, at every width', () => {
+    // Neither drop reserves a cell for the hint, so it never costs the provider or the profile:
+    // with the provider and the full badge (106 cells) both fitting, 120 leaves the hint 14
+    // cells, 110 leaves it 4, and 106 none at all.
     const decide = (columns: number) =>
       statusBarRow({ ...input, columns, approvals: assisted, debugHint: true });
-    expect(decide(110)).toEqual({ segments: BARE, badge: SHORT_BADGE, hint: DEBUG_HINT });
-    expect(barRowsAt(110, bar(110, assisted, true))).toEqual([
-      `${BARE}${SHORT_BADGE}${DEBUG_HINT}`,
-    ]);
-    // Nothing left to drop at 100: the hint — the least informative element — is clipped to the
-    // 20 cells the segments and the badge leave it, and the badge stays whole.
-    expect(decide(100)).toEqual({
-      segments: BARE,
-      badge: SHORT_BADGE,
-      hint: '  ·  Tab: focus deb…',
+    expect(decide(120)).toEqual({
+      segments: WITH_PROVIDER,
+      badge: FULL_BADGE,
+      hint: '  ·  Tab: foc…',
     });
-    expect(barRowsAt(100, bar(100, assisted, true))).toEqual([
-      `${BARE}${SHORT_BADGE}  ·  Tab: focus deb…`,
+    expect(barRowsAt(120, bar(120, assisted, true))).toEqual([
+      `${WITH_PROVIDER}${FULL_BADGE}  ·  Tab: foc…`,
     ]);
+    expect(decide(110)).toEqual({ segments: WITH_PROVIDER, badge: FULL_BADGE, hint: '  ·…' });
+    expect(barRowsAt(110, bar(110, assisted, true))).toEqual([`${WITH_PROVIDER}${FULL_BADGE}  ·…`]);
+    expect(decide(106)).toEqual({ segments: WITH_PROVIDER, badge: FULL_BADGE });
+    expect(barRowsAt(106, bar(106, assisted, true))).toEqual([`${WITH_PROVIDER}${FULL_BADGE}`]);
+    // The provider goes at 105 exactly as it would with no hint at all, and the room that frees
+    // goes to the hint: at 100 the profile is kept and the hint gets the seven cells left.
+    expect(decide(105).segments).toBe(BARE);
+    expect(decide(100)).toEqual({ segments: BARE, badge: FULL_BADGE, hint: '  ·  T…' });
+    expect(barRowsAt(100, bar(100, assisted, true))).toEqual([`${BARE}${FULL_BADGE}  ·  T…`]);
+    // The profile goes at 92, as it does with no hint at all (the 93/92 cell), never earlier.
+    expect(decide(93)).toEqual({ segments: BARE, badge: FULL_BADGE });
+    expect(decide(92)).toEqual({ segments: BARE, badge: SHORT_BADGE, hint: '  ·  Tab: f…' });
+    expect(barRowsAt(92, bar(92, assisted, true))).toEqual([`${BARE}${SHORT_BADGE}  ·  Tab: f…`]);
     // One cell of room draws the ellipsis alone; none leaves the hint out, and the row is then
     // exactly the segments and the badge — which fit 80 to the cell.
     expect(decide(81).hint).toBe('…');
@@ -286,6 +299,28 @@ describe('the status bar gives way in order and stays one row (TUI-C92)', () => 
     expect(barRowsAt(80, bar(80, assisted, true))).toEqual([`${BARE}${SHORT_BADGE}`]);
     // Only below that does the badge give way, exactly as it does with no hint at all.
     expect(barRowsAt(70, bar(70, assisted, true))).toEqual([`${BARE}  ·  approval…`]);
+  });
+
+  it('bypass: the provider is no longer dropped merely to keep the hint whole', () => {
+    // With the provider the segments are 69 cells; beside the 10-cell badge they fit from 79 up,
+    // and the hint gets what is left — whole at 110, clipped at 100, nothing at 79. At 78 the
+    // provider goes because it no longer fits beside the badge, not to make room for the hint,
+    // and the room that frees goes to the hint.
+    const decide = (columns: number) =>
+      statusBarRow({ ...input, columns, approvals: bypass, debugHint: true });
+    expect(decide(110)).toEqual({ segments: WITH_PROVIDER, badge: BYPASS, hint: DEBUG_HINT });
+    expect(decide(100)).toEqual({
+      segments: WITH_PROVIDER,
+      badge: BYPASS,
+      hint: '  ·  Tab: focus debu…',
+    });
+    expect(barRowsAt(100, bar(100, bypass, true))).toEqual([
+      `${WITH_PROVIDER}${BYPASS}  ·  Tab: focus debu…`,
+    ]);
+    expect(decide(79)).toEqual({ segments: WITH_PROVIDER, badge: BYPASS });
+    expect(barRowsAt(79, bar(79, bypass, true))).toEqual([`${WITH_PROVIDER}${BYPASS}`]);
+    expect(decide(78)).toEqual({ segments: BARE, badge: BYPASS, hint: '  ·  Tab: f…' });
+    expect(barRowsAt(78, bar(78, bypass, true))).toEqual([`${BARE}${BYPASS}  ·  Tab: f…`]);
   });
 
   it('80 columns, bypass, a 36-cell id, the debug hint open: the hint goes first, the badge and model hold', () => {
@@ -310,13 +345,17 @@ describe('the status bar gives way in order and stays one row (TUI-C92)', () => 
     expect(rows).toEqual([`chat  ·  model: ${id}  ·  turns: 0  · …${BYPASS}`]);
     expect(rows[0].endsWith(BYPASS)).toBe(true);
     expect(rows[0]).toContain(`model: ${id}  ·  turns: 0`);
-    // Wider, it is the hint that is clipped and the segments stay whole: 85 holds the segments
-    // and the badge exactly, 100 leaves the hint fifteen cells.
+    // Wider, it is the hint that is clipped and the segments stay whole: 85 holds the bare
+    // segments and the badge exactly. The provider comes back the moment it fits beside the badge
+    // (98, exactly), and the hint gets only what is left after that — two cells at 100.
     expect(barRowsAt(85, bypassBar(85, id, true))).toEqual([
       `chat  ·  model: ${id}  ·  turns: 0  ·  ready${BYPASS}`,
     ]);
+    expect(barRowsAt(98, bypassBar(98, id, true))).toEqual([
+      `chat  ·  model: ${id} (openrouter)  ·  turns: 0  ·  ready${BYPASS}`,
+    ]);
     expect(barRowsAt(100, bypassBar(100, id, true))).toEqual([
-      `chat  ·  model: ${id}  ·  turns: 0  ·  ready${BYPASS}  ·  Tab: focu…`,
+      `chat  ·  model: ${id} (openrouter)  ·  turns: 0  ·  ready${BYPASS} …`,
     ]);
   });
 
