@@ -9,7 +9,10 @@ import { displayWidth } from '@gaunt-sloth/core/utils/displayWidth.js';
 /** Separates the bar's segments, and the unit the width budget is spent in. */
 const SEPARATOR = '  ·  ';
 
-/** The trailing hint, as its own sibling `<Text>`; a constant so its width can be reserved. */
+/**
+ * The trailing hint, as its own sibling `<Text>`; a constant so `hintAsDrawn` can clip it by cell.
+ * Its width is NOT reserved by any drop decision — it takes only the room the rest of the row leaves.
+ */
 const DEBUG_HINT_TEXT = '  ·  Tab: focus debug panel';
 
 /**
@@ -145,8 +148,8 @@ export interface StatusBarRow {
  * row budget in `App.tsx` counts it as one. The order of sacrifice when it will not fit, least
  * informative first:
  *
- * 1. the provider — `statusBarSegments`'s decision, with the badge and the debug hint reserved,
- *    so the same width arithmetic makes every step;
+ * 1. the provider — `statusBarSegments`'s decision, with the badge reserved and the debug hint
+ *    NOT reserved, so the same width arithmetic makes every step;
  * 2. the rater profile on the badge — `approvals: Assisted (auto-rater)` becomes
  *    `approvals: Assisted`;
  * 3. the debug hint, when it is drawn: it gets only the room the segments and the badge leave it
