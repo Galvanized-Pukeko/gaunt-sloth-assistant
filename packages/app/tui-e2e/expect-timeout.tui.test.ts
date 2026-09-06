@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { test, expect } from '@microsoft/tui-test';
 import { settleSessionsAfterEach } from './fixtures/tmpHome.mjs';
 import { configuredExpectTimeout } from './fixtures/expectTimeout.mjs';
@@ -28,8 +29,13 @@ const LATE_MARKER = 'QA15-LATE-MARKER';
  * The delay the fixture holds the marker back by. It has to sit strictly between the library's
  * 5000 ms fallback and the configured bound, with room on both sides: too small and the case passes
  * under either bound and proves nothing; too large and it eats into the per-test timeout.
+ *
+ * Read out of the fixture rather than restated here. A copy of the number would go green while the
+ * fixture drifted underneath it, which is the one way the guard on it below could stop meaning
+ * anything.
  */
-const FIXTURE_DELAY_MS = 7_000;
+const FIXTURE_DELAY_MS: number = JSON.parse(readFileSync(fixture('expect-timeout.json'), 'utf8'))
+  .turns[0].delayMs;
 
 /** The bound the config asks for, read from the config rather than restated, so retuning it here is one edit. */
 const DECLARED_EXPECT_TIMEOUT = tuiTestConfig.expect?.timeout;
@@ -54,9 +60,9 @@ const DECLARED_EXPECT_TIMEOUT = tuiTestConfig.expect?.timeout;
  * - the marker becomes visible at all — proves the matchers resolve to the **same** physical config
  *   module the fixture populated, which is the actual defect and the one thing a reading of the
  *   sources cannot establish;
- * - the wait really exceeded 5000 ms — without it, shortening `FIXTURE_DELAY_MS` (or a fixture
- *   agent that stopped honouring `delayMs`) would leave a case that passes under both bounds and
- *   quietly stops testing anything.
+ * - the wait really exceeded 5000 ms, and the fixture's own delay does too — without those,
+ *   shortening the fixture's `delayMs` (or a fixture agent that stopped honouring it) would leave a
+ *   case that passes under both bounds and quietly stops testing anything.
  */
 test.describe('gth chat TUI — the configured expect timeout binds in the worker', () => {
   test.use({

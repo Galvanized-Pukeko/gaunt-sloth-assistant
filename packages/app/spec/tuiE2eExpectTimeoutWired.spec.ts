@@ -90,6 +90,16 @@ describe('QA-15 the PTY e2e expect timeout is wired into every test file', () =>
   });
 });
 
+/**
+ * Every file the suite would run, found the way the suite finds them.
+ *
+ * Recursive, because `testMatch` is `**` + `/*.tui.test.ts` and a flat read is not: a case added in
+ * a subdirectory would run in the suite and be invisible to the gate whose whole job is catching
+ * files added later. Nothing else under here is a `.tui.test.ts` — the transpiled cache holds `.js`,
+ * because the transform rewrites the extension.
+ */
 function testFiles(): string[] {
-  return readdirSync(E2E_DIR).filter((name) => name.endsWith('.tui.test.ts'));
+  return readdirSync(E2E_DIR, { recursive: true })
+    .map(String)
+    .filter((name) => name.endsWith('.tui.test.ts'));
 }
