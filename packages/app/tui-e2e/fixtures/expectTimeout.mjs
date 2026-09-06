@@ -37,6 +37,12 @@
  */
 import { getExpectTimeout, loadConfig } from '@microsoft/tui-test/lib/config/config.js';
 
+/**
+ * The library's own fallback. Named here because it is the value that means "no config was found",
+ * and both checks below turn on telling that apart from a configured number.
+ */
+const LIBRARY_FALLBACK_MS = 5000;
+
 const loaded = await loadConfig();
 
 if (getExpectTimeout() !== loaded.expect.timeout) {
@@ -45,6 +51,22 @@ if (getExpectTimeout() !== loaded.expect.timeout) {
       `getExpectTimeout() returns ${getExpectTimeout()} ms. The library no longer keeps the loaded ` +
       `config in the module state its matchers read, so every matcher in this suite is back on the ` +
       `5000 ms fallback. See fixtures/expectTimeout.mjs (QA-15).`
+  );
+}
+
+// The check above cannot see the failure mode most likely to arrive with a dependency bump. If the
+// library moves the transpiled config it reads, `loadConfig()` finds no file and returns its
+// defaults; `getExpectTimeout()` then returns the same defaults, the comparison is equal, and this
+// module reports success while every matcher is silently back on 5 s. What distinguishes that case
+// is the VALUE: the config this suite ships asks for more than the fallback, so a loader that comes
+// back holding exactly the fallback either found nothing or was pointed at a different file.
+if (loaded.expect.timeout === LIBRARY_FALLBACK_MS) {
+  throw new Error(
+    `tui-test's config loader returned the ${LIBRARY_FALLBACK_MS} ms fallback, which this suite's ` +
+      `tui-test.config.ts never asks for. The loader most likely found no config at all — the path ` +
+      `it reads is derived from the working directory and the library's own cache layout, so a ` +
+      `dependency bump can move it. Every matcher in this suite is on the fallback bound until ` +
+      `this is fixed. See fixtures/expectTimeout.mjs (QA-15).`
   );
 }
 

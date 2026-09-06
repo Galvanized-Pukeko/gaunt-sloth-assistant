@@ -34,9 +34,29 @@ const read = (name: string): string => readFileSync(`${E2E_DIR}${name}`, 'utf8')
  * import is there — is not mistaken for the import itself.
  */
 function importsFixture(source: string): boolean {
-  return /^\s*import\s+(?:[^'"]*\sfrom\s+)?['"][^'"]*\/expectTimeout\.mjs['"]\s*;?\s*$/m.test(
-    source
-  );
+  return importsModule(source, 'expectTimeout.mjs');
+}
+
+/**
+ * The same test for `tmpHome.mjs`, the module most test files reach the fixture through.
+ *
+ * It goes through one helper with {@link importsFixture} rather than its own regex, because the
+ * two branches of the coverage assertion have to be equally strict: a bare filename search here
+ * would match the comment every one of these files carries explaining the link, so a file that
+ * imported *neither* module would be counted as wired. Measured before this was shared: such a
+ * file compiled, linted clean, and left the gate green.
+ */
+function importsTmpHome(source: string): boolean {
+  return importsModule(source, 'tmpHome.mjs');
+}
+
+/** Matches a real `import` statement for a module, never a mention of it in prose. */
+function importsModule(source: string, basename: string): boolean {
+  const escaped = basename.replace(/\./g, '\\.');
+  return new RegExp(
+    `^\\s*import\\s+(?:[^'"]*\\sfrom\\s+)?['"][^'"]*/${escaped}['"]\\s*;?\\s*$`,
+    'm'
+  ).test(source);
 }
 
 describe('QA-15 the PTY e2e expect timeout is wired into every test file', () => {
@@ -52,6 +72,12 @@ describe('QA-15 the PTY e2e expect timeout is wired into every test file', () =>
     expect(importsFixture("import fs from 'node:fs';")).toBe(false);
     expect(importsFixture('// see fixtures/expectTimeout.mjs for why')).toBe(false);
     expect(importsFixture(' * through ./fixtures/expectTimeout.mjs')).toBe(false);
+    // The tmpHome branch is held to the same standard, and it is the one that used to match a
+    // bare filename: every test file that reaches the fixture through tmpHome carries a comment
+    // naming it, so a prose match there counted an unwired file as wired.
+    expect(importsTmpHome("import { removeTmpHome } from './fixtures/tmpHome.mjs';")).toBe(true);
+    expect(importsTmpHome('// settled through ./fixtures/tmpHome.mjs')).toBe(false);
+    expect(importsTmpHome(" * see './fixtures/tmpHome.mjs'")).toBe(false);
     // A file reaching it only through tmpHome.mjs has no import of its own; that link is asserted
     // separately below, and this must not paper over its absence.
     expect(
@@ -69,7 +95,7 @@ describe('QA-15 the PTY e2e expect timeout is wired into every test file', () =>
   it('every *.tui.test.ts file reaches the fixture, directly or through tmpHome.mjs', () => {
     const unwired = testFiles().filter((name) => {
       const source = read(name);
-      return !importsFixture(source) && !/['"]\.\/fixtures\/tmpHome\.mjs['"]/.test(source);
+      return !importsFixture(source) && !importsTmpHome(source);
     });
     expect(unwired).toEqual([]);
   });

@@ -91,6 +91,12 @@ test.describe('gth chat TUI — the configured expect timeout binds in the worke
     const waitedMs = Date.now() - submittedAt;
 
     expect(FIXTURE_DELAY_MS).toBeGreaterThan(5_000);
+    // Bounded from above as well, so the fixture stays inside the window this case needs rather
+    // than only outside the old bound. Asserted from one side, retuning the configured timeout
+    // downwards would leave the delay above it, and the case would fail as though the timeout had
+    // stopped binding — a true assertion pointing at the wrong defect, which is worse than a
+    // missing one. The guard names the real constraint instead: the delay sits between the two.
+    expect(FIXTURE_DELAY_MS).toBeLessThan(DECLARED_EXPECT_TIMEOUT as number);
     expect(waitedMs).toBeGreaterThan(5_000);
   });
 });

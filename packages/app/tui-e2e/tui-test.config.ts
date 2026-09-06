@@ -20,9 +20,13 @@ export default defineConfig({
   // The per-test cap has to hold a whole test whose last assertion then burns the full expect
   // budget, or a slow failure is killed as a bare `worker was terminated` and loses the terminal
   // snapshot that says what was actually on screen — the one output worth having from a flake.
-  // Measured on this suite: the slowest passing test is under 8 s, of which 5 s is the fixed wait
-  // tui-test does before running a test body, so a failing run needs roughly 8 + 15 here and the
-  // rest is headroom for a loaded Windows runner.
+  // Measured on this suite, locally: median 5.2 s, p90 5.5 s, slowest passing case 7.8 s, of which
+  // 5 s is the fixed wait tui-test does before running a test body. On those numbers alone the old
+  // 30 s cap was not actually breached — 5 + 8.4 + 15 is 28.4 — so the case for raising it is the
+  // loaded Windows runner rather than this machine. CI has now shown it: a Windows cell on this
+  // branch took 30.2 s for a single approval-framing case (run 34044200014), which is over the old
+  // cap outright, and the flake register records that cell running roughly 6x these durations, so
+  // the budget a failing test needs there is nearer 37 s. 45 s covers that with room and no more.
   timeout: 45_000,
   expect: { timeout: 15_000 },
   retries: process.env.CI ? 2 : 0,
