@@ -410,6 +410,14 @@ Gaunt Sloth · exec · claude-haiku-4-5 (anthropic)
   never a second spelling of the same fact on a second surface. The line itself is assembled by the
   shared `runHeaderLine` (`@gaunt-sloth/core/core/runHeader.js`), which is what keeps its two
   writers from drifting.
+- **Everywhere the model is named, the provider is named beside it, through that same helper
+  (DL-4 transparency, DL-6 consistency).** A model id alone is ambiguous — one name is served by
+  several providers, and which one is in play changes cost, rate limits, tool-call behaviour and
+  where the traffic goes. So `/status`, `/model`, `/config`, the `debug` rung's `Model:` line and
+  the TUI status bar all render `modelProviderLabel`'s output, and a change to the spelling lands on
+  every one of them at once. Adding another site means importing the helper, not retyping the
+  format: a local `${model} (${provider})` passes every rendered-string test and is exactly how one
+  surface drifts to `google-genai:gemini` while its neighbour says `gemini (google-genai)`.
 - **Drop rather than mislead (DL-7).** No provider — a JS config hands us an already-built model —
   prints the bare model, with no `(unknown)` and no empty parentheses. On a review, no model drops
   the label altogether and the line ends after the command: a provider name would sit exactly where
@@ -615,11 +623,48 @@ because those are signal, not chatter (DL-1 no important action is silent). Plai
   unmounted with it whenever something else owns the keyboard — an approval prompt, the attack
   banner, the approvals picker, a focused debug pane.
 - **Single-line, stable status bar** (`tui/components/StatusBar.tsx`). One dim line carrying
-  session context — **mode · model · turn counter · ready** — when idle; a spinner +
+  session context — **mode · model (provider) · turn counter · ready** — when idle; a spinner +
   `Thinking… (Esc to interrupt)` while a turn runs. Keep it to one line and free of streaming
   progress (that belongs to the live turn) so it never flickers. It names the approvals mode in its
   display spelling, and at `bypass` additionally carries the yellow **`⚡ Bypass`** badge in both
-  states (see `/approvals`).
+  states (see `/approvals`). **One line is enforced, not assumed (DL-7):** the dock's row budget in
+  `App.tsx` counts the bar as one row, so every `<Text>` on it truncates with `…` rather than
+  wrapping, and exactly one part of the row sits in a `flexShrink={0}` box so the rest gives way
+  to it. That part is the leading text, so that the badge, not the model, is what shrinks — except
+  at `bypass`, where the **`⚡ Bypass`** badge is the part that holds and the leading text's tail
+  shrinks instead: a badge clipped to `⚡ …` would hide the one posture with no gate at all. The
+  same rule holds the hint row at the foot of the dock to one line: it truncates from the end of
+  the scroll note, keeping the exit instruction at the front.
+- **The bar gives things up in a fixed order before it truncates (DL-6 consistency, DL-7 graceful
+  degradation).** The model half is the shared `modelProviderLabel` spelling the run header and
+  launch banner use, so all three say `model (provider)` and none of them invents a second one.
+  This is the only surface where that costs anything — one line already carrying the mode, the
+  turn counter, the approvals badge and sometimes the debug hint — so it is the only one allowed a
+  width-conditional omission. When the assembled line will not fit, the sacrifice runs least
+  informative first: the **provider** goes (`statusBarSegments` drops it and keeps the model),
+  then the **rater profile** on the approvals badge (`approvals: Assisted (auto-rater)` becomes
+  `approvals: Assisted`), and only then does the render truncate — the badge first, and the
+  segments only on a terminal narrower than the bare segments themselves. The model is never
+  clipped to make room for a badge that can shrink: it is the half the user chose, and a clipped
+  `openrou…` or `claude-sonnet-4…` misleads rather than merely shortens, which is the same reason
+  the banner drops a version it cannot fit. At `bypass` the row's priority, highest first, is the
+  `⚡ Bypass` badge whole, then the model whole, then the rest of the segments — `ready`, then the
+  turn counter — clipped from the end with `…`. Below the width that holds the mode, the whole
+  model, the `…` the clipped segments end in, and the badge, the model is the last thing left on
+  the segments' side and is clipped itself; that is the stated floor, not a defect — a clipped
+  model beside a whole `⚡ Bypass` still tells the truth about the gate. The **debug hint**
+  (`Tab: focus debug panel`, drawn while the panel is open and unfocused) is the lowest priority
+  on the row at every rung: neither drop reserves a cell for it, so it gets only the room the
+  segments and the badge leave — clipped with `…`, or left off the row — before the profile goes
+  and before the provider goes, because it is the least informative element there (Tab focuses the
+  panel whether or not the hint is drawn). So the row's priority, highest first, is: at `bypass`
+  the badge, the model, the rest of the segments, the hint; at every other rung the segments (the
+  model first among them), the badge, the hint. The budget counts the badge, because it is a
+  separate `<Text>` node on the row the terminal wraps as a whole; the hint takes what is left.
+  The drop decisions and the hint's give-way live in pure exported
+  functions taking `columns` as a parameter (`statusBarSegments`, `statusBarRow`), not in the
+  render — a rule that only exists inside a component can only be tested by driving a terminal,
+  and a layout engine cannot be told which sibling gives way first.
 
 ## Persistent startup advisories (DL-1 nothing important is silent, TUI-C19)
 
@@ -726,6 +771,20 @@ their config has a problem.
   completely, the message is captured and put back around the dispatch (caret included), and `Esc`
   closes leaving it as it was — mid-turn, `Esc` also stops the turn (see the `Esc` entry above).
   **Only one of the two is ever on screen.**
+  - **The menu is a bounded, scrolling viewport, one row per entry (DL-7 legibility, DL-3 preserve
+    the user's content, TUI-C92).** The dock is pinned to the terminal floor and never gives up
+    rows, so a menu as tall as it has matches pushes the prompt — and, through the chord door, the
+    very message the menu exists to preserve — off the bottom of a short terminal. `<App>` works
+    out the rows the prompt block may take (the terminal, less the dock's chrome, less the optional
+    panels it is drawing, less a three-row floor for the conversation), the prompt takes its own
+    rows and the query row off that, and the menu windows itself in what is left — never fewer
+    than three rows where the terminal allows it, and one otherwise. The window is sticky around
+    the highlight, exactly as the first-run model picker scrolls (CFG-15), and the same dim
+    `↑ N more` / `↓ N more` rows say what is hidden; with fewer matches than rows none is drawn and
+    nothing differs from an unbounded list. An entry is exactly one row: the `/name` column stays
+    whole and the description truncates with `…` at the width the terminal leaves it — a wrapped
+    menu row is worse to read than a clipped one, and the full text is one `/help` away. Write a
+    description to lead with what matters, because its tail is what goes.
   - **The message comes back even when the command REPLACED the prompt while it ran.** `/approvals`
     opens a picker, and the prompt is not rendered while one is up, so a draft restored into the
     prompt's own state would be restored into something about to be unmounted and lost with it —
