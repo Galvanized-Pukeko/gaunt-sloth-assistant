@@ -1,4 +1,9 @@
 import fs from 'node:fs';
+// [[QA-15]] — side-effect import: loads tui-test's config in THIS process, so the matchers in a
+// test file that reaches this module use the `expect.timeout` from `tui-test.config.ts` instead of
+// the library's 5000 ms fallback. Most `*.tui.test.ts` files reach it through here; the rest import
+// it directly. `spec/tuiE2eExpectTimeoutWired.spec.ts` fails if either link is broken.
+import './expectTimeout.mjs';
 
 /**
  * [[GS2-20]] — the per-suite throwaway `HOME`: settling the session that owns it, then removing it.

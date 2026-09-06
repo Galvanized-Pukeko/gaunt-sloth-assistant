@@ -1,5 +1,9 @@
 import path from 'node:path';
 import { test, expect } from '@microsoft/tui-test';
+// [[QA-15]] — side-effect import, and it is load-bearing: without it every matcher in this file
+// polls for tui-test's 5000 ms fallback rather than the `expect.timeout` in `tui-test.config.ts`.
+// Files that use the throwaway-HOME fixture get it through `tmpHome.mjs`; this one does not.
+import './fixtures/expectTimeout.mjs';
 
 // tui-test keeps process.cwd() at the invocation dir (this folder); the cli lives one level up.
 const e2eDir = process.cwd();

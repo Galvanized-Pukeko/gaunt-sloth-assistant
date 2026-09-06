@@ -1,6 +1,10 @@
 import os from 'node:os';
 import path from 'node:path';
 import { test, expect } from '@microsoft/tui-test';
+// [[QA-15]] — side-effect import, and it is load-bearing: without it every matcher in this file
+// polls for tui-test's 5000 ms fallback rather than the `expect.timeout` in `tui-test.config.ts`.
+// Files that use the throwaway-HOME fixture get it through `tmpHome.mjs`; this one does not.
+import './fixtures/expectTimeout.mjs';
 
 /**
  * Windows ConPTY parses and re-encodes input escape sequences rather than passing raw bytes to the
