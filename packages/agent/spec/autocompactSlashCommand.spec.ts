@@ -240,9 +240,12 @@ describe('EXT-161 — what the notices say', () => {
     expect(notice.title).toBe('Automatic compaction is off in your config');
     expect(notice.tone).toBe('warn');
     const lines = notice.lines.join(' ');
-    expect(lines).toContain('autocompact: false');
+    expect(lines).toContain('`autocompact` key in your config');
     expect(lines).toContain('Nothing was changed');
     expect(lines).not.toContain('rest of this session only');
+    // No threshold in the config, so the remedy is the key itself.
+    expect(lines).toContain('remove the key from your config or give it a threshold');
+    expect(lines).not.toContain('already names a threshold');
     // The bare report under the same status is still a report of the OFF state, not a refusal.
     const shown = autocompactNotice(off, false);
     expect(shown.title).toBe('Automatic compaction');
@@ -305,6 +308,38 @@ describe('EXT-161 — `/autocompact <N>` under `autocompact: false` is refused',
     const notice = autocompactNotice(await offController().status(), false);
     expect(notice.title).toBe('Automatic compaction');
     expect(notice.lines.join(' ')).toContain('OFF');
+  });
+
+  /**
+   * The off switch has a second spelling, `{ enabled: false, threshold: … }`, and the refusal has
+   * to be true of it: that user HAS set a threshold in the config, so advice to go and set one
+   * names work already done and leaves the actual remedy — removing `enabled: false` — unsaid.
+   * Both refusals are the same code path; what separates them is the budget the status carries.
+   */
+  it('names the off switch, not a missing number, when the config also carries a threshold', async () => {
+    const controller = new AutocompactController({
+      config: resolveAutocompactConfig({ enabled: false, threshold: '300K' }),
+      window: { read: async () => ({ tokens: 200_000, origin: 'models.dev' as const }) },
+      defaultThreshold: (window) => window - 2048,
+    });
+    const before = await controller.status();
+    expect(before.enabled).toBe(false);
+    expect(before.budget).not.toBeNull();
+
+    const result = run('/autocompact 400K');
+    if (!result.autocompact || !('budget' in result.autocompact)) throw new Error('no budget');
+    controller.setSessionBudget(result.autocompact.budget);
+    const after = await controller.status();
+    const notice = autocompactNotice(after, true);
+
+    expect(notice.title).toBe('Automatic compaction is off in your config');
+    const lines = notice.lines.join(' ');
+    expect(lines).toContain('already names a threshold');
+    expect(lines).toContain('`enabled: false`');
+    // Never the advice for the other spelling: this user has already set a threshold.
+    expect(lines).not.toContain('give it a threshold instead');
+    expect(after).toEqual(before);
+    expect(controller.sessionOverride).toBeNull();
   });
 });
 

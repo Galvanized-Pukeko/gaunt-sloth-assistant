@@ -1499,11 +1499,21 @@ export function autocompactNotice(status: AutocompactStatus, changed: boolean): 
     return {
       title: 'Automatic compaction is off in your config',
       lines: [
-        'Your config has `autocompact: false`, which turns automatic compaction off for every ' +
-          'session; a threshold set here would never fire.',
+        'The `autocompact` key in your config turns automatic compaction off for every session, ' +
+          'so a threshold set here would never fire.',
         'Nothing was changed.',
-        'To turn it back on, remove the key from your config or set a threshold there instead ' +
-          '(for example `"autocompact": "300K"`).',
+        // The off switch has two spellings and they need different advice. `autocompact: false`
+        // carries no number, so the remedy is the key itself. The object form can carry one —
+        // `{ "enabled": false, "threshold": "300K" }` — and telling THAT user to "set a threshold"
+        // names something they have already done, while the sentence they need is that the number
+        // is not what is stopping it. A status with a budget under `enabled: false` is exactly the
+        // second case: a session budget cannot be recorded while compaction is off, so the budget
+        // that survives here can only have come from the config.
+        status.budget
+          ? 'Your config already names a threshold; it is the `enabled: false` beside it, not a ' +
+            'missing number, that stops compaction firing. Remove that to turn it back on.'
+          : 'To turn it back on, remove the key from your config or give it a threshold instead ' +
+            '(for example `"autocompact": "300K"`).',
       ],
       tone: 'warn',
     };

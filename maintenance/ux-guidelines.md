@@ -42,6 +42,19 @@ Rules:
 - **Tone.** `tone: 'info'` (cyan title, the default) for normal feedback; `tone: 'warn'` (yellow)
   for caution — e.g. the **unknown-command** notice, which never forwards the text to the model and
   points the user at `/help`.
+- **A command that was refused says so, and the remedy it names has to be true of the config the
+  user actually wrote (DL-1, DL-4).** A command whose effect the configuration forbids must not
+  report the effect: `/autocompact 300K` under a config that turns automatic compaction off changes
+  nothing, so its notice is a refusal — *nothing was changed* — not the "threshold set" title that
+  would tell the user the opposite of what happened. This is the toggle rule above one step on:
+  describe the resulting state, and where nothing changed, say that. The second half is the part
+  that is easy to get wrong. An off switch with two spellings needs two remedies, because copy that
+  quotes one spelling is false of the other: `autocompact: false` is remedied by removing the key,
+  while `{ "enabled": false, "threshold": "300K" }` already carries a threshold, so advice to set
+  one names work the user has done and leaves the real remedy unsaid. Branch the sentence on the
+  state the surface can actually read — here a threshold surviving in the status under a disabled
+  config can only have come from the config, since a session override cannot be recorded while the
+  feature is off.
 
 ### On the plain surface a notice is written to ONE stream (DL-4 transparency, DL-7 graceful degradation)
 
