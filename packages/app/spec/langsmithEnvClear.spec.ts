@@ -76,13 +76,22 @@ describe('OPS-30 — LangSmith configuration is cleared for the unit suite', () 
     const cleared = clearLangSmithEnv(env);
 
     expect(cleared.sort()).toEqual(['LANGCHAIN_SOMETHING_NEW', 'LANGSMITH_SOMETHING_NEW']);
+    // Deleted, not merely listed: without this the whole cell passes against a function that
+    // reports names and removes none, which the first cell would then be alone in catching.
+    expect('LANGSMITH_SOMETHING_NEW' in env).toBe(false);
+    expect('LANGCHAIN_SOMETHING_NEW' in env).toBe(false);
     expect(env.KEEP).toBe('set');
   });
 
-  it('reports nothing when there was nothing to clear', () => {
-    const env: NodeJS.ProcessEnv = { PATH: '/usr/bin' };
-    expect(clearLangSmithEnv(env)).toEqual([]);
-    expect(env.PATH).toBe('/usr/bin');
+  it('reports nothing only when there was nothing to clear', () => {
+    // The empty case is asserted against a populated one in the same cell deliberately. An empty
+    // result on an empty environment is also what a function that always returns nothing produces,
+    // so on its own this cell would pin the absence of a report rather than its accuracy.
+    const empty: NodeJS.ProcessEnv = { PATH: '/usr/bin' };
+    expect(clearLangSmithEnv(empty)).toEqual([]);
+    expect(empty.PATH).toBe('/usr/bin');
+
+    expect(clearLangSmithEnv({ LANGSMITH_API_KEY: 'set' })).toEqual(['LANGSMITH_API_KEY']);
   });
 
   it('sweeps both prefixes, so neither spelling can be dropped unnoticed', () => {
