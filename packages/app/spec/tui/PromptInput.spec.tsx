@@ -212,9 +212,12 @@ describe('tui <PromptInput> slash-command menu (TUI-C10 interaction)', () => {
     stdin.write('/');
     await tick();
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('/help');
-    expect(frame).toContain('/verbose');
-    expect(frame).toContain('/exit');
+    // Names come from the registry, not from literals: the window is positional, so a command
+    // added ahead of the ninth entry (EXT-161's `/autocompact` did this) moves which name sits on
+    // the last visible row and which is the first hidden one, and the cell must move with it.
+    expect(frame).toContain(`/${registry[0].name}`);
+    expect(frame).toContain(`/${registry[5].name}`);
+    expect(frame).toContain(`/${registry[8].name}`);
     expect(frame).toContain(`↓ ${registry.length - 9} more`);
     expect(frame).not.toContain(`/${registry[9].name}`);
   });
