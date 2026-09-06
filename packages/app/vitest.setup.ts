@@ -1,6 +1,49 @@
 import { applyTuiColour } from '#src/tui/colour.js';
 
 /**
+ * OPS-30 — the prefixes LangSmith resolves its configuration through. `getLangSmithEnvironmentVariable(name)`
+ * reads `LANGSMITH_<name>` and falls back to `LANGCHAIN_<name>`, so every knob it has exists under
+ * both spellings and a list of individual names is a list that the next release outruns.
+ */
+export const LANGSMITH_ENV_PREFIXES = ['LANGSMITH_', 'LANGCHAIN_'] as const;
+
+/**
+ * OPS-30 — take LangSmith's whole configuration out of `env`, and report what was taken.
+ *
+ * **The defect.** Five `gthWebFetchTool` specs replace the global with a one-shot `fetch` mock.
+ * With tracing switched on and a key present, `tool.invoke()` starts a tracer that calls
+ * `globalThis.fetch` *before* the tool body runs, so the tracer consumes the queued value; the
+ * implementation's own call then resolves to `undefined`, and every assertion collapses into the
+ * same "Unknown error" rejection. The mock is installed and is genuinely the global — it was
+ * drained by a different caller, which is why probing the global proves nothing.
+ *
+ * **Why this is not a machine-local fix.** It reproduces in any process that exports the tracing
+ * flag together with a key, on any machine, and the suite is green everywhere else. Clearing the
+ * environment has a justification stronger than making a test pass: a unit suite must not be able
+ * to POST run data to an external service.
+ *
+ * **Why a prefix sweep rather than a list of names.** Enumerate from the grammar, not from the
+ * instances observed: the switch alone has four spellings (`TRACING` and `TRACING_V2` under both
+ * prefixes), and the endpoint, project, session and key each have two. A list would also have to
+ * be revisited on every langsmith bump, and nothing in this repo reads a variable under either
+ * prefix — the only other mentions are process-spawning specs that already delete three of the
+ * switches from the child's environment by hand.
+ *
+ * **Why not `test.env` in the vitest config.** The value that switches tracing off is the absence
+ * of the variable, not a falsy value: the gate tests `=== 'true'`, so any assignment is a decision
+ * where none was made, and a spec that later reads the environment would see one.
+ */
+export function clearLangSmithEnv(env: NodeJS.ProcessEnv): string[] {
+  const cleared = Object.keys(env).filter((name) =>
+    LANGSMITH_ENV_PREFIXES.some((prefix) => name.startsWith(prefix))
+  );
+  for (const name of cleared) delete env[name];
+  return cleared;
+}
+
+clearLangSmithEnv(process.env);
+
+/**
  * OPS-33 — pin the colour environment for the unit suite, so no spec depends on ambient terminal
  * capability.
  *
