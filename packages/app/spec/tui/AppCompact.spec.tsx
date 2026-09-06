@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
 import type { ConversationCompaction } from '@gaunt-sloth/core/core/compaction.js';
+import type { AutocompactStatus } from '@gaunt-sloth/core/core/compactionThreshold.js';
+import type { TokenBudget } from '@gaunt-sloth/core/config/tokenBudget.js';
 import type { AgentStreamEvent } from '@gaunt-sloth/core/core/types.js';
 import type { TuiAgent } from '#src/tui/types.js';
 import { App } from '#src/tui/components/App.js';
@@ -194,6 +196,77 @@ describe('tui <App> — /compact (GS2-23)', () => {
     // Released: the next message is a turn again.
     await submit(stdin, lastFrame, 'hello afterwards');
     await vi.waitFor(() => expect(turnsRun()).toBe(1));
+
+    unmount();
+  });
+});
+
+/**
+ * EXT-161 — `/autocompact` applied by the Ink `<App>`, and the snapshot the synchronous `/status`
+ * reads. The controller proves the provenance flips to `session` and the notice proves a session
+ * status renders as such; this is the seam between them — the surface refreshing the snapshot
+ * after the command — which neither of those can see.
+ */
+describe('tui <App> — /autocompact (EXT-161)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  /** What the session starts with: the config's number. */
+  const configStatus: AutocompactStatus = {
+    enabled: true,
+    thresholdTokens: 160_000,
+    thresholdOrigin: 'config',
+    window: 200_000,
+    windowOrigin: 'models.dev',
+    budget: { kind: 'tokens', tokens: 160_000 },
+  };
+
+  it('/autocompact 300K moves the threshold, and the next /status reports the SESSION provenance', async () => {
+    const set = vi.fn(async (budget: TokenBudget): Promise<AutocompactStatus> => ({
+      ...configStatus,
+      thresholdTokens: 300_000,
+      thresholdOrigin: 'session',
+      budget,
+    }));
+    const get = vi.fn(async () => configStatus);
+    const { agent, turnsRun } = compactingAgent(undefined);
+    const wired: TuiAgent = { ...agent, getAutocompactStatus: get, setAutocompactThreshold: set };
+    const { stdin, frames, lastFrame, unmount } = render(<App {...baseProps} agent={wired} />);
+
+    await submit(stdin, lastFrame, '/autocompact 300K');
+    await vi.waitFor(() =>
+      expect(frames.join('\n')).toContain('Automatic compaction threshold set')
+    );
+    expect(set).toHaveBeenCalledWith({ kind: 'tokens', tokens: 300_000 });
+
+    await submit(stdin, lastFrame, '/status');
+    await vi.waitFor(() => expect(lastFrame()).toContain('Session status'));
+    // Only the /status block is read. The /autocompact notice above it already says "session", so
+    // an assertion over the whole screen would stay green with the snapshot never refreshed.
+    const frame = lastFrame() ?? '';
+    const statusBlock = frame.slice(frame.lastIndexOf('Session status'));
+    expect(statusBlock).toContain('300,000');
+    expect(statusBlock).toContain('overridden'); // the session provenance line
+    expect(statusBlock).not.toContain('160,000'); // the config value it replaced
+    expect(turnsRun()).toBe(0);
+
+    unmount();
+  });
+
+  it('says the threshold is unavailable, and changes nothing, when the agent has no setAutocompactThreshold', async () => {
+    const { agent, turnsRun } = compactingAgent(undefined);
+    const { stdin, frames, lastFrame, unmount } = render(<App {...baseProps} agent={agent} />);
+
+    await submit(stdin, lastFrame, '/autocompact 300K');
+
+    await vi.waitFor(() => {
+      const all = frames.join('\n');
+      expect(all).toContain('Automatic compaction unavailable');
+      expect(all).toContain('Nothing was changed.');
+    });
+    expect(frames.join('\n')).not.toContain('threshold set');
+    expect(turnsRun()).toBe(0);
 
     unmount();
   });

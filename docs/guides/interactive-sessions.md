@@ -67,7 +67,9 @@ there opens a searchable command menu. A few worth knowing:
 - `/autocompact` — show the size the conversation is folded at automatically, and where that number
   came from. With an argument it moves the threshold for this session: `/autocompact 300000`,
   `/autocompact 300K`, `/autocompact 0.9M`, or `/autocompact 80%` for a share of the model's
-  context window. See [When the session compacts without being asked](#when-the-session-compacts-without-being-asked)
+  context window. While your config has `autocompact: false` the command refuses to set one and
+  says so — nothing changes until the key is removed or given a threshold. See
+  [When the session compacts without being asked](#when-the-session-compacts-without-being-asked)
 - `/status` — mode, the model and the provider serving it, turn count, the id of the conversation
   being recorded (the number `/resume` and `gth history resume` take), and the automatic-compaction
   threshold with its source
@@ -108,7 +110,7 @@ passed the threshold for your model it folds the older messages into a summary f
 turn. It says so in one line and carries on:
 
 ```
-Context is nearly full (about 158420 tokens, past the 160000-token compaction threshold for this
+Context is nearly full (about 163420 tokens, past the 160000-token compaction threshold for this
 model's 200000-token window), so 9 earlier messages were folded into a summary before this call.
 6 kept verbatim.
 ```

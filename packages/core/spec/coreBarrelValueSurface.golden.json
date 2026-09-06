@@ -46,18 +46,6 @@
       "kind": "object"
     },
     {
-      "name": "CATALOG_ATTRIBUTION",
-      "kind": "string"
-    },
-    {
-      "name": "CATALOG_TIMEOUT_MS",
-      "kind": "number"
-    },
-    {
-      "name": "CATALOG_TTL_MS",
-      "kind": "number"
-    },
-    {
       "name": "COMPACTION_SUMMARY_PREFIX",
       "kind": "string"
     },
@@ -74,20 +62,12 @@
       "kind": "string"
     },
     {
-      "name": "CONTEXT_WINDOW_ORIGIN_LABELS",
-      "kind": "object"
-    },
-    {
       "name": "ConfigDiscoveryError",
       "kind": "class"
     },
     {
       "name": "DEFAULT_APPROVAL_RUNG",
       "kind": "string"
-    },
-    {
-      "name": "DEFAULT_AUTOCOMPACT_SEED_FRACTION",
-      "kind": "number"
     },
     {
       "name": "DEFAULT_COMMIT_CO_AUTHOR_EMAIL",
@@ -108,10 +88,6 @@
     {
       "name": "DEFAULT_OLLAMA_HOST",
       "kind": "string"
-    },
-    {
-      "name": "DEFAULT_OLLAMA_NUM_CTX",
-      "kind": "number"
     },
     {
       "name": "DEFAULT_SCAFFOLD_MODEL",
@@ -190,14 +166,6 @@
       "kind": "string"
     },
     {
-      "name": "MODELS_DEV_PROVIDER_KEY",
-      "kind": "object"
-    },
-    {
-      "name": "MODELS_DEV_URL",
-      "kind": "string"
-    },
-    {
       "name": "MissingProviderKeyError",
       "kind": "class"
     },
@@ -264,10 +232,6 @@
     {
       "name": "TokenBudgetError",
       "kind": "class"
-    },
-    {
-      "name": "UNKNOWN_CONTEXT_WINDOW",
-      "kind": "function"
     },
     {
       "name": "USER_PROJECT_CONFIG_JS",
@@ -350,10 +314,6 @@
       "kind": "function"
     },
     {
-      "name": "createOllamaContextWindowSource",
-      "kind": "function"
-    },
-    {
       "name": "describeGrantedBuiltInTools",
       "kind": "function"
     },
@@ -367,10 +327,6 @@
     },
     {
       "name": "discoverModelsWithProvenance",
-      "kind": "function"
-    },
-    {
-      "name": "enrichModels",
       "kind": "function"
     },
     {
@@ -435,10 +391,6 @@
     },
     {
       "name": "getGhReadFileMaxBytes",
-      "kind": "function"
-    },
-    {
-      "name": "getProviderCatalog",
       "kind": "function"
     },
     {
@@ -582,10 +534,6 @@
       "kind": "function"
     },
     {
-      "name": "readProfileContextWindow",
-      "kind": "function"
-    },
-    {
       "name": "recordSessionSafe",
       "kind": "function"
     },
@@ -598,23 +546,11 @@
       "kind": "function"
     },
     {
-      "name": "resolveAutocompactConfig",
-      "kind": "function"
-    },
-    {
       "name": "resolveConfig",
       "kind": "function"
     },
     {
       "name": "resolveConfigExtends",
-      "kind": "function"
-    },
-    {
-      "name": "resolveContextWindow",
-      "kind": "function"
-    },
-    {
-      "name": "resolveContextWindowSource",
       "kind": "function"
     },
     {
@@ -647,10 +583,6 @@
     },
     {
       "name": "resolveTokenBudget",
-      "kind": "function"
-    },
-    {
-      "name": "seedAutocompactThreshold",
       "kind": "function"
     },
     {

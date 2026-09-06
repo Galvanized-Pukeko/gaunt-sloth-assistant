@@ -19,8 +19,12 @@ import {
   parseSlashCommand,
   type SlashCommandContext,
 } from '#src/modules/slashCommands.js';
-import { parseTokenBudget, resolveAutocompactConfig, TokenBudgetError } from '@gaunt-sloth/core';
-import type { AutocompactStatus } from '@gaunt-sloth/core/core/compactionThreshold.js';
+import { parseTokenBudget, TokenBudgetError } from '@gaunt-sloth/core';
+import {
+  AutocompactController,
+  resolveAutocompactConfig,
+  type AutocompactStatus,
+} from '@gaunt-sloth/core/core/compactionThreshold.js';
 
 const ctx = (over: Partial<SlashCommandContext> = {}): SlashCommandContext => ({
   mode: 'chat',
@@ -225,6 +229,26 @@ describe('EXT-161 — what the notices say', () => {
     expect(lines).toContain('autocompact: false');
   });
 
+  it('reports a REFUSAL, never "threshold set", when a change is asked for with compaction off', () => {
+    const off = status({
+      enabled: false,
+      thresholdTokens: null,
+      thresholdOrigin: 'none',
+      budget: null,
+    });
+    const notice = autocompactNotice(off, true);
+    expect(notice.title).toBe('Automatic compaction is off in your config');
+    expect(notice.tone).toBe('warn');
+    const lines = notice.lines.join(' ');
+    expect(lines).toContain('autocompact: false');
+    expect(lines).toContain('Nothing was changed');
+    expect(lines).not.toContain('rest of this session only');
+    // The bare report under the same status is still a report of the OFF state, not a refusal.
+    const shown = autocompactNotice(off, false);
+    expect(shown.title).toBe('Automatic compaction');
+    expect(shown.lines.join(' ')).toContain('OFF');
+  });
+
   it('a changed threshold says it is session-only and where to make it permanent', () => {
     const notice = autocompactNotice(status({ thresholdOrigin: 'session' }), true);
     expect(notice.title).toBe('Automatic compaction threshold set');
@@ -243,6 +267,44 @@ describe('EXT-161 — what the notices say', () => {
 
   it('the rejection notice shows the usage line', () => {
     expect(autocompactRejectedNotice('bad').lines.join(' ')).toContain('/autocompact [<tokens>]');
+  });
+});
+
+/**
+ * RULED: `/autocompact <N>` while the config has compaction off changes nothing and says so. The
+ * real command, the real controller and the real notice, wired the way both surfaces wire them
+ * (set, then read the status that landed), so the pin covers the seam and not a stubbed half of it.
+ */
+describe('EXT-161 — `/autocompact <N>` under `autocompact: false` is refused', () => {
+  const offController = () =>
+    new AutocompactController({
+      config: resolveAutocompactConfig(false),
+      window: { read: async () => ({ tokens: 200_000, origin: 'models.dev' as const }) },
+      defaultThreshold: (window) => window - 2048,
+    });
+
+  it('changes nothing, and the notice says the config turned it off', async () => {
+    const controller = offController();
+    const before = await controller.status();
+
+    const result = run('/autocompact 300K');
+    expect(result.autocompact).toBeDefined();
+    if (!result.autocompact || !('budget' in result.autocompact)) throw new Error('no budget');
+    controller.setSessionBudget(result.autocompact.budget);
+    const after = await controller.status();
+    const notice = autocompactNotice(after, true);
+
+    expect(notice.title).toBe('Automatic compaction is off in your config');
+    expect(notice.lines.join(' ')).toContain('Nothing was changed');
+    expect(notice.lines.join(' ')).not.toContain('rest of this session only');
+    expect(after).toEqual(before);
+    expect(controller.sessionOverride).toBeNull();
+  });
+
+  it('the bare /autocompact still reports the OFF state under the same config', async () => {
+    const notice = autocompactNotice(await offController().status(), false);
+    expect(notice.title).toBe('Automatic compaction');
+    expect(notice.lines.join(' ')).toContain('OFF');
   });
 });
 

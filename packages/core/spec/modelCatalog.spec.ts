@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
@@ -61,6 +61,31 @@ function okFetch() {
     status: 200,
     json: async () => MODELS_DEV_PAYLOAD,
   })) as unknown as typeof fetch & { mock: { calls: unknown[] } };
+}
+
+/**
+ * A fetch stub that records the call and REFUSES it. The `cacheOnly` cells below assert the call
+ * count, so a guard that stopped holding would show as a recorded call even though nothing reached
+ * the network.
+ */
+function refusingFetch() {
+  return vi.fn(async () => {
+    throw new Error('the test refused a network call');
+  }) as unknown as typeof fetch;
+}
+
+/** A cached anthropic slice as `getProviderCatalog` writes it, stamped at `fetchedAt`. */
+function writeAnthropicSlice(cacheDir: string, fetchedAt: number): void {
+  writeFileSync(
+    resolve(cacheDir, 'anthropic.json'),
+    JSON.stringify({
+      providerId: 'anthropic',
+      providerKey: 'anthropic',
+      fetchedAt,
+      models: { 'claude-opus-4-5': { limit: { context: 200000 } } },
+    }),
+    'utf8'
+  );
 }
 
 describe('modelCatalog', () => {
@@ -197,5 +222,57 @@ describe('modelCatalog', () => {
     });
     expect(stale).not.toBeNull();
     expect(stale!.models['claude-opus-4-5']).toBeDefined();
+  });
+
+  /**
+   * EXT-161 — `cacheOnly` is the one line keeping the running agent off the network: the window
+   * resolution in front of a session's first model call passes it, and without it a cold or stale
+   * cache would put a multi-megabyte fetch behind a 10 s timeout in front of the user's first turn
+   * — and rewrite the developer's real catalog from a unit run. Every cell here points at a cache
+   * directory the test created and a fetch stub that records and refuses.
+   */
+  it('cacheOnly on a cold cache answers null and never calls fetch', async () => {
+    const { getProviderCatalog } = await import('#src/providers/modelCatalog.js');
+    const fetchImpl = refusingFetch();
+
+    const catalog = await getProviderCatalog('anthropic', { cacheDir, fetchImpl, cacheOnly: true });
+
+    expect(catalog).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('cacheOnly on a stale (past-TTL) cache answers the stale slice and never calls fetch', async () => {
+    const { getProviderCatalog } = await import('#src/providers/modelCatalog.js');
+    writeAnthropicSlice(cacheDir, 0);
+    const fetchImpl = refusingFetch();
+
+    const catalog = await getProviderCatalog('anthropic', {
+      cacheDir,
+      fetchImpl,
+      cacheOnly: true,
+      now: 999_999_999_999, // well past the 24h TTL
+    });
+
+    // A stale slice is still a real number — the runtime takes it over nothing.
+    expect(catalog?.models['claude-opus-4-5']?.limit?.context).toBe(200000);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('refresh overrides cacheOnly: an explicit refresh is a request to go and fetch', async () => {
+    const { getProviderCatalog } = await import('#src/providers/modelCatalog.js');
+    writeAnthropicSlice(cacheDir, 5_000_000);
+    const fetchImpl = okFetch();
+
+    const catalog = await getProviderCatalog('anthropic', {
+      cacheDir,
+      fetchImpl,
+      cacheOnly: true,
+      refresh: true,
+      now: 5_000_000, // the cache is fresh, so only `refresh` can be what fetched
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    // What came back is the fetched slice, not the one that was on disk.
+    expect(Object.keys(catalog!.models).sort()).toEqual(['claude-haiku-4-5', 'claude-opus-4-5']);
   });
 });

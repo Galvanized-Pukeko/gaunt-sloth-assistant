@@ -197,11 +197,6 @@
       "arity": 0
     },
     {
-      "name": "ContextWindowResolutionOptions",
-      "file": "core/contextWindow.d.ts",
-      "arity": 0
-    },
-    {
       "name": "ContextWindowSource",
       "file": "core/contextWindow.d.ts",
       "arity": 0
@@ -269,11 +264,6 @@
     {
       "name": "DiscoveryKind",
       "file": "providers/modelDiscovery.d.ts",
-      "arity": 0
-    },
-    {
-      "name": "EnrichedModel",
-      "file": "providers/modelCatalog.d.ts",
       "arity": 0
     },
     {
@@ -499,11 +489,6 @@
     {
       "name": "ModelModalities",
       "file": "providers/modelCatalog.d.ts",
-      "arity": 0
-    },
-    {
-      "name": "OllamaLikeModel",
-      "file": "core/contextWindow.d.ts",
       "arity": 0
     },
     {

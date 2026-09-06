@@ -159,8 +159,15 @@ export class AutocompactController {
    * Deliberately takes an already-parsed {@link TokenBudget} rather than raw text: parsing is the
    * shared parser's job, and a second entry point that took a string would be a second place the
    * grammar could drift.
+   *
+   * **Refused while the config has compaction off.** `autocompact: false` means nothing fires,
+   * whatever number is named, so recording the budget would only make the next {@link status}
+   * describe a threshold that can never trigger. Nothing is recorded and the status is unchanged;
+   * the surface reads `enabled: false` off the status that comes back and says so. Turning it back
+   * on is a config edit — removing the key, or setting a threshold there — not a session command.
    */
   setSessionBudget(budget: TokenBudget): void {
+    if (!this.options.config.enabled) return;
     this.sessionBudget = budget;
   }
 

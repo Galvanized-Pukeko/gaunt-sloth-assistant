@@ -8,6 +8,8 @@
  * and the REAL slash-command registry.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AutocompactStatus } from '@gaunt-sloth/core/core/compactionThreshold.js';
+import type { TokenBudget } from '@gaunt-sloth/core/config/tokenBudget.js';
 import type { SessionConfig } from '#src/modules/interactiveSessionModule.js';
 
 let inputs: string[] = [];
@@ -59,6 +61,8 @@ const runnerInstanceMock = {
   init: vi.fn(),
   processMessages: vi.fn(),
   compactConversation: vi.fn(),
+  getAutocompactStatus: vi.fn(),
+  setAutocompactThreshold: vi.fn(),
   setApprovalOutcomeCallback: vi.fn(),
   setToolApprovalCallback: vi.fn(),
   setAttackHaltCallback: vi.fn(),
@@ -154,28 +158,29 @@ const runSession = async (...userInputs: string[]) => {
   await createInteractiveSession(sessionConfig, {});
 };
 
-describe('interactiveSessionModule — /compact (GS2-23)', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    inputs = [];
-    initConfigMock.mockResolvedValue({
-      streamSessionInferenceLog: false,
-      modelDisplayName: 'test-model',
-    });
-    runnerInstanceMock.init.mockResolvedValue(undefined);
-    runnerInstanceMock.processMessages.mockResolvedValue('answer');
-    runnerInstanceMock.cleanup.mockResolvedValue(undefined);
-    runnerInstanceMock.getSessionApprovals.mockReturnValue({
-      rung: 'assisted',
-      allow: [],
-      deny: [],
-    });
-    runnerInstanceMock.getAllowlistCounts.mockReturnValue({ session: 0, always: undefined });
-    runnerInstanceMock.getRefusals.mockReturnValue([]);
-    runnerInstanceMock.getGrants.mockReturnValue([]);
-    runnerInstanceMock.getMcpAnnotationTrust.mockReturnValue({ defaults: [], servers: [] });
+// One scaffold for both describes below: the same scripted readline and mocked runner.
+beforeEach(() => {
+  vi.resetAllMocks();
+  inputs = [];
+  initConfigMock.mockResolvedValue({
+    streamSessionInferenceLog: false,
+    modelDisplayName: 'test-model',
   });
+  runnerInstanceMock.init.mockResolvedValue(undefined);
+  runnerInstanceMock.processMessages.mockResolvedValue('answer');
+  runnerInstanceMock.cleanup.mockResolvedValue(undefined);
+  runnerInstanceMock.getSessionApprovals.mockReturnValue({
+    rung: 'assisted',
+    allow: [],
+    deny: [],
+  });
+  runnerInstanceMock.getAllowlistCounts.mockReturnValue({ session: 0, always: undefined });
+  runnerInstanceMock.getRefusals.mockReturnValue([]);
+  runnerInstanceMock.getGrants.mockReturnValue([]);
+  runnerInstanceMock.getMcpAnnotationTrust.mockReturnValue({ defaults: [], servers: [] });
+});
 
+describe('interactiveSessionModule — /compact (GS2-23)', () => {
   it('awaits the runner with the focus, prints the in-progress line, and renders the landed notice', async () => {
     runnerInstanceMock.compactConversation.mockResolvedValue(outcome());
     await runSession('/compact keep the file names', 'exit');
@@ -232,5 +237,71 @@ describe('interactiveSessionModule — /compact (GS2-23)', () => {
   it('/help lists /compact on this surface too', async () => {
     await runSession('/help', 'exit');
     expect(allOutput()).toContain('/compact — ');
+  });
+});
+
+/**
+ * EXT-161 — `/autocompact` on the readline surface, and the `/status` that follows it. The runner
+ * is what moves the threshold; this pins that the surface hands the parsed budget to it, prints the
+ * status that LANDED, and that the next `/status` is read fresh — the session provenance, not the
+ * config value the command replaced.
+ */
+describe('interactiveSessionModule — /autocompact (EXT-161)', () => {
+  /** What the session starts with: the config's number. */
+  const configStatus: AutocompactStatus = {
+    enabled: true,
+    thresholdTokens: 160_000,
+    thresholdOrigin: 'config',
+    window: 200_000,
+    windowOrigin: 'models.dev',
+    budget: { kind: 'tokens', tokens: 160_000 },
+  };
+
+  it('/autocompact 300K moves the runner threshold, and the next /status reads the SESSION provenance', async () => {
+    // A stateful runner: the status it reports follows the budget it was given, as the real one does.
+    let current: AutocompactStatus = configStatus;
+    runnerInstanceMock.setAutocompactThreshold.mockImplementation(async (budget: TokenBudget) => {
+      current = { ...configStatus, thresholdTokens: 300_000, thresholdOrigin: 'session', budget };
+      return current;
+    });
+    runnerInstanceMock.getAutocompactStatus.mockImplementation(async () => current);
+
+    await runSession('/autocompact 300K', '/status', 'exit');
+
+    expect(runnerInstanceMock.setAutocompactThreshold).toHaveBeenCalledWith({
+      kind: 'tokens',
+      tokens: 300_000,
+    });
+    const notices = noticeCalls();
+    expect(notices.map((n) => n.title)).toEqual([
+      'Automatic compaction threshold set',
+      'Session status',
+    ]);
+    // The /status block on its own — the command's notice already says "session".
+    const statusLines = notices[1].lines.join(' ');
+    expect(statusLines).toContain('300,000');
+    expect(statusLines).toContain('set with /autocompact in this session');
+    expect(statusLines).not.toContain('from the `autocompact` key');
+    expect(statusLines).not.toContain('160,000');
+    expect(runnerInstanceMock.processMessages).not.toHaveBeenCalled();
+  });
+
+  it('reports unavailability, and changes nothing, when the runner has no setAutocompactThreshold', async () => {
+    const { setAutocompactThreshold, getAutocompactStatus } = runnerInstanceMock;
+    Object.assign(runnerInstanceMock, {
+      setAutocompactThreshold: undefined,
+      getAutocompactStatus: undefined,
+    });
+    try {
+      await runSession('/autocompact 300K', 'exit');
+    } finally {
+      Object.assign(runnerInstanceMock, { setAutocompactThreshold, getAutocompactStatus });
+    }
+
+    const notices = noticeCalls();
+    expect(notices).toHaveLength(1);
+    expect(notices[0].title).toBe('Automatic compaction unavailable');
+    expect(notices[0].lines.join(' ')).toContain('Nothing was changed');
+    expect(runnerInstanceMock.processMessages).not.toHaveBeenCalled();
   });
 });

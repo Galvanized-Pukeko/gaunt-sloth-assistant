@@ -179,6 +179,25 @@ describe('EXT-161 — the answers that must never be a number', () => {
     const status = await controller({ enabled: false, threshold: '300K' }, KNOWN).status();
     expect(status.thresholdTokens).toBeNull();
   });
+
+  it('REFUSES a session override while the off switch is set: nothing recorded, status unchanged', async () => {
+    // RULED: `/autocompact 300K` under `autocompact: false` changes nothing. Recording the budget
+    // would only make the next status describe a threshold that can never fire.
+    for (const off of [false, { enabled: false, threshold: '300K' }]) {
+      const c = controller(off, KNOWN);
+      const before = await c.status();
+      c.setSessionBudget(parseTokenBudget('300K'));
+      expect(c.sessionOverride).toBeNull();
+      expect(await c.status()).toEqual(before);
+      expect((await c.status()).enabled).toBe(false);
+    }
+    // The discriminating half: the same call on a controller that is ON is recorded, so a
+    // controller that ignored every setSessionBudget could not pass this cell.
+    const on = controller(undefined, KNOWN);
+    on.setSessionBudget(parseTokenBudget('300K'));
+    expect(on.sessionOverride).toEqual({ kind: 'tokens', tokens: 300_000 });
+    expect((await on.status()).thresholdOrigin).toBe('session');
+  });
 });
 
 describe('EXT-161 — the threshold `gth init` seeds', () => {

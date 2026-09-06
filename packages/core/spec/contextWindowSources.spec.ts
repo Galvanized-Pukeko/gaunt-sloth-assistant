@@ -165,10 +165,16 @@ describe('EXT-161 — an unknown window is reported as unknown, and never guesse
   it('never answers 4097, the value LangChain guesses for a model it does not recognise', async () => {
     // The whole reason there is no `?? DEFAULT` on this path: `fraction: 0.8` over a 4097 default
     // compacts at roughly 3.3k tokens, silently, on any model outside the table.
+    //
+    // The catalog reader is injected — a slice that has never heard of the model — so this cell
+    // reads the catalog tier and still gets no number, and never touches the developer's real
+    // `~/.gsloth/model-catalog/` the way the default reader would.
+    const catalogReader = vi.fn(async () => catalogWith({ 'some-other-model': 128_000 }));
     const reading = await resolveContextWindow(
       {},
-      { providerId: 'openai', modelId: 'nope' }
+      { providerId: 'openai', modelId: 'nope', catalogReader }
     ).read();
+    expect(catalogReader).toHaveBeenCalledTimes(1);
     expect(reading.tokens).toBeNull();
     expect(reading.tokens).not.toBe(4097);
   });

@@ -1486,8 +1486,28 @@ export function autocompactLines(status: AutocompactStatus): string[] {
   ];
 }
 
-/** EXT-161 — the notice `/autocompact` prints, whether it reported or changed the threshold. */
+/**
+ * EXT-161 — the notice `/autocompact` prints, whether it reported or changed the threshold.
+ *
+ * A request to CHANGE the threshold while the config has compaction off is refused by the
+ * controller, and the status that comes back still says `enabled: false`. That combination is
+ * reported as the refusal it is: a notice titled "threshold set" over a body saying nothing will
+ * ever fire would tell the user the opposite of what happened. The bare report keeps the OFF lines.
+ */
 export function autocompactNotice(status: AutocompactStatus, changed: boolean): SlashCommandNotice {
+  if (changed && !status.enabled) {
+    return {
+      title: 'Automatic compaction is off in your config',
+      lines: [
+        'Your config has `autocompact: false`, which turns automatic compaction off for every ' +
+          'session; a threshold set here would never fire.',
+        'Nothing was changed.',
+        'To turn it back on, remove the key from your config or set a threshold there instead ' +
+          '(for example `"autocompact": "300K"`).',
+      ],
+      tone: 'warn',
+    };
+  }
   return {
     title: changed ? 'Automatic compaction threshold set' : 'Automatic compaction',
     lines: [
