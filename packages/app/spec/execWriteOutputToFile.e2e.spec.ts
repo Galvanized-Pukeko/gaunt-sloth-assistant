@@ -41,10 +41,9 @@ describe('gth exec -w writes the report file (e2e)', () => {
     // wherever `pnpm test` was invoked — the repo root. Inherited, it would aim this run's
     // project-relative paths at the repository instead of the temp dir under test.
     delete env.INIT_CWD;
-    // LangSmith tracing turns a hermetic run into a networked one; keep it out of this spec.
-    delete env.LANGCHAIN_TRACING_V2;
-    delete env.LANGCHAIN_TRACING;
-    delete env.LANGSMITH_TRACING;
+    // LangSmith tracing would turn a hermetic run into a networked one; clearLangSmithEnv() in
+    // packages/app/vitest.setup.ts clears it from process.env before any spec runs, so the child
+    // inherits none of it.
     const result = spawnSync('node', [cliEntry, '--nopipe', '-c', configPath, ...args], {
       encoding: 'utf8',
       cwd: dir,
