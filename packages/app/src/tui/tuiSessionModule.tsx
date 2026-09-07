@@ -488,8 +488,8 @@ function createAttackHaltBridge() {
  * Ink TUI counterpart to `createInteractiveSession` (the readline path).
  *
  * This wrapper is nothing but the exit-output channel's lifetime: the session's whole body runs
- * inside it, so the channel is emptied on the way in and drained on the way out no matter how the
- * body leaves. {@link runTuiSession} is the session itself.
+ * inside it, so the channel is emptied on the way in and drained on the way out however the body
+ * returns or throws. `runTuiSession` is the session itself.
  *
  * TUI-C56 — start the channel empty. Nothing in a normal process defers before a session begins,
  * so this is not a fix for an observed leak; it is what makes the guarantee simple enough to rely
@@ -524,10 +524,13 @@ function createAttackHaltBridge() {
  *    never drains, because its output already survives its own exit — and neither half is a flag
  *    anyone can get wrong.
  *
- * Still not covered, and deliberately: an external SIGINT/SIGTERM. Ink resolves its exit promise
- * synchronously during shutdown (async callbacks no longer fire), so the body never returns and
- * this `finally` is not reached. Nothing is added to chase it, because a second teardown path is
- * exactly what [[TUI-C48]] measured its way out of.
+ * Still not covered, and deliberately: the two ways a process ends without unwinding. An external
+ * SIGINT/SIGTERM is one — Ink resolves its exit promise synchronously during shutdown (async
+ * callbacks no longer fire), so the body never returns and this `finally` is not reached. A
+ * `process.exit` is the other, and the body makes one: the `--resume` refusal's `exit(1)`, which
+ * runs while the screen is still the terminal's, where nothing can have been deferred — a no-op by
+ * construction, like the early render failure above. Nothing is added to chase either, because a
+ * second teardown path is exactly what [[TUI-C48]] measured its way out of.
  */
 export async function createTuiSession(
   sessionConfig: SessionConfig,
@@ -540,7 +543,31 @@ export async function createTuiSession(
   try {
     await runTuiSession(sessionConfig, commandLineConfigOverrides, message, onRenderStart, options);
   } finally {
-    writeDeferredExitOutput();
+    // The drain must never BECOME the error. A throw out of this `finally` replaces whatever is
+    // unwinding, and it does so on both paths: a render failure would reach `startSession` as
+    // "TUI unavailable (write EPIPE)" with the real cause gone — on exactly the path the drain was
+    // put here to serve — and a session that ended NORMALLY would be turned into a rejection, so
+    // `startSession` would announce a broken TUI and open a readline session after a run that
+    // worked. Reporting beats rethrowing on both.
+    //
+    // Reported, though, never swallowed: a block the user was told to go and open has just been
+    // lost, which is the silent loss this whole seam exists to end. So it goes through the notice
+    // helper — stderr, which is not the stream that just failed — and `gate: 'always'`, because
+    // there is no re-run that brings the lost line back. The write above bypasses `consoleUtils`
+    // (see its call site); this is commentary about a failure rather than the surviving output
+    // itself, so it takes the ordinary path.
+    try {
+      writeDeferredExitOutput();
+    } catch (drainFailure) {
+      displayNotice(
+        'Exit output could not be printed',
+        [
+          'Text this session deferred to print after the screen came back has been lost.',
+          drainFailure instanceof Error ? drainFailure.message : String(drainFailure),
+        ],
+        { tone: 'warn', gate: 'always' }
+      );
+    }
   }
 }
 

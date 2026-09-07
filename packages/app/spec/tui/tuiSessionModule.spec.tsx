@@ -56,6 +56,10 @@ vi.mock('@gaunt-sloth/core/utils/consoleUtils.js', () => ({
   // TUI-C19 — the load-time warning-capture window wrapped around initConfig.
   beginWarningCapture: vi.fn(),
   endWarningCapture: vi.fn(() => []),
+  // TUI-C104 — where a drain that could not write reports itself. It has to be here rather than
+  // absent: the report is raised from inside a `finally`, so an undefined helper would throw there
+  // and replace the very error the guard exists to preserve.
+  displayNotice: vi.fn(),
 }));
 vi.mock('@gaunt-sloth/core/utils/fileUtils.js', () => ({
   appendToFile: vi.fn(),
@@ -800,9 +804,11 @@ describe('createTuiSession — deferred exit output (TUI-C56, TUI-C104)', () => 
     // Same boundary the normal exit is held to: nothing of it while Ink still owned the screen —
     // Ink leaves the alternate screen inside its own unmount before it rejects the exit promise.
     expect(snapshot.atUnmount()).not.toContain(DEFERRED);
-    // Written after it, on a line of its own, and written once BY THIS SURFACE — what this count
-    // catches is a drain that ran on the throw path as well as on the normal exit path. Nothing
-    // downstream can repeat it either, but that is the cell below, not this one.
+    // Written after it, on a line of its own. Read the count for what it is and no more: because
+    // the drain empties the queue as it reads it, a SECOND drain writes nothing, so this number
+    // cannot catch one. What it catches is a second WRITE — the block reaching stdout by some
+    // route that did not consume the queue. The no-double-print property rests on the drain being
+    // destructive (`exitOutputChannel.drainExitOutput`), which is the cell below.
     expect(written()).toContain(`${DEFERRED}\n`);
     expect(timesWritten()).toBe(1);
   });
@@ -852,5 +858,64 @@ describe('createTuiSession — deferred exit output (TUI-C56, TUI-C104)', () => 
     await expect(createTuiSession(sessionConfig, overrides)).rejects.toBe(failure);
 
     expect(written()).not.toContain(DEFERRED);
+  });
+
+  /**
+   * TUI-C104 — the drain must not become the error.
+   *
+   * Putting the drain in a `finally` bought every exit path at the cost of a new one: a throw from
+   * the write now leaves through that `finally` and replaces whatever was already unwinding. The
+   * two cells below are the two directions it fails in, and they are only worth having together —
+   * a guard that fixed the crash path and turned a clean exit into a rejection would leave one of
+   * them green.
+   */
+  const failWritingTheBlock = (): Error => {
+    const writeFailure = new Error('write EPIPE');
+    systemUtilsMock.stdout.write.mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string' && chunk.includes(DEFERRED)) throw writeFailure;
+      return true;
+    });
+    return writeFailure;
+  };
+
+  it('reports a drain that cannot write, rather than letting it replace the session error', async () => {
+    // The deferred line is already lost once the write throws. Losing the reason the session
+    // crashed as well — `startSession` would announce "TUI unavailable (write EPIPE)" — would take
+    // the diagnostic on precisely the path this drain was added to serve.
+    const failure = new Error('no raw mode');
+    const { deferExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    deferThenFail(deferExitOutput, failure);
+    const writeFailure = failWritingTheBlock();
+    const { displayNotice } = await import('@gaunt-sloth/core/utils/consoleUtils.js');
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await expect(createTuiSession(sessionConfig, overrides)).rejects.toBe(failure);
+
+    // And not silently: the loss is announced at a gate no console level can quiet, because no
+    // re-run brings the line back.
+    expect(vi.mocked(displayNotice)).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.arrayContaining([writeFailure.message]),
+      expect.objectContaining({ gate: 'always' })
+    );
+  });
+
+  it('does not turn a session that ended normally into a failure when the drain cannot write', async () => {
+    // The other direction, and the one with a user-visible cost even though nothing crashed: a
+    // rejection here reaches `startSession`'s `catch`, which would warn that the TUI is unavailable
+    // and open a readline session on top of a run that had already finished.
+    const { deferExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    deferDuringSession(deferExitOutput);
+    const writeFailure = failWritingTheBlock();
+    const { displayNotice } = await import('@gaunt-sloth/core/utils/consoleUtils.js');
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await expect(createTuiSession(sessionConfig, overrides)).resolves.toBeUndefined();
+
+    expect(vi.mocked(displayNotice)).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.arrayContaining([writeFailure.message]),
+      expect.objectContaining({ gate: 'always' })
+    );
   });
 });
