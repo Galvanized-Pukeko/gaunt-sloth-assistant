@@ -40,10 +40,10 @@ describe('gth --resume in front of a subcommand (real CLI definition)', () => {
     // `INIT_CWD` is set by pnpm to wherever `pnpm test` ran, and the CLI prefers it as its working
     // directory — inherited, this run would aim at the repository instead of the temp project.
     delete env.INIT_CWD;
-    // Tracing would turn a hermetic run into a networked one; this desktop exports it.
-    delete env.LANGCHAIN_TRACING_V2;
-    delete env.LANGCHAIN_TRACING;
-    delete env.LANGSMITH_TRACING;
+    // Tracing would turn a hermetic run into a networked one — in any process that exports the
+    // switch together with a key, on any machine, not on one particular desktop. No deletion is
+    // needed for it here: clearLangSmithEnv() in packages/app/vitest.setup.ts clears LangSmith's
+    // whole configuration from process.env before any spec runs, so the child inherits none of it.
     const result = spawnSync('node', [cliEntry, '--nopipe', ...args], {
       encoding: 'utf8',
       cwd: projectDir,

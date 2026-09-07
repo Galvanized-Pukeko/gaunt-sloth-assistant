@@ -26,8 +26,8 @@ export const LANGSMITH_ENV_PREFIXES = ['LANGSMITH_', 'LANGCHAIN_'] as const;
  * instances observed: the switch alone has four spellings (`TRACING` and `TRACING_V2` under both
  * prefixes), and the endpoint, project, session and key each have two. A list would also have to
  * be revisited on every langsmith bump, and nothing in this repo reads a variable under either
- * prefix — the only other mentions are process-spawning specs that already delete three of the
- * switches from the child's environment by hand.
+ * prefix. This call is the single enforcement point: the specs that spawn a child process build
+ * that child's environment from an already-cleared `process.env` and delete none of these by hand.
  *
  * **Why not `test.env` in the vitest config.** The value that switches tracing off is the absence
  * of the variable, not a falsy value: the gate tests `=== 'true'`, so any assignment is a decision

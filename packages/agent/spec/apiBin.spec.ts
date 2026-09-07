@@ -73,10 +73,9 @@ function freePort(): Promise<number> {
 function childEnv(home: string): NodeJS.ProcessEnv {
   const env = { ...process.env, HOME: home, USERPROFILE: home };
   delete env.INIT_CWD;
-  // LangSmith tracing would turn a hermetic run into a networked one.
-  delete env.LANGCHAIN_TRACING_V2;
-  delete env.LANGCHAIN_TRACING;
-  delete env.LANGSMITH_TRACING;
+  // LangSmith tracing would turn a hermetic run into a networked one; clearLangSmithEnv() in
+  // packages/app/vitest.setup.ts clears it from process.env before any spec runs, so the child
+  // inherits none of it.
   return env;
 }
 
