@@ -560,4 +560,25 @@ describe('interactiveSessionModule shared slash-command registry (GS2-8)', () =>
     expect(out).not.toContain('Debug dump unavailable');
     expect(runnerInstanceMock.processMessages).not.toHaveBeenCalled();
   });
+
+  it('never drains the exit-output channel, so a block the TUI already printed cannot appear twice (TUI-C104)', async () => {
+    // The other half of TUI-C104's no-double-print guarantee, and the half that lives over here.
+    // When the Ink TUI throws once its frame is live, `createTuiSession` drains the channel in a
+    // `finally` and `startSession` then starts THIS session in the same process. It must not print
+    // the block again — and it does not, because this surface never drains at all: its output
+    // already survives its own exit, so there is nothing for a re-print to rescue. That is a
+    // property of the code, not a flag either side has to set correctly.
+    const queued = 'Debug dump written (secrets redacted, review before sharing): /tmp/h/dump';
+    const { clearExitOutput, deferExitOutput, drainExitOutput } =
+      await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    clearExitOutput();
+    deferExitOutput(queued);
+
+    await runSession('exit');
+
+    // Not printed by this surface...
+    expect(allOutput()).not.toContain('/tmp/h/dump');
+    // ...and not consumed either: it leaves the channel exactly as it found it.
+    expect(drainExitOutput()).toEqual([queued]);
+  });
 });

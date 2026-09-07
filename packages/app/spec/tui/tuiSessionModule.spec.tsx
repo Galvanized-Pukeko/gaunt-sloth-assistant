@@ -673,7 +673,7 @@ describe('createTuiSession — the render-phase boundary (CFG-47)', () => {
  * A cell asserting only that the line was eventually written would pass for a session that printed
  * it into the alternate screen — which is the bug.
  */
-describe('createTuiSession — deferred exit output (TUI-C56)', () => {
+describe('createTuiSession — deferred exit output (TUI-C56, TUI-C104)', () => {
   const DEFERRED = 'Debug dump written (secrets redacted, review before sharing): /tmp/h/dump';
 
   beforeEach(renderPhaseBeforeEach);
@@ -755,5 +755,102 @@ describe('createTuiSession — deferred exit output (TUI-C56)', () => {
     await createTuiSession(sessionConfig, overrides);
 
     expect(written()).not.toContain('left over from something else');
+  });
+
+  /**
+   * TUI-C104 — the crash path. A throw raised once the frame is live leaves through the session's
+   * `catch`; `startSession` then warns "TUI unavailable" and starts a readline session in the SAME
+   * process. Before this node neither the throw nor that readline session drained, so the block the
+   * user was told to go and open was discarded in silence — with a crash as the only symptom they
+   * could see, and a missing line as the one they could not.
+   *
+   * The two cells are the two halves of the answer and fail in opposite directions: the first
+   * catches a drain that never happens, the second catches a drain that leaves the block queued for
+   * whatever runs next and so prints it twice.
+   */
+  const deferThenFail = (
+    defer: (text: string) => void,
+    failure: Error
+  ): { atUnmount: () => string } => {
+    let atUnmount = '';
+    renderMock.mockImplementation(() => {
+      defer(DEFERRED);
+      return {
+        clear: vi.fn(),
+        waitUntilExit: vi.fn(async () => {
+          atUnmount = written();
+          throw failure;
+        }),
+      };
+    });
+    return { atUnmount: () => atUnmount };
+  };
+
+  /** How many times the block appears in everything stdout was asked to write. */
+  const timesWritten = (): number => written().split(DEFERRED).length - 1;
+
+  it('drains on a render-phase throw, after the unmount and exactly once (TUI-C104)', async () => {
+    const failure = new Error('no raw mode');
+    const { deferExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    const snapshot = deferThenFail(deferExitOutput, failure);
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await expect(createTuiSession(sessionConfig, overrides)).rejects.toBe(failure);
+
+    // Same boundary the normal exit is held to: nothing of it while Ink still owned the screen —
+    // Ink leaves the alternate screen inside its own unmount before it rejects the exit promise.
+    expect(snapshot.atUnmount()).not.toContain(DEFERRED);
+    // Written after it, on a line of its own, and written once BY THIS SURFACE — what this count
+    // catches is a drain that ran on the throw path as well as on the normal exit path. Nothing
+    // downstream can repeat it either, but that is the cell below, not this one.
+    expect(written()).toContain(`${DEFERRED}\n`);
+    expect(timesWritten()).toBe(1);
+  });
+
+  it('leaves the channel empty after that throw, so the session started next has nothing to print', async () => {
+    // This is what makes the no-double-print property structural rather than a flag: the drain is
+    // destructive and this `finally` completes before `startSession`'s `catch` runs, so the
+    // readline session that follows finds an empty queue. (It would not drain one anyway — its
+    // output already survives its own exit — and that half is pinned on the readline surface.)
+    const failure = new Error('no raw mode');
+    const { deferExitOutput, drainExitOutput } =
+      await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    deferThenFail(deferExitOutput, failure);
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await expect(createTuiSession(sessionConfig, overrides)).rejects.toBe(failure);
+
+    expect(drainExitOutput()).toEqual([]);
+  });
+
+  it('drains a render-phase throw on the hermetic branch too, which has its own render path', async () => {
+    // The drain lives on the one seam every branch unwinds through, so a branch is covered without
+    // anyone remembering to add a call to it. This cell is what would go red if it were moved back
+    // beside the render paths and a branch were missed.
+    systemUtilsMock.env = { GTH_TUI_E2E_FIXTURE: '/fixtures/session.json' };
+    const failure = new Error('fixture replay failed');
+    const { deferExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    const snapshot = deferThenFail(deferExitOutput, failure);
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await expect(createTuiSession(sessionConfig, overrides)).rejects.toBe(failure);
+
+    expect(snapshot.atUnmount()).not.toContain(DEFERRED);
+    expect(timesWritten()).toBe(1);
+  });
+
+  it('writes nothing on a throw raised BEFORE anything could be deferred', async () => {
+    // The pre-mount failures — the mouse plumbing, `render` itself — reach the drain with an empty
+    // queue, because the only producer is a slash command and a slash command needs a mounted App.
+    // So the drain is a no-op there by construction, not because the terminal state was guessed at.
+    const failure = new Error('render exploded');
+    renderMock.mockImplementation(() => {
+      throw failure;
+    });
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await expect(createTuiSession(sessionConfig, overrides)).rejects.toBe(failure);
+
+    expect(written()).not.toContain(DEFERRED);
   });
 });

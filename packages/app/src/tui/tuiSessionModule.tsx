@@ -160,9 +160,11 @@ function dumpDebugSession(input: DebugDumpInput): { archiveDir: string } {
  * judgements it makes are the SURFACE's:
  *
  *  - **When.** Only this module knows the terminal is back: Ink restores the primary buffer inside
- *    `finishUnmount` and resolves the exit promise behind a write barrier afterwards, so a write
- *    made once `waitUntilExit()` has resolved lands on the restored screen. Anything written
- *    earlier is teardown output on the alternate screen, which Ink discards by design.
+ *    `finishUnmount` and settles the exit promise behind a write barrier afterwards, so a write
+ *    made once `waitUntilExit()` has settled — resolved on a normal exit, rejected on a failure
+ *    Ink unmounts for — lands on the restored screen. Anything written earlier is teardown output
+ *    on the alternate screen, which Ink discards by design. `createTuiSession` is where the call
+ *    sits, so both cases reach it; see the note there.
  *  - **Whether.** `isTTY` here is PIPE PROTECTION, not alternate-screen detection. A caller
  *    reading this session's stdout through a pipe gets a stream it may be parsing, and an extra
  *    trailing line it never asked for is exactly the kind of pollution that breaks one. It is not
@@ -483,9 +485,69 @@ function createAttackHaltBridge() {
 }
 
 /**
- * Ink TUI counterpart to `createInteractiveSession` (the readline path). Same lifecycle —
- * init config, session logging, a `GthAgentRunner` driving the agent — but it renders
- * over the typed {@link import('@gaunt-sloth/core/core/types.js').AgentStreamEvent} stream
+ * Ink TUI counterpart to `createInteractiveSession` (the readline path).
+ *
+ * This wrapper is nothing but the exit-output channel's lifetime: the session's whole body runs
+ * inside it, so the channel is emptied on the way in and drained on the way out no matter how the
+ * body leaves. {@link runTuiSession} is the session itself.
+ *
+ * TUI-C56 — start the channel empty. Nothing in a normal process defers before a session begins,
+ * so this is not a fix for an observed leak; it is what makes the guarantee simple enough to rely
+ * on — what this session prints on the way out is what THIS session deferred, never a block left
+ * behind by something earlier in the same process.
+ *
+ * TUI-C104 — and drain it in a `finally`, which is the whole point of the wrapper. A drain sitting
+ * on each render branch's own exit instead covers every way a user DELIBERATELY leaves — `/exit`,
+ * `/quit`, the bare `exit` keyword and Ctrl+C alike, since [[TUI-C79]] routes Ctrl+C through
+ * <App>'s `quit()` and Ink's own `exit()` rather than through a signal — and nothing else. It does
+ * not cover a throw raised once the render phase has begun: that leaves through the session's
+ * `catch`, `startSession` warns "TUI unavailable" and starts a readline session in the same
+ * process, and a block the user was told to go and open would be discarded in silence — with the
+ * crash as the only symptom they can see and the missing line as the one they cannot. A crash is
+ * exactly when they cannot afford to lose it, so the drain sits where both paths reach it.
+ *
+ * One drain, here, rather than one per render branch: every return and every throw from the body
+ * unwinds through this `finally`, so a branch added later is covered without anyone remembering —
+ * the property a per-branch call cannot have.
+ *
+ * Two things make this safe to state without hedging:
+ *
+ *  - **It lands on the restored screen, on the throw path too.** The only producer is
+ *    `/debug-dump`, and a slash command needs a mounted <App> — so a non-empty queue means the
+ *    failure arrived through `waitUntilExit()`, and Ink leaves the alternate screen inside
+ *    `finishUnmount` BEFORE it rejects that promise. A failure early enough to miss Ink's unmount
+ *    (the mouse plumbing, `render` itself) is also early enough that nothing has been deferred, so
+ *    the drain there is a no-op by construction rather than by luck.
+ *  - **It cannot double-print.** `drainExitOutput` empties the queue as it reads it, and this
+ *    `finally` completes before `startSession`'s `catch` runs, so the readline session started
+ *    after a render throw finds nothing to print. It would not print it anyway — that surface
+ *    never drains, because its output already survives its own exit — and neither half is a flag
+ *    anyone can get wrong.
+ *
+ * Still not covered, and deliberately: an external SIGINT/SIGTERM. Ink resolves its exit promise
+ * synchronously during shutdown (async callbacks no longer fire), so the body never returns and
+ * this `finally` is not reached. Nothing is added to chase it, because a second teardown path is
+ * exactly what [[TUI-C48]] measured its way out of.
+ */
+export async function createTuiSession(
+  sessionConfig: SessionConfig,
+  commandLineConfigOverrides: CommandLineConfigOverrides,
+  message?: string,
+  onRenderStart?: () => void,
+  options: InteractiveSessionOptions = {}
+): Promise<void> {
+  clearExitOutput();
+  try {
+    await runTuiSession(sessionConfig, commandLineConfigOverrides, message, onRenderStart, options);
+  } finally {
+    writeDeferredExitOutput();
+  }
+}
+
+/**
+ * The session proper. Same lifecycle as the readline path — init config, session logging, a
+ * `GthAgentRunner` driving the agent — but it renders over the typed
+ * {@link import('@gaunt-sloth/core/core/types.js').AgentStreamEvent} stream
  * (`processMessagesWithEvents`) instead of `consoleUtils`. The status callback is bridged
  * into the React app rather than written to stdout, which would corrupt Ink's frame.
  *
@@ -505,18 +567,13 @@ function createAttackHaltBridge() {
  * anything. Anything moved to before the call joins the propagating side by construction — so if
  * you add TUI-only, terminal-touching setup, put it after the call.
  */
-export async function createTuiSession(
+async function runTuiSession(
   sessionConfig: SessionConfig,
   commandLineConfigOverrides: CommandLineConfigOverrides,
-  message?: string,
-  onRenderStart?: () => void,
-  options: InteractiveSessionOptions = {}
+  message: string | undefined,
+  onRenderStart: (() => void) | undefined,
+  options: InteractiveSessionOptions
 ): Promise<void> {
-  // TUI-C56 — start the exit-output channel empty. Nothing in a normal process defers before a
-  // session begins, so this is not a fix for an observed leak; it is what makes the guarantee
-  // simple enough to rely on — what this session prints on the way out is what THIS session
-  // deferred, never a block left behind by something earlier in the same process.
-  clearExitOutput();
   // Hermetic e2e seam: when GTH_TUI_E2E_FIXTURE is set, drive the real <App> (Ink renderer +
   // foldEvents) from a deterministic, key-free replay of recorded events instead of a model.
   // Production never takes this branch (the env var is set only by the PTY e2e harness).
@@ -583,11 +640,10 @@ export async function createTuiSession(
     } finally {
       fixtureMouse?.dispose();
     }
-    // TUI-C56 — the hermetic branch drains too, and it must: it renders the real <App> with the
-    // real `/debug-dump` writer wired in, so it is the branch the PTY suite proves the restored
-    // screen on. A drain only on the production path below would leave that assertion testing a
-    // fixture-only shortcut instead of the behaviour a user gets.
-    writeDeferredExitOutput();
+    // TUI-C56 — this branch's exit is drained too, and it must be: it renders the real <App> with
+    // the real `/debug-dump` writer wired in, so it is the branch the PTY suite proves the restored
+    // screen on. The drain itself is `createTuiSession`'s, so this `return` reaches it exactly as
+    // the production path's exit does — and so does a throw from this branch.
     return;
   }
 
@@ -1004,27 +1060,6 @@ export async function createTuiSession(
     // TUI-C37 — restore the terminal the moment Ink is done with it. The process-level hooks
     // installed alongside remain as the backstop for the paths that never get here.
     mouseSession?.dispose();
-    // TUI-C56 — the terminal is fully the user's again (Ink has left the alternate screen, mouse
-    // reporting is off), so anything the session deferred as must-survive-the-exit is written now,
-    // onto the restored screen. This is the production path's drain — the hermetic branch above
-    // has the only other one — and it is deliberately on the normal exit path, which every way a
-    // user DELIBERATELY leaves takes: `/exit`, `/quit`, the bare `exit` keyword and Ctrl+C alike,
-    // because [[TUI-C79]] routes Ctrl+C through <App>'s `quit()` and
-    // Ink's own `exit()` rather than through a signal.
-    //
-    // That list is the deliberate exits, and nothing more. Anything that ends the session without
-    // running this continuation skips the drain, and the deferred block is dropped rather than
-    // printed. Two known cases, neither of them covered:
-    //  - An external signal. Ink resolves its exit promise synchronously during shutdown (async
-    //    callbacks no longer fire), so this line is not reached. Nothing is added to chase it,
-    //    because a second teardown path is exactly what TUI-C48 measured its way out of.
-    //  - A throw once the render phase has begun. It goes to the `catch` below, which rethrows
-    //    without draining, and `startSession` then warns "TUI unavailable" and starts a readline
-    //    session in the same process — a surface that never drains — so the block is discarded
-    //    silently. `clearExitOutput()` at session entry bounds it to that session rather than
-    //    leaking across sessions. Draining on the error path would be a behaviour change beyond
-    //    this node's normal-exit-path scope, so it is left to TUI-C104.
-    writeDeferredExitOutput();
   } catch (err) {
     mouseSession?.dispose();
     approvalBridge.abortPending();
