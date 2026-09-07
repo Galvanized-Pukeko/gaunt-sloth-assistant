@@ -84,7 +84,7 @@ escaping.
 
 ### Output
 
-Use [consoleUtils.ts](src/consoleUtils.ts) to output to users.
+Use [consoleUtils.ts](packages/core/src/utils/consoleUtils.ts) to output to users.
 Do not use console.log directly.
 
 One exception: `writeDeferredExitOutput` in `packages/app/src/tui/tuiSessionModule.tsx` writes the
@@ -95,12 +95,12 @@ is kept at the call site.
 
 ### System
 
-Use [systemUtils.ts](src/systemUtils.ts) to access system variables and functions such as
+Use [systemUtils.ts](packages/core/src/utils/systemUtils.ts) to access system variables and functions such as
 process.env, process.stdout, etc.
 
 ### LLM
 
-Use [llmUtils.ts](src/llmUtils.ts) to access LLM.
+Use [llmUtils.ts](packages/core/src/utils/llmUtils.ts) to access LLM.
 
 ### Middleware
 
@@ -124,8 +124,8 @@ Middleware provides hooks to intercept and control agent execution at critical p
 - JS configs support both predefined and custom middleware objects
 
 **Implementation:**
-- Middleware registry is in [src/middleware/registry.ts](src/middleware/registry.ts)
-- Middleware types are in [src/middleware/types.ts](src/middleware/types.ts)
+- Middleware registry is in [packages/agent/src/middleware/registry.ts](packages/agent/src/middleware/registry.ts)
+- Middleware types are in [packages/agent/src/middleware/types.ts](packages/agent/src/middleware/types.ts)
 - Provider-specific middleware can be auto-injected via `postProcessJsonConfig()` in preset files
 
 ### AG-UI Server (`@gaunt-sloth/agent`)
