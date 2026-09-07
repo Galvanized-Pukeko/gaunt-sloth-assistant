@@ -373,14 +373,29 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
     async () => {
       // Port 0 means "any free port". The number the caller passed is then not the number the
       // socket has, and the banner is the only place they can learn the real one.
-      const { dir, home } = makeDirs('anyport');
-      writeFixtureConfig(join(dir, '.gsloth.config.json'), 0);
+      //
+      // TWO servers, and the assertion that matters is that they DIFFER. One server cannot tell
+      // "the 0 was honoured" from "the 0 was replaced by the default": a single announced port
+      // satisfies `not.toBe(0)` on both readings, and answers health on both. Two concurrent
+      // servers cannot both be handed the same default, so a precedence that drops the 0 —
+      // `port || DEFAULT` in place of `port ?? DEFAULT`, where `0` is falsy — shows up here
+      // either as an equal pair or as a second server that never starts at all.
+      const first = makeDirs('anyport-a');
+      const second = makeDirs('anyport-b');
+      writeFixtureConfig(join(first.dir, '.gsloth.config.json'), 0);
+      writeFixtureConfig(join(second.dir, '.gsloth.config.json'), 0);
 
-      const { child, transcript } = startServer(['ag-ui'], dir, home);
+      const a = startServer(['ag-ui'], first.dir, first.home);
+      const b = startServer(['ag-ui'], second.dir, second.home);
 
-      const announced = await waitForAnnouncedPort(child, transcript);
-      expect(announced).not.toBe(0);
-      expect(await waitForHealth(announced, child, transcript)).toBe(200);
+      const announcedA = await waitForAnnouncedPort(a.child, a.transcript);
+      const announcedB = await waitForAnnouncedPort(b.child, b.transcript);
+
+      expect(announcedA).not.toBe(0);
+      expect(announcedB).not.toBe(0);
+      expect(announcedA).not.toBe(announcedB);
+      expect(await waitForHealth(announcedA, a.child, a.transcript)).toBe(200);
+      expect(await waitForHealth(announcedB, b.child, b.transcript)).toBe(200);
     },
     CELL_TIMEOUT_MS
   );
