@@ -699,7 +699,7 @@ describe('modelDiscovery', () => {
               name: 'models/gemini-experimental-xyz',
               supportedGenerationMethods: ['generateContent'],
             },
-            { name: 'models/gemini-3.7-flash', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
           ],
         })
       );
@@ -708,7 +708,7 @@ describe('modelDiscovery', () => {
       const { models, status } = await discoverModelsWithProvenance('google-genai');
       expect(status).toBe('live');
       // Curated id present in the live catalog → flagged ⭐ preferred and sorted first.
-      expect(models[0]).toEqual({ id: 'gemini-3.7-flash', preferred: true });
+      expect(models[0]).toEqual({ id: 'gemini-3.8-flash', preferred: true });
       // Non-curated live id is kept but not preferred.
       expect(models.find((m) => m.id === 'gemini-experimental-xyz')!.preferred).toBe(false);
     });
@@ -789,7 +789,7 @@ describe('modelDiscovery', () => {
 
     it('resolveInitModel returns the highest-ranked curated id that is actually live (verified-present, not curated[0])', async () => {
       systemUtilsMock.env.GOOGLE_API_KEY = 'g-live-123';
-      // curated[0] (gemini-3.6-flash) is NOT live; curated[1] (gemini-3.5-flash-lite) IS.
+      // curated[0] (gemini-3.8-flash) is NOT live; curated[1] (gemini-3.5-flash-lite) IS.
       vi.stubGlobal(
         'fetch',
         okJson({
