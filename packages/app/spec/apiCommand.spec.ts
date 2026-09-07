@@ -83,4 +83,19 @@ describe('gth api ag-ui --port (CFG-62)', () => {
     await expect(run('--port', '10abc')).rejects.toThrow('Expected an integer, got "10abc"');
     expect(startAgUiServerMock).not.toHaveBeenCalled();
   });
+
+  it('a server that could not start reaches the exit status, and says why', async () => {
+    // `gth api ag-ui` is the second door onto the same server. A bind that fails has to be as
+    // loud here as it is on the bin, so the failure is reported and the run is not a success.
+    startAgUiServerMock.mockRejectedValue(
+      new Error('AG-UI server failed to listen on port 4000: listen EADDRINUSE')
+    );
+
+    await run('--port', '4000');
+
+    expect(displayErrorMock).toHaveBeenCalledWith(
+      expect.stringContaining('failed to listen on port 4000')
+    );
+    expect(setExitCodeMock).toHaveBeenCalledWith(1);
+  });
 });

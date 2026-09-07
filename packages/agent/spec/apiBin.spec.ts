@@ -1,5 +1,5 @@
 /**
- * CFG-62 — **the `gaunt-sloth-api` bin's flags, proved at the door.**
+ * **The `gaunt-sloth-api` bin's flags, and its bind, proved at the door.**
  *
  * ## Why this spawns, and why it connects
  *
@@ -10,10 +10,18 @@
  * way the code builds it would have passed against the broken bin — so every cell here runs the
  * real file, through the real `bin` entry an installed user has on PATH.
  *
- * And the port cell **connects to the port**. The banner is not evidence: `startAgUiServer` prints
- * the number it was handed, so a run that printed `listening at http://localhost:3123` while
- * binding 3000 is exactly the defect being fixed. `GET /health` answering on the flag's port is
- * the only thing that distinguishes them.
+ * And the port cell **connects to the port**. A banner is a claim about a socket, and only the
+ * socket can settle it: `GET /health` answering on the flag's port is the one thing that separates
+ * a bound flag from a dropped one.
+ *
+ * ## Why a cell holds a port of its own
+ *
+ * The same reasoning covers the bind itself. Announcing a listen is not establishing one — express
+ * runs the listen callback whether the bind succeeded or failed — so the suite starts the server on
+ * a port it has taken and is holding, and requires a non-zero exit. It holds its own port rather
+ * than reusing the configured or allocated one, because that port may be free, or held by something
+ * unrelated, and neither case measures the bind. The complementary control is the free-port cell
+ * above it, which must keep passing: banner, `/health`, and a process that is still running.
  *
  * ## Why the ports come from the OS rather than a fixed number
  *
@@ -65,6 +73,40 @@ function freePort(): Promise<number> {
       const address = probe.address();
       const port = typeof address === 'object' && address ? address.port : 0;
       probe.close(() => (port ? resolvePort(port) : rejectPort(new Error('no port assigned'))));
+    });
+  });
+}
+
+/** A port held open for the length of a cell, so a server starting on it must collide. */
+interface HeldPort {
+  port: number;
+  release: () => Promise<void>;
+}
+
+/**
+ * Take a port and keep it.
+ *
+ * The holder is bound with **no host**, which is the wildcard address — the same one
+ * `app.listen(port)` asks for. A holder on `127.0.0.1` alone leaves the outcome to the platform's
+ * rules for overlapping binds, which is how a collision cell passes here and flakes on the Windows
+ * runner. The OS picks the number, so the cell reserves nothing and assumes nothing about what
+ * else is live on the machine — the port it collides on is one it is holding itself.
+ */
+function holdPort(): Promise<HeldPort> {
+  return new Promise((resolveHold, rejectHold) => {
+    const holder = createServer();
+    holder.on('error', rejectHold);
+    holder.listen(0, () => {
+      const address = holder.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      if (!port) {
+        holder.close(() => rejectHold(new Error('no port assigned')));
+        return;
+      }
+      resolveHold({
+        port,
+        release: () => new Promise<void>((done) => holder.close(() => done())),
+      });
     });
   });
 }
@@ -164,10 +206,41 @@ async function waitForHealth(
   );
 }
 
+/** The banner, and the port it names. */
+const LISTENING_BANNER = /AG-UI server listening at http:\/\/localhost:(\d+)/;
+
+/**
+ * Wait for the startup banner and read the port out of it.
+ *
+ * A caller who asked for port 0 has no other way to learn which port they got, so the banner is
+ * the interface here rather than decoration.
+ */
+async function waitForAnnouncedPort(
+  child: ChildProcess,
+  transcript: () => string
+): Promise<number> {
+  const deadline = Date.now() + BOOT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new Error(
+        `the server exited with code ${child.exitCode} before announcing a port; it said:\n${transcript()}`
+      );
+    }
+    const announced = LISTENING_BANNER.exec(transcript());
+    if (announced) return Number(announced[1]);
+    await sleep(200);
+  }
+  throw new Error(
+    `no listening banner within ${BOOT_TIMEOUT_MS}ms; the server said:\n${transcript()}`
+  );
+}
+
 describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
   /** Each spawned server, paired with the promise that resolves when it is really gone. */
   const children: { child: ChildProcess; gone: Promise<string | undefined> }[] = [];
   const tempDirs: string[] = [];
+  /** Ports a cell is deliberately occupying, released in afterEach. */
+  const heldPorts: HeldPort[] = [];
 
   /** Spawn the bin and collect both streams; the child is killed in afterEach either way. */
   function startServer(
@@ -205,6 +278,17 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
       const problem = await goneWithin(gone);
       if (problem) failures.push(`the server (pid ${child.pid}) was not cleaned up: ${problem}`);
     }
+    // Before the directories, and for the same reason the children are killed first: a port this
+    // suite is still occupying would make a later cell fail as though the server could not start.
+    for (const held of heldPorts.splice(0)) {
+      try {
+        await held.release();
+      } catch (err) {
+        failures.push(
+          `port ${held.port} could not be released: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
     for (const dir of tempDirs.splice(0)) {
       try {
         // Node's own EPERM/EBUSY backoff, for a win32 handle that outlives the process by a moment.
@@ -239,9 +323,64 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
         home
       );
 
-      // Connecting is the assertion. The banner prints whatever number it was handed, so it
-      // cannot tell a bound port from a dropped flag.
+      // Connecting is the assertion: it is the only thing that distinguishes the flag's port
+      // being bound from the flag being dropped and some other port bound instead.
       expect(await waitForHealth(flagPort, child, transcript)).toBe(200);
+
+      // The ordinary free-port path, kept as the control: the server announces itself, names the
+      // port it is really on, and is STILL RUNNING. "Exits 0" for a server that is meant to keep
+      // serving is exactly this — it has not exited at all, where the collision path exits.
+      expect(transcript()).toContain(`AG-UI server listening at http://localhost:${flagPort}`);
+      expect(child.exitCode).toBeNull();
+    },
+    CELL_TIMEOUT_MS
+  );
+
+  it(
+    'exits non-zero, and prints no banner, when another process already holds the port',
+    async () => {
+      // The port is one this cell took and is holding, not the configured or allocated one. A
+      // collision test aimed at "the port the server would use anyway" proves nothing: that port
+      // may be free, or held by something unrelated, and either way the cell is not measuring the
+      // bind.
+      const held = await holdPort();
+      heldPorts.push(held);
+
+      const { dir, home } = makeDirs('inuse');
+      writeFixtureConfig(join(dir, '.gsloth.config.json'));
+
+      const result = spawnSync('node', [cliEntry, 'ag-ui', '--port', String(held.port)], {
+        cwd: dir,
+        env: childEnv(home),
+        encoding: 'utf8',
+        timeout: BOOT_TIMEOUT_MS,
+      });
+
+      const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+      expect(result.status, `expected a non-zero exit; the CLI said:\n${output}`).not.toBe(0);
+      // This project's own words and its own interpolation of the port, in one string. Never the
+      // platform's errno text — its wording is not the same on win32 as it is here — and never the
+      // bare number, which node's own message happens to carry too, so a message that dropped the
+      // port would still satisfy it.
+      expect(output).toContain(`failed to listen on port ${held.port}`);
+      expect(output).not.toContain('AG-UI server listening');
+    },
+    CELL_TIMEOUT_MS
+  );
+
+  it(
+    'announces the port the OS chose, when the configured port is 0',
+    async () => {
+      // Port 0 means "any free port". The number the caller passed is then not the number the
+      // socket has, and the banner is the only place they can learn the real one.
+      const { dir, home } = makeDirs('anyport');
+      writeFixtureConfig(join(dir, '.gsloth.config.json'), 0);
+
+      const { child, transcript } = startServer(['ag-ui'], dir, home);
+
+      const announced = await waitForAnnouncedPort(child, transcript);
+      expect(announced).not.toBe(0);
+      expect(await waitForHealth(announced, child, transcript)).toBe(200);
     },
     CELL_TIMEOUT_MS
   );

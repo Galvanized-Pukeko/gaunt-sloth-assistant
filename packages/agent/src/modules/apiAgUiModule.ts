@@ -7,6 +7,7 @@ import { GthAbstractAgent } from '@gaunt-sloth/core/core/GthAbstractAgent.js';
 import { GthLangChainAgent } from '@gaunt-sloth/core/core/GthLangChainAgent.js';
 import {
   defaultStatusCallback,
+  displayError,
   displayInfo,
   displayWarning,
 } from '@gaunt-sloth/core/utils/consoleUtils.js';
@@ -818,11 +819,43 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
     });
   });
 
-  return new Promise((resolve) => {
-    app.listen(port, () => {
-      displayInfo(`AG-UI server listening at http://localhost:${port}`);
-      displayInfo(`AG-UI endpoint: POST http://localhost:${port}/agents/{agentId}/run`);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    // The listen callback firing is NOT evidence of a bind. Express wraps the callback in `once()`
+    // and registers it as the server's `error` listener as well as its `listening` one, so a bind
+    // that failed runs it exactly like a bind that succeeded — and the presence of that listener is
+    // also what keeps node from making an EADDRINUSE loud. The socket is the only witness:
+    // `server.listening` says whether the bind happened, and the `error` event carries why it did
+    // not. Announcing a server on a port another process holds is worse than a wrong message — the
+    // per-worktree port allocation that keeps two lanes apart depends on a collision being loud.
+    const server = app.listen(port, () => {
+      if (!server.listening) {
+        // The bind failed. The `error` handler below has the reason and rejects; saying anything
+        // here would be the banner this guard exists to withhold.
+        return;
+      }
+      settled = true;
+      // The port comes off the bound socket rather than from the argument, because the two are not
+      // always the same number: port 0 asks the OS to choose one, and repeating the 0 would name an
+      // endpoint that connects to nothing.
+      const address = server.address();
+      const boundPort = typeof address === 'object' && address !== null ? address.port : port;
+      displayInfo(`AG-UI server listening at http://localhost:${boundPort}`);
+      displayInfo(`AG-UI endpoint: POST http://localhost:${boundPort}/agents/{agentId}/run`);
       resolve();
+    });
+
+    server.on('error', (err: Error) => {
+      if (settled) {
+        // The server was up and has now failed. Nothing is waiting on the boot promise any more,
+        // and express's own callback has already been spent, so without this the failure would be
+        // absorbed in silence.
+        displayError(`AG-UI server error: ${err.message}`);
+        return;
+      }
+      settled = true;
+      reject(new Error(`AG-UI server failed to listen on port ${port}: ${err.message}`));
     });
   });
 }

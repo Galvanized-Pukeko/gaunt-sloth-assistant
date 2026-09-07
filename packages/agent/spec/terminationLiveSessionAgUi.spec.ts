@@ -50,13 +50,23 @@ vi.mock('@gaunt-sloth/core/core/GthLangChainAgent.js', () => {
 
 const mockPostFn = vi.hoisted(() => vi.fn());
 vi.mock('express', () => {
-  // `listen` must invoke its callback: `startAgUiServer` awaits it, and a mock that never calls
-  // back leaves every cell here hanging on a promise that cannot settle.
+  // `listen` must return a listening server and invoke its callback: `startAgUiServer` awaits the
+  // banner, which it prints only once the socket says it is bound, so a mock that returns nothing
+  // or never calls back leaves every cell here hanging on a promise that cannot settle. The
+  // callback goes on a later turn because node's does, and the module consults the server the call
+  // returns.
   const app = {
     use: vi.fn(),
     post: mockPostFn,
     get: vi.fn(),
-    listen: vi.fn((_port: number, cb: () => void) => cb()),
+    listen: vi.fn((port: number, cb: () => void) => {
+      queueMicrotask(cb);
+      return {
+        listening: true,
+        address: () => ({ address: '::', family: 'IPv6', port }),
+        on: vi.fn(),
+      };
+    }),
   };
   const express = Object.assign(
     vi.fn(() => app),

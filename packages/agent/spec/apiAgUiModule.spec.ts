@@ -52,6 +52,40 @@ const mockExpressApp = {
   get: mockGetFn,
   listen: mockListenFn,
 };
+
+/**
+ * The `http.Server` surface `startAgUiServer` reads, as a fake a cell can drive.
+ *
+ * `listening` and `address()` are the two things the module trusts instead of the callback, so a
+ * mock that omits them cannot exercise the code under test; `emit` lets a cell fire the `error`
+ * event that a real failed bind delivers.
+ */
+function makeFakeServer(port: number, listening = true) {
+  const listeners: Record<string, Array<(..._args: unknown[]) => void>> = {};
+  return {
+    listening,
+    address: () => (listening ? { address: '::', family: 'IPv6', port } : null),
+    on(event: string, cb: (..._args: unknown[]) => void) {
+      (listeners[event] ??= []).push(cb);
+      return this;
+    },
+    emit(event: string, ...args: unknown[]) {
+      for (const cb of listeners[event] ?? []) cb(...args);
+    },
+  };
+}
+
+/**
+ * A `listen` that behaves the way node's does: it returns the server synchronously and calls back
+ * on a later turn. A mock that called back inline would run the callback before `app.listen` has
+ * returned, so the server it consults would not exist yet — an artefact of the mock, not of the
+ * code.
+ */
+function fakeListen(port: number, cb: () => void, listening = true) {
+  const server = makeFakeServer(port, listening);
+  queueMicrotask(cb);
+  return server;
+}
 const expressJsonMock = vi.fn(() => 'json-middleware');
 const expressMock = Object.assign(
   vi.fn(() => mockExpressApp),
@@ -164,9 +198,7 @@ describe('apiAgUiModule', () => {
     gthLangChainAgentInitMock.mockResolvedValue(undefined);
     gthLangChainAgentStreamWithEventsMock.mockReturnValue(emptyStream());
     gthLangChainAgentStreamWithEventsResumeMock.mockReturnValue(emptyStream());
-    mockListenFn.mockImplementation((_port: number, cb: () => void) => {
-      cb();
-    });
+    mockListenFn.mockImplementation((port: number, cb: () => void) => fakeListen(port, cb));
     mockEncoderInstance = {
       getContentType: vi.fn().mockReturnValue('text/event-stream'),
       encode: vi.fn((event) => JSON.stringify(event)),
@@ -1285,6 +1317,65 @@ describe('apiAgUiModule', () => {
       getHandler({}, res);
 
       expect(res.json).toHaveBeenCalledWith({ status: 'ok' });
+    });
+  });
+
+  // ─── the bind is what the banner reports ───────────────────────────────────
+
+  describe('the banner reports the socket, not the request', () => {
+    it('rejects naming the port, and prints no banner, when the bind fails', async () => {
+      // What a failed bind looks like from inside express: the callback runs, the server is not
+      // listening, and the reason arrives on the `error` event.
+      let failing: ReturnType<typeof makeFakeServer> | undefined;
+      mockListenFn.mockImplementation((port: number, cb: () => void) => {
+        failing = makeFakeServer(port, false);
+        queueMicrotask(() => {
+          cb();
+          failing?.emit('error', new Error('listen EADDRINUSE: address already in use :::4321'));
+        });
+        return failing;
+      });
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await expect(startAgUiServer(baseConfig, 4321)).rejects.toThrow('4321');
+
+      const banners = consoleUtilsMock.displayInfo.mock.calls.map(([line]) => String(line));
+      expect(banners.some((line) => line.includes('AG-UI server listening'))).toBe(false);
+    });
+
+    it('names the port the socket actually got, not the 0 that asked for any port', async () => {
+      mockListenFn.mockImplementation((_port: number, cb: () => void) => {
+        // Port 0 means "any free port"; the OS answers with a real one, and only `address()`
+        // knows which.
+        const server = makeFakeServer(45123);
+        queueMicrotask(cb);
+        return server;
+      });
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 0);
+
+      const banners = consoleUtilsMock.displayInfo.mock.calls.map(([line]) => String(line));
+      expect(banners).toContain('AG-UI server listening at http://localhost:45123');
+      expect(banners.some((line) => line.includes('localhost:0'))).toBe(false);
+    });
+
+    it('reports a failure that arrives after the server is already up', async () => {
+      let started: ReturnType<typeof makeFakeServer> | undefined;
+      mockListenFn.mockImplementation((port: number, cb: () => void) => {
+        started = makeFakeServer(port);
+        queueMicrotask(cb);
+        return started;
+      });
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000);
+
+      started?.emit('error', new Error('socket hang up'));
+
+      expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
+        expect.stringContaining('socket hang up')
+      );
     });
   });
 });
