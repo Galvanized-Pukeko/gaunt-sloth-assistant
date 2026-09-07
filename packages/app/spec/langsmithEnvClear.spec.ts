@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { clearLangSmithEnv, LANGSMITH_ENV_PREFIXES } from '../vitest.setup.js';
 
 /**
@@ -96,5 +99,116 @@ describe('OPS-30 — LangSmith configuration is cleared for the unit suite', () 
 
   it('sweeps both prefixes, so neither spelling can be dropped unnoticed', () => {
     expect([...LANGSMITH_ENV_PREFIXES].sort()).toEqual(['LANGCHAIN_', 'LANGSMITH_']);
+  });
+});
+
+/**
+ * OPS-112 — the CALL, not the function.
+ *
+ * The block above proves `clearLangSmithEnv` clears whatever environment it is handed. Nothing
+ * proved the setup file still *calls* it, and that call is now the single enforcement point:
+ * OPS-111 removed the hand-deletions that used to shadow it, and three specs
+ * (`rootResumeOption`, `execWriteOutputToFile.e2e`, `apiBin`) carry comments naming it as the
+ * reason their runs are hermetic. Comment the call out and, on any machine that exports no
+ * tracing variables — every CI cell included — the entire suite stays green while those three
+ * comments go on describing a guarantee that no longer exists.
+ *
+ * **Why the obvious assertion is not this test.** Asserting that `process.env` holds no
+ * `LANGSMITH_`/`LANGCHAIN_` key passes whether or not the clear ran, on every machine that never
+ * had one. It cannot fail for the reason it names, so it measures the machine and not the code.
+ * Do not "simplify" the cells below into that one.
+ *
+ * **What is done instead.** Seed the real environment, then re-evaluate the setup module against
+ * it. The clear is a module-scope side effect, so an evaluation that removes the seed can only
+ * have executed the call — and removing the call turns this red on a machine with nothing
+ * exported, which is the whole point.
+ *
+ * **Why re-evaluating the setup file is safe.** Its only other module-scope statement is
+ * `applyTuiColour(false)`, which writes `chalk.level` and never `process.env`, and only when the
+ * level would actually change; under vitest chalk already sits at 0, so it is an identity
+ * operation. The file installs no hooks, so nothing is registered twice. chalk itself lives in
+ * `node_modules` and is externalized, so `vi.resetModules()` does not hand the re-evaluated
+ * module a second copy of it.
+ */
+describe('OPS-112 — the setup file still invokes the clear', () => {
+  /**
+   * One flag per prefix. Flags rather than key-shaped names on purpose: a dropped `apiKey` falls
+   * back to `process.env` in this repo, so nothing here should put a value under a `*_API_KEY`
+   * name, and every assertion below is on presence, never on a value.
+   */
+  const seeds = ['LANGCHAIN_TRACING_V2', 'LANGSMITH_TRACING'] as const;
+
+  /**
+   * Seed, re-evaluate `vitest.setup.ts`, and report which seeds survived. Restoration is by
+   * `delete` when the name was absent — an assignment would leave the name present with the
+   * string "undefined" and quietly re-arm tracing for every spec that follows in this file.
+   */
+  async function survivingSeedsAfterSetupReimport(): Promise<string[]> {
+    const priorlyPresent = seeds.filter((name) => name in process.env);
+    const priorValues = new Map(priorlyPresent.map((name) => [name, process.env[name]]));
+    for (const name of seeds) process.env[name] = 'true';
+
+    try {
+      vi.resetModules();
+      await import('../vitest.setup.js');
+      return seeds.filter((name) => name in process.env);
+    } finally {
+      for (const name of seeds) {
+        if (priorValues.has(name)) process.env[name] = priorValues.get(name);
+        else delete process.env[name];
+      }
+      vi.resetModules();
+    }
+  }
+
+  it('takes a seeded tracing variable back out when the module is evaluated', async () => {
+    const survivors = await survivingSeedsAfterSetupReimport();
+
+    // Absence, asserted as `in`, is what discriminates a delete from an assignment of undefined —
+    // and a surviving seed here means the module body no longer calls clearLangSmithEnv, because
+    // this test put the variables there itself a moment earlier.
+    expect(survivors, 'vitest.setup.ts evaluated without clearing the seeded variables').toEqual(
+      []
+    );
+  });
+
+  it('leaves nothing behind for the specs that run after it', async () => {
+    // Seeds through the helper itself rather than relying on the cell above having run first.
+    // Reading process.env without seeding it passes on any machine that exports no tracing
+    // variables — which is every CI cell — so under a `.concurrent`, a reorder, or the deletion
+    // of the cell above, that form would go on passing while the restore was never exercised at
+    // all. That is the unfailable assertion this whole block exists to avoid, so the call below
+    // is not redundant with the previous cell: it is what gives this assertion something to be
+    // wrong about, and it must not be removed as duplication.
+    await survivingSeedsAfterSetupReimport();
+
+    // A regressed restore would switch tracing on for the rest of this file — the exact condition
+    // OPS-30 exists to prevent. `in` is what discriminates a delete from an assignment of
+    // undefined, which would leave the name present carrying the string "undefined".
+    for (const name of seeds) {
+      expect(name in process.env, `${name} leaked out of the re-import cell`).toBe(false);
+    }
+  });
+
+  it('is still the file the vitest config declares as a setup file', () => {
+    // A complement to the cells above, covering a different mutation: they prove the file clears
+    // the environment when evaluated, and this proves the root vitest config still declares it as
+    // a setup file. The assertion is a read of the config text, so what it establishes is the
+    // declaration — not that the runner resolved the entry and evaluated it. Deleting or
+    // repointing the setupFiles entry leaves the file itself perfectly correct and every other
+    // cell here green, while no spec is protected any more.
+    const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+    const setupFile = fileURLToPath(new URL('../vitest.setup.ts', import.meta.url));
+    const config = readFileSync(resolve(repoRoot, 'vitest.config.ts'), 'utf8');
+
+    const entries = config.match(/setupFiles:\s*\[([^\]]*)\]/);
+    expect(entries, 'no setupFiles array found in vitest.config.ts').not.toBeNull();
+
+    // Both sides go through resolve()/fileURLToPath rather than comparing a POSIX literal, so the
+    // Windows cell compares the same separators the rest of the suite does.
+    const resolved = [...entries![1].matchAll(/['"]([^'"]+)['"]/g)].map((match) =>
+      resolve(repoRoot, match[1])
+    );
+    expect(resolved).toContain(setupFile);
   });
 });
