@@ -172,18 +172,29 @@ describe('OPS-112 — the setup file still invokes the clear', () => {
     );
   });
 
-  it('leaves nothing behind for the specs that run after it', () => {
-    // The cell above seeds the real process.env. If its restore ever regressed, tracing would be
-    // switched on for the rest of this file — the exact condition OPS-30 exists to prevent — so
-    // the restore is asserted rather than assumed.
+  it('leaves nothing behind for the specs that run after it', async () => {
+    // Seeds through the helper itself rather than relying on the cell above having run first.
+    // Reading process.env without seeding it passes on any machine that exports no tracing
+    // variables — which is every CI cell — so under a `.concurrent`, a reorder, or the deletion
+    // of the cell above, that form would go on passing while the restore was never exercised at
+    // all. That is the unfailable assertion this whole block exists to avoid, so the call below
+    // is not redundant with the previous cell: it is what gives this assertion something to be
+    // wrong about, and it must not be removed as duplication.
+    await survivingSeedsAfterSetupReimport();
+
+    // A regressed restore would switch tracing on for the rest of this file — the exact condition
+    // OPS-30 exists to prevent. `in` is what discriminates a delete from an assignment of
+    // undefined, which would leave the name present carrying the string "undefined".
     for (const name of seeds) {
       expect(name in process.env, `${name} leaked out of the re-import cell`).toBe(false);
     }
   });
 
-  it('is still the file the vitest config loads as a setup file', () => {
+  it('is still the file the vitest config declares as a setup file', () => {
     // A complement to the cells above, covering a different mutation: they prove the file clears
-    // the environment when evaluated, and this proves the suite still evaluates it. Deleting or
+    // the environment when evaluated, and this proves the root vitest config still declares it as
+    // a setup file. The assertion is a read of the config text, so what it establishes is the
+    // declaration — not that the runner resolved the entry and evaluated it. Deleting or
     // repointing the setupFiles entry leaves the file itself perfectly correct and every other
     // cell here green, while no spec is protected any more.
     const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
