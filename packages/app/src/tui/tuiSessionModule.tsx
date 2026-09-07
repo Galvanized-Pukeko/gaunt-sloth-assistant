@@ -1023,7 +1023,7 @@ export async function createTuiSession(
     //    session in the same process — a surface that never drains — so the block is discarded
     //    silently. `clearExitOutput()` at session entry bounds it to that session rather than
     //    leaking across sessions. Draining on the error path would be a behaviour change beyond
-    //    this node's normal-exit-path scope, so it is left to its own node.
+    //    this node's normal-exit-path scope, so it is left to TUI-C104.
     writeDeferredExitOutput();
   } catch (err) {
     mouseSession?.dispose();
