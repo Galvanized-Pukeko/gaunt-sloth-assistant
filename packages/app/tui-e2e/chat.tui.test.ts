@@ -1290,3 +1290,86 @@ test.describe('gth chat TUI — /help lists the key bindings (greeting fixture, 
     ).toBeVisible();
   });
 });
+
+/**
+ * TUI-C56 — the archive path is still on the terminal after the session has taken its screen away.
+ *
+ * This is the one assertion the two `/debug-dump` blocks above cannot make. They prove the notice
+ * is on screen WHILE the session runs, which is true and useful and also exactly the thing that
+ * does not survive: TUI-C48 put the session in the alternate screen, and Ink discards
+ * alternate-screen teardown output by design, so on exit the notice goes with the buffer and the
+ * user is left holding a diagnostic bundle they cannot find. Nothing errors on the way.
+ *
+ * So the cell runs the command, LEAVES, and then looks at the restored primary screen — which
+ * needs a real terminal, because there is no unit-testable representation of a buffer the
+ * emulator threw away.
+ *
+ * Both halves are asserted and they answer different questions. That the deferred line is present
+ * is the feature. That the session's own frame is gone is what makes the first half mean anything:
+ * without it a restore that silently failed — leaving the whole alternate buffer painted on the
+ * primary screen, notice included — would pass the presence check while proving the opposite of
+ * what the node claims.
+ */
+test.describe('gth chat TUI — /debug-dump survives the exit (TUI-C56)', () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'gth-e2e-home-'));
+
+  test.use({
+    program: { file: 'node', args: [cli, 'chat', '--tui'] },
+    env: { ...envFor('greeting.json'), ...homeEnv(tmpHome) },
+    // Same reason as the blocks above, and it binds harder here: the line is asserted after the
+    // process is gone, so nothing will ever re-render it to repair a wrap. A terminal row is
+    // padded to its full width, so a line broken across two rows cannot be matched as one string.
+    columns: 240,
+    rows: 30,
+  });
+
+  test.afterAll(() => {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  test('prints the archive path onto the restored screen after the session ends', async ({
+    terminal,
+  }) => {
+    await expect(terminal.getByText('ready to chat')).toBeVisible();
+
+    terminal.write('hello');
+    await expect(terminal.getByText('> hello')).toBeVisible();
+    terminal.submit();
+    await expect(terminal.getByText('chat  ·  turns: 1  ·  ready')).toBeVisible();
+
+    terminal.write('/debug-dump');
+    await expect(terminal.getByText('> /debug-dump')).toBeVisible();
+    terminal.submit();
+    // Wait for the in-frame notice before leaving, so the exit cannot race the archive write.
+    await expect(terminal.getByText('Debug dump written — secrets redacted')).toBeVisible();
+
+    terminal.write('exit');
+    await expect(terminal.getByText('> exit')).toBeVisible();
+    terminal.submit();
+    expect((await waitForExit(terminal))?.exitCode).toBe(0);
+
+    // The exact path the archive was written to — read off disk, so the assertion is the real
+    // value and not a shape the test made up.
+    const dumpsDir = path.join(tmpHome, '.gsloth', 'debug-dumps');
+    const entries = fs.readdirSync(dumpsDir);
+    expect(entries.length).toBe(1);
+    const archiveDir = path.join(dumpsDir, entries[0]);
+
+    // Half one: the labelled line is on the restored screen, path and all. The label is asserted
+    // with the path because a bare path found later says nothing about what it is.
+    await expect(
+      terminal.getByText(
+        `Debug dump written (secrets redacted, review before sharing): ${archiveDir}`
+      )
+    ).toBeVisible();
+
+    // Half two: everything that lived only in the frame is gone — the dock, and the notice this
+    // line is the surviving twin of.
+    await expect(terminal.getByText('chat  ·  turns: 1  ·  ready')).not.toBeVisible();
+    await expect(
+      terminal.getByText(
+        'Secrets were redacted (API keys, tokens and auth headers replaced with <redacted>).'
+      )
+    ).not.toBeVisible();
+  });
+});

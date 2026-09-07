@@ -1404,8 +1404,12 @@ describe('tui/slashCommands /reasoning (TUI-C18 recall a turn’s thinking)', ()
 });
 
 describe('tui/slashCommands /debug-dump (GS2-46)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
+    // TUI-C56 — the command now defers a line to the exit-output channel, whose queue is
+    // module-level. Empty it between cells so each one asserts on its own dispatch.
+    const { clearExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    clearExitOutput();
   });
 
   it('calls the injected dumpDebugSession with redact ON by default and renders the path + softened redacted note (GS2-47)', async () => {
@@ -1538,6 +1542,69 @@ describe('tui/slashCommands /debug-dump (GS2-46)', () => {
     const registry = createCommandRegistry();
     const result = dispatchSlashCommand(parseSlashCommand('/help')!, registry, ctx);
     expect(result.notice?.lines.some((l) => l.startsWith('/debug-dump —'))).toBe(true);
+  });
+
+  /**
+   * TUI-C56 — the archive path also goes to the exit-output channel, so it is still on the
+   * terminal after the full-screen session has taken its own frame away. The in-frame notice is
+   * unchanged and asserted above; these cells are about the second copy and about it standing on
+   * its own, since it lands with none of the session's framing around it.
+   */
+  it('defers a labelled archive path to the exit-output channel', async () => {
+    const { createCommandRegistry, dispatchSlashCommand, parseSlashCommand } =
+      await import('@gaunt-sloth/agent/modules/slashCommands.js');
+    const { drainExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    const dumpDebugSession = vi.fn().mockReturnValue({ archiveDir: '/tmp/home/dumps/2026' });
+
+    dispatchSlashCommand(parseSlashCommand('/debug-dump')!, createCommandRegistry(), {
+      ...ctx,
+      dumpDebugSession,
+    });
+
+    const deferred = drainExitOutput();
+    expect(deferred).toHaveLength(1);
+    // The path, and enough words that the line means something to someone who finds it later
+    // under an unrelated scrollback: what it is, and what redaction did to it.
+    expect(deferred[0]).toContain('/tmp/home/dumps/2026');
+    expect(deferred[0].toLowerCase()).toContain('debug dump');
+    expect(deferred[0].toLowerCase()).toContain('redacted');
+    // One line, because that is what a restored screen shows well.
+    expect(deferred[0]).not.toContain('\n');
+  });
+
+  it('defers the unsanitized wording when the raw opt-out was used', async () => {
+    // The caution travels with the line: someone acting on it hours later gets the same warning
+    // the session gave them, not a bare path that looks safe to send on.
+    const { createCommandRegistry, dispatchSlashCommand, parseSlashCommand } =
+      await import('@gaunt-sloth/agent/modules/slashCommands.js');
+    const { drainExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    const dumpDebugSession = vi.fn().mockReturnValue({ archiveDir: '/tmp/raw-dump' });
+
+    dispatchSlashCommand(
+      parseSlashCommand('/debug-dump --unsafe-no-redact')!,
+      createCommandRegistry(),
+      { ...ctx, dumpDebugSession }
+    );
+
+    const deferred = drainExitOutput();
+    expect(deferred).toHaveLength(1);
+    expect(deferred[0]).toContain('/tmp/raw-dump');
+    expect(deferred[0].toLowerCase()).toContain('unsanitized');
+  });
+
+  it('defers nothing when no writer is available and no archive was written', async () => {
+    // The control for the two cells above: the channel carries a path only when there is one.
+    const { createCommandRegistry, dispatchSlashCommand, parseSlashCommand } =
+      await import('@gaunt-sloth/agent/modules/slashCommands.js');
+    const { drainExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+
+    dispatchSlashCommand(
+      parseSlashCommand('/debug-dump')!,
+      createCommandRegistry(),
+      ctx // no dumpDebugSession — the "unavailable" branch
+    );
+
+    expect(drainExitOutput()).toEqual([]);
   });
 });
 

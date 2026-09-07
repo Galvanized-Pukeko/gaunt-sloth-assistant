@@ -8,6 +8,7 @@ import {
   mergeToolOutputIntoEvents,
   setToolOutputSuppressed,
 } from '@gaunt-sloth/core/core/toolOutputChannel.js';
+import { clearExitOutput, drainExitOutput } from '@gaunt-sloth/core/core/exitOutputChannel.js';
 import { StatusLevel } from '@gaunt-sloth/core/core/types.js';
 import type {
   ApprovalOutcome,
@@ -149,6 +150,44 @@ function dumpDebugSession(input: DebugDumpInput): { archiveDir: string } {
     // forward it so the writer applies (or skips) the shared secret-redaction pass.
     redact: input.redact,
   });
+}
+
+/**
+ * TUI-C56 — write everything the session deferred to the exit-output channel, now that the
+ * terminal belongs to the user again.
+ *
+ * The write half of the channel lives here rather than in the channel itself, because both of the
+ * judgements it makes are the SURFACE's:
+ *
+ *  - **When.** Only this module knows the terminal is back: Ink restores the primary buffer inside
+ *    `finishUnmount` and resolves the exit promise behind a write barrier afterwards, so a write
+ *    made once `waitUntilExit()` has resolved lands on the restored screen. Anything written
+ *    earlier is teardown output on the alternate screen, which Ink discards by design.
+ *  - **Whether.** `isTTY` here is PIPE PROTECTION, not alternate-screen detection. A caller
+ *    reading this session's stdout through a pipe gets a stream it may be parsing, and an extra
+ *    trailing line it never asked for is exactly the kind of pollution that breaks one. It is not
+ *    a test for whether the alternate screen was in play — Ink also declines the alternate screen
+ *    when a CI variable is set even on a real TTY, and in that case this prints a second copy of
+ *    a path Ink's non-interactive branch already flushed. A duplicated path on a developer's
+ *    screen is cheap; re-deriving Ink's private CI heuristic here would drift out of step with it.
+ *
+ * Each block gets its own trailing newline: they are separate statements landing under whatever
+ * the user's scrollback already held, not a paragraph. The drain happens BEFORE the gate, so the
+ * declining path discards what was deferred rather than leaving it queued for someone else.
+ *
+ * The write goes through `systemUtils`' stdout rather than a `consoleUtils` display helper on
+ * purpose, and it is the one place in this module where that needs saying: every one of those
+ * helpers is gated on the console level, while the in-frame notice this text is the twin of is a
+ * TUI notice and is not. Routing it through the level gate would mean a user who had turned the
+ * console quiet keeps the notice they can no longer act on and loses the line that survives —
+ * which is the same silent loss this seam exists to end, reintroduced one rung up.
+ */
+function writeDeferredExitOutput(): void {
+  const blocks = drainExitOutput();
+  if (!stdout.isTTY) return;
+  for (const block of blocks) {
+    stdout.write(`${block}\n`);
+  }
 }
 
 /**
@@ -472,6 +511,11 @@ export async function createTuiSession(
   onRenderStart?: () => void,
   options: InteractiveSessionOptions = {}
 ): Promise<void> {
+  // TUI-C56 — start the exit-output channel empty. Nothing in a normal process defers before a
+  // session begins, so this is not a fix for an observed leak; it is what makes the guarantee
+  // simple enough to rely on — what this session prints on the way out is what THIS session
+  // deferred, never a block left behind by something earlier in the same process.
+  clearExitOutput();
   // Hermetic e2e seam: when GTH_TUI_E2E_FIXTURE is set, drive the real <App> (Ink renderer +
   // foldEvents) from a deterministic, key-free replay of recorded events instead of a model.
   // Production never takes this branch (the env var is set only by the PTY e2e harness).
@@ -538,6 +582,11 @@ export async function createTuiSession(
     } finally {
       fixtureMouse?.dispose();
     }
+    // TUI-C56 — the hermetic branch drains too, and it must: it renders the real <App> with the
+    // real `/debug-dump` writer wired in, so it is the branch the PTY suite proves the restored
+    // screen on. A drain only on the production path below would leave that assertion testing a
+    // fixture-only shortcut instead of the behaviour a user gets.
+    writeDeferredExitOutput();
     return;
   }
 
@@ -954,6 +1003,17 @@ export async function createTuiSession(
     // TUI-C37 — restore the terminal the moment Ink is done with it. The process-level hooks
     // installed alongside remain as the backstop for the paths that never get here.
     mouseSession?.dispose();
+    // TUI-C56 — the terminal is fully the user's again (Ink has left the alternate screen, mouse
+    // reporting is off), so anything the session deferred as must-survive-the-exit is written now,
+    // onto the restored screen. This is the production path's drain — the hermetic branch above
+    // has the only other one — and it is deliberately on the normal exit path, which every way a
+    // user actually leaves takes: `/exit`, `/quit`, the bare `exit` keyword and Ctrl+C alike,
+    // because [[TUI-C79]] routes Ctrl+C through <App>'s `quit()` and
+    // Ink's own `exit()` rather than through a signal. A run torn down by an external signal
+    // resolves Ink's exit promise synchronously during shutdown (async callbacks no longer fire),
+    // so this line is not reached there; nothing is added to chase it, because a second teardown
+    // path is exactly what TUI-C48 measured its way out of.
+    writeDeferredExitOutput();
   } catch (err) {
     mouseSession?.dispose();
     approvalBridge.abortPending();

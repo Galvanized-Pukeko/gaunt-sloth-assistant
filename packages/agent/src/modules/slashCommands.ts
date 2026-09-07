@@ -40,6 +40,7 @@ import {
 import type { ApprovalGrant } from '@gaunt-sloth/core/core/approvals/grants.js';
 import { describeApprovalEntry } from '@gaunt-sloth/core/core/approvals/matcher.js';
 import type { ConversationCompaction } from '@gaunt-sloth/core/core/compaction.js';
+import { deferExitOutput } from '@gaunt-sloth/core/core/exitOutputChannel.js';
 import { modelProviderLabel } from '@gaunt-sloth/core/core/modelLabel.js';
 import { MOUSE_SELECTION_HINT } from '@gaunt-sloth/core/config/mouse.js';
 import { parseResumeId } from '#src/modules/sessionResume.js';
@@ -1368,6 +1369,27 @@ export function debugDumpNotice(archiveDir: string, redacted: boolean): SlashCom
 }
 
 /**
+ * TUI-C56 — the same archive path, written for a screen the session is no longer on.
+ *
+ * The notice above is painted into the session's frame, which on the full-screen surface lives in
+ * the alternate screen and is discarded the moment the user exits. This is the block deferred to
+ * the exit-output channel instead, so the path is still on the terminal after the session is gone.
+ *
+ * It repeats rather than replaces the notice, and it is one self-contained line rather than the
+ * notice's seven, because the two are read in different places: the notice arrives in a session
+ * the user is still in and can act on immediately, while this lands under whatever the user's
+ * terminal held before they started. So it carries its own label and its own statement of what
+ * redaction did — a reader who scrolled past the session start has no other context — and stops
+ * there: the opt-out instructions and the review-before-sharing detail belong to the moment of
+ * running the command, not to a line found later.
+ */
+export function debugDumpExitLine(archiveDir: string, redacted: boolean): string {
+  return redacted
+    ? `Debug dump written (secrets redacted, review before sharing): ${archiveDir}`
+    : `Debug dump written (UNSANITIZED — may include secrets, review before sharing): ${archiveDir}`;
+}
+
+/**
  * GS2-23 — the line a surface prints the moment `/compact` starts, because the model call behind
  * it takes seconds and a command that goes quiet reads as a command that did nothing (DL-1).
  */
@@ -1861,6 +1883,14 @@ export function createCommandRegistry(): SlashCommand[] {
           modelDisplayName: ctx.modelDisplayName,
           redact,
         });
+        // TUI-C56 — the in-frame notice below is the mid-session answer, and on the full-screen
+        // surface it dies with the alternate screen when the user exits. The whole point of the
+        // command is a path the user goes and opens AFTERWARDS, so the path is also deferred to
+        // the exit-output channel, which the surface drains onto the restored screen. Deferring
+        // unconditionally keeps the command identical on both surfaces: the readline session
+        // never drains (its output already survives its own exit), so this costs it one array
+        // entry and prints nothing.
+        deferExitOutput(debugDumpExitLine(archiveDir, redact));
         return { notice: debugDumpNotice(archiveDir, redact) };
       },
     },

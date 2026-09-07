@@ -657,3 +657,103 @@ describe('createTuiSession — the render-phase boundary (CFG-47)', () => {
     expect(onRenderStart).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * TUI-C56 — the deferred exit-output channel, at the only point where its timing is decidable.
+ *
+ * The channel itself is a queue (`packages/core/spec/exitOutputChannel.spec.ts` has its
+ * contract). What cannot be tested there is the property the node exists for: the text is written
+ * AFTER Ink has unmounted and given the primary screen back, and never while the frame is live,
+ * because Ink discards alternate-screen teardown output by design. So these cells drive the real
+ * session and pin the ordering against the real `waitUntilExit()` boundary.
+ *
+ * Both sides of the boundary are asserted, and they fail in opposite directions: `writtenAtUnmount`
+ * is the whole stdout log as it stood at the moment the unmount completed, so a drain moved even
+ * one line earlier shows up there, while the second assertion catches a drain that never happens.
+ * A cell asserting only that the line was eventually written would pass for a session that printed
+ * it into the alternate screen — which is the bug.
+ */
+describe('createTuiSession — deferred exit output (TUI-C56)', () => {
+  const DEFERRED = 'Debug dump written (secrets redacted, review before sharing): /tmp/h/dump';
+
+  beforeEach(renderPhaseBeforeEach);
+
+  /** Everything stdout has been asked to write so far, joined — escapes and text alike. */
+  const written = (): string =>
+    systemUtilsMock.stdout.write.mock.calls.map((c: unknown[]) => c[0]).join('');
+
+  /**
+   * Render mock that defers a block WHILE THE FRAME IS LIVE — where a slash command actually runs,
+   * after the session's own `clearExitOutput()` — and snapshots the stdout log at the instant the
+   * unmount completes.
+   */
+  const deferDuringSession = (defer: (text: string) => void): { atUnmount: () => string } => {
+    let atUnmount = '';
+    renderMock.mockImplementation(() => {
+      defer(DEFERRED);
+      return {
+        clear: vi.fn(),
+        waitUntilExit: vi.fn(async () => {
+          atUnmount = written();
+        }),
+      };
+    });
+    return { atUnmount: () => atUnmount };
+  };
+
+  it('writes deferred output after the unmount, and nothing of it into the live frame', async () => {
+    const { deferExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    const snapshot = deferDuringSession(deferExitOutput);
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await createTuiSession(sessionConfig, overrides);
+
+    // While Ink owned the screen, not a byte of it was written — anything written then would have
+    // gone into the alternate buffer and been thrown away with it.
+    expect(snapshot.atUnmount()).not.toContain(DEFERRED);
+    // And once the screen was handed back, it was written in full, on a line of its own.
+    expect(written()).toContain(`${DEFERRED}\n`);
+  });
+
+  it('writes it on the hermetic e2e branch too, on the same side of the unmount', async () => {
+    // The branch the PTY suite drives: it mounts the real <App> with the real `/debug-dump`
+    // writer, so a drain missing here would leave the e2e assertion proving nothing about the
+    // surface a user gets.
+    systemUtilsMock.env = { GTH_TUI_E2E_FIXTURE: '/fixtures/session.json' };
+    const { deferExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    const snapshot = deferDuringSession(deferExitOutput);
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await createTuiSession(sessionConfig, overrides);
+
+    expect(snapshot.atUnmount()).not.toContain(DEFERRED);
+    expect(written()).toContain(`${DEFERRED}\n`);
+  });
+
+  it('writes nothing to a piped stdout, and drops what was deferred rather than queuing it', async () => {
+    // A caller parsing this session's stdout must not be handed a trailing line it never asked
+    // for. The second half matters as much as the first: a gate that skipped the drain would
+    // leave the block queued for whatever ran next in the same process.
+    systemUtilsMock.stdout.isTTY = false;
+    const { deferExitOutput, drainExitOutput } =
+      await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    deferDuringSession(deferExitOutput);
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await createTuiSession(sessionConfig, overrides);
+
+    expect(written()).not.toContain(DEFERRED);
+    expect(drainExitOutput()).toEqual([]);
+  });
+
+  it('starts each session with an empty channel, so nothing earlier leaks into its exit', async () => {
+    // Deferred before the session begins — by anything at all — is not this session's to print.
+    const { deferExitOutput } = await import('@gaunt-sloth/core/core/exitOutputChannel.js');
+    deferExitOutput('left over from something else');
+    const { createTuiSession } = await import('#src/tui/tuiSessionModule.js');
+
+    await createTuiSession(sessionConfig, overrides);
+
+    expect(written()).not.toContain('left over from something else');
+  });
+});
