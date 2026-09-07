@@ -87,6 +87,12 @@ escaping.
 Use [consoleUtils.ts](src/consoleUtils.ts) to output to users.
 Do not use console.log directly.
 
+One exception: `writeDeferredExitOutput` in `packages/app/src/tui/tuiSessionModule.tsx` writes the
+TUI's must-survive-the-exit blocks straight to `systemUtils`' stdout, because every `consoleUtils`
+helper is gated on the console level while the in-frame TUI notice that text is the twin of is not —
+so the gate would drop the surviving line for a user who had turned the console quiet. The reasoning
+is kept at the call site; do not add a second deviation without recording it here.
+
 ### System
 
 Use [systemUtils.ts](src/systemUtils.ts) to access system variables and functions such as

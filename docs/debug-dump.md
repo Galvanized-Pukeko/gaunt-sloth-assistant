@@ -30,13 +30,17 @@ issue I'm about to file. Here's how:
    values — it does **not** sanitize general file contents or transcript text the session captured —
    so still review the archive before you attach it to a public issue.
 
-   The full-screen session draws that notice on a screen the terminal takes back when you leave, so
-   you do not have to write the path down: the session prints it once more on its way out, onto the
-   screen you return to.
+   The session prints the path once more as it exits, onto the screen you return to:
 
    ```
    Debug dump written (secrets redacted, review before sharing): /Users/you/.gsloth/debug-dumps/2026-07-18T22-24-37-118Z
    ```
+
+   That covers every way you end the session yourself, Ctrl+C included, so you do not have to write
+   the path down. It does not cover a session killed from outside (`kill`, or closing the terminal
+   window), or one that drops to the readline fallback after an error — if you lose the path that
+   way, the dump is the newest timestamped directory under `~/.gsloth/debug-dumps/`.
+
 4. Attach the reviewed file(s) — or the whole reviewed directory — to your [GitHub
    issue](https://github.com/pukeko-robotics/gaunt-sloth/issues) (see
    [CONTRIBUTING.md](../CONTRIBUTING.md) for the issue/PR process).

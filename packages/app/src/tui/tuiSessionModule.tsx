@@ -180,7 +180,8 @@ function dumpDebugSession(input: DebugDumpInput): { archiveDir: string } {
  * helpers is gated on the console level, while the in-frame notice this text is the twin of is a
  * TUI notice and is not. Routing it through the level gate would mean a user who had turned the
  * console quiet keeps the notice they can no longer act on and loses the line that survives —
- * which is the same silent loss this seam exists to end, reintroduced one rung up.
+ * which is the same silent loss this seam exists to end, reintroduced one rung up. AGENTS.md
+ * records this as the one exception to its Output rule.
  */
 function writeDeferredExitOutput(): void {
   const blocks = drainExitOutput();
@@ -1007,12 +1008,22 @@ export async function createTuiSession(
     // reporting is off), so anything the session deferred as must-survive-the-exit is written now,
     // onto the restored screen. This is the production path's drain — the hermetic branch above
     // has the only other one — and it is deliberately on the normal exit path, which every way a
-    // user actually leaves takes: `/exit`, `/quit`, the bare `exit` keyword and Ctrl+C alike,
+    // user DELIBERATELY leaves takes: `/exit`, `/quit`, the bare `exit` keyword and Ctrl+C alike,
     // because [[TUI-C79]] routes Ctrl+C through <App>'s `quit()` and
-    // Ink's own `exit()` rather than through a signal. A run torn down by an external signal
-    // resolves Ink's exit promise synchronously during shutdown (async callbacks no longer fire),
-    // so this line is not reached there; nothing is added to chase it, because a second teardown
-    // path is exactly what TUI-C48 measured its way out of.
+    // Ink's own `exit()` rather than through a signal.
+    //
+    // That list is the deliberate exits, and nothing more. Anything that ends the session without
+    // running this continuation skips the drain, and the deferred block is dropped rather than
+    // printed. Two known cases, neither of them covered:
+    //  - An external signal. Ink resolves its exit promise synchronously during shutdown (async
+    //    callbacks no longer fire), so this line is not reached. Nothing is added to chase it,
+    //    because a second teardown path is exactly what TUI-C48 measured its way out of.
+    //  - A throw once the render phase has begun. It goes to the `catch` below, which rethrows
+    //    without draining, and `startSession` then warns "TUI unavailable" and starts a readline
+    //    session in the same process — a surface that never drains — so the block is discarded
+    //    silently. `clearExitOutput()` at session entry bounds it to that session rather than
+    //    leaking across sessions. Draining on the error path would be a behaviour change beyond
+    //    this node's normal-exit-path scope, so it is left to its own node.
     writeDeferredExitOutput();
   } catch (err) {
     mouseSession?.dispose();
