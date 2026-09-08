@@ -47,11 +47,10 @@ export interface BinaryContentInjectionMiddlewareSettings {
  *   as if nothing were attached. Nothing throws, nothing warns, and the model answers about content
  *   it never received. This is the only value that must be refused.
  * - `delivered-or-loud` — the client either puts the data in the request body or fails where
- *   somebody sees it (a client-side throw). What CFG-63 measured is the CLIENT half; gth stays out
- *   of the way. **The known exception is `groq`**, whose client sends our block to the wire verbatim
- *   and whose SERVER outcome was never measured — if Groq accepts the request and ignores the
- *   unrecognised part, the user does not find out, which is the failure this check exists to catch.
- *   Settling it needs one live call; see the `groq` arm below.
+ *   somebody sees it: a client-side throw, or a provider rejection the user reads. For most labels
+ *   what CFG-63 measured is the CLIENT half and gth stays out of the way. `groq` is the one whose
+ *   client settles nothing — it forwards the block untouched — so its SERVER half was measured
+ *   separately, and it rejects. See the `groq` arm below.
  * - `unmeasured` — the label is not enumerated below. Treated exactly as before this check existed.
  */
 export type NonImageBinaryFate = 'silently-discarded' | 'delivered-or-loud' | 'unmeasured';
@@ -86,14 +85,16 @@ export type NonImageBinaryFate = 'silently-discarded' | 'delivered-or-loud' | 'u
  *   binary throw from the dispatcher.
  * - `ollama` → delivered-or-loud. `@langchain/ollama@1.3.0` `dist/utils.js:92` throws
  *   `Unsupported content type: <type>` for every non-`text`/`image_url` part.
- * - `groq` → delivered-or-loud. `@langchain/groq@1.3.1` `dist/chat_models.js:82` assigns
- *   `content: message.content` verbatim, so the block reaches the wire unchanged and Groq's API
- *   decides. Not an in-process discard: the payload leaves the machine and the answer comes back
- *   from the server, which is where this one is knowable. **What that server does with it was not
- *   measured** — establishing it needs a live call, which this node forbids. So this arm asserts the
- *   client half only. The specific possibility it cannot rule out is the one this whole check exists
- *   to catch: Groq accepting the request and ignoring the unrecognised part, which would make `groq`
- *   a second `silently-discarded` label. Anyone who can make one live call should settle it.
+ * - `groq` → delivered-or-loud, and this is the one arm measured on the SERVER rather than the
+ *   client. `@langchain/groq@1.3.1` `dist/chat_models.js:82` assigns `content: message.content`
+ *   verbatim, so the block reaches the wire unchanged and only Groq's API can decide. Measured live
+ *   2026-09-08 against `qwen/qwen3.8-27b` with a PDF: the API **rejects** it — HTTP 400
+ *   `invalid_request_error`, naming the content-part types it accepts, `text` / `image_url` /
+ *   `document`. The user reads that error, so nothing is discarded and nothing is refused here.
+ *   **Note what the rejection also reveals:** Groq has a `document` part type, and gth emits the
+ *   standard block's `file`, which is not one of the three — so a shape Groq would accept plausibly
+ *   exists and gth does not build it. Whether any Groq model then *reads* a `document` is a separate
+ *   question and is NOT established; do not treat the accepted type as a working feature.
  *
  * Everything else is `unmeasured`, and like {@link imageBlockFor}'s fallback arm it must stay
  * permissive. Who lands there, precisely: any label this switch does not enumerate — a custom or
@@ -257,8 +258,9 @@ export function createBinaryContentInjectionMiddleware(
             // evidence. One label is measured to discard it silently: `xai-responses` rewrites the
             // block to an empty text part and sends a request that looks complete. There is no
             // better block to emit there, so the attachment is refused here instead, before the
-            // call. One label is measured on the client side only: `groq` puts the block on the wire
-            // verbatim and what its server then does was not measured.
+            // call. `groq` was the one label its client could not settle — it forwards the block
+            // untouched — so its server half was measured live instead: it rejects with a 400 the
+            // user reads, which is loud, so nothing is refused for it here.
             //
             // Refusing from `beforeModel` is a deliberate departure from CFG-45's ruling that this
             // path must never throw, and the difference is the evidence. That ruling protects a

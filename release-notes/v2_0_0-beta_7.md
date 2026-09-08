@@ -44,7 +44,5 @@
   looked exactly like a good one.** The turn now fails with an error naming the file and the provider.
   **This refuses only where the loss was actually measured.** Every other provider we measured either
   delivers the attachment or rejects it loudly, and images are untouched everywhere, `xai-responses`
-  included — one exception worth naming is Groq, whose client puts the block on the wire unchanged
-  and whose server-side handling we could not establish without a live call. There is no correct
-  shape to send instead: xAI's Responses API accepts a file only as a Files-API `file_id`, and
-  gaunt-sloth has no upload path to produce one.
+  included. There is no correct shape to send instead: xAI's Responses API accepts a file only as a
+  Files-API `file_id`, and gaunt-sloth has no upload path to produce one.
