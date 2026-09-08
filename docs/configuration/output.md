@@ -68,7 +68,7 @@ Set `writeBinaryOutputsToFile` in your config to control this behavior:
 
 ## Binary Format Configuration
 
-Gaunt Sloth can process binary formats (images, files, audio, video) when your LLM model
+Gaunt Sloth can process binary formats (images, files, audio) when your LLM model
 supports multimodal inputs.
 
 Important notes:
@@ -97,7 +97,12 @@ Format types:
 | `image` | Image files for vision-capable models |
 | `file`  | Other files (e.g., PDFs)              |
 | `audio` | Audio files for speech-capable models |
-| `video` | Video files for video-capable models  |
+
+These three are the whole vocabulary, and any other value is a config error naming the entry that
+carries it. An attachment reaches a model as an image, an audio or a file block; there is no
+provider that accepts anything else, so a format type outside this set could only fail once the
+file had been read and the request built. Whether a given model then *understands* the attachment
+is a separate question — check your provider's documentation for the formats it supports.
 
 Each format type supports:
 

@@ -68,6 +68,7 @@ these before you upgrade.
 | `--content-provider` / `--requirements-provider` CLI flags removed | Scripts passing those flags error out | `--content-source` / `--requirements-source` (`-p` still aliases `--requirements-source`) |
 | `ContentProviderType` / `RequirementsProviderType` type exports removed, and the runtime `contentProvider` / `requirementsProvider` fields removed | TypeScript / programmatic configs that import those types or read those fields fail to compile or resolve | Use `contentSource` / `requirementSource` (and their `string` types) |
 | The `gaunt-sloth` app package no longer exports modules (its `exports` map keeps only `./package.json`) | Any `import ... from 'gaunt-sloth/<path>'` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`; the CLI binaries (`gth`, `gsloth`, `gaunt-sloth`) are unaffected | Import from the scoped packages instead: `@gaunt-sloth/core`, `@gaunt-sloth/agent`, `@gaunt-sloth/review` (see each package's README for the embed surface) |
+| `binaryFormats` accepts `image`, `file` and `audio` only | A `video` or `binary` entry is a validation abort: `binaryFormats.1.type: "video" is not a binary format type any model provider can receive.` | Remove a `video` entry; move a `binary` entry's extensions under `file` (see section M) |
 | The `deep` agent backend removed | `agent.backend: "deep"` is a validation abort: `Agent backend "deep" is no longer supported: Gaunt Sloth ships one agent backend.` | Remove the `agent` block, or set `"backend": "lean"` (see section J) |
 | `@gaunt-sloth/agent` exports removed with the `deep` backend | `import { GthDeepAgent, gthDeepAgentFactory, … } from '@gaunt-sloth/agent'` no longer resolves, and neither do the `@gaunt-sloth/agent/core/GthDeepAgent.js` / `deepAgentPermissions.js` / `gthAcpServer.js` / `modules/acpModule.js` deep paths | Nothing replaces them. `extractDebugRequestExtras` moved to `@gaunt-sloth/agent/core/debugCapture.js`; `startAcpServer` is still a root export and now starts Gaunt Sloth's own ACP server; the rest have no successor (see section J) |
 
@@ -682,6 +683,36 @@ and a plan printed before anything goes; it takes whole conversations and keeps 
 so `gth history show <id>` goes on working and only the resume stops. `gth history list` prints the
 store's size and `gth insights` breaks it down.
 
+## M. `binaryFormats` accepts `image`, `file` and `audio` only (HARD)
+
+`binaryFormats` also took `video` and `binary`, and neither could reach a model. Every provider
+builds its request through one LangChain converter that recognises image, audio and file blocks and
+rejects anything else, so a config naming either validated, `gth_read_binary` read the file, and the
+run then failed at the provider — with a message naming a LangChain block type rather than the file
+you attached. Both are now refused at load, naming the entry that carries them:
+
+```text
+Invalid configuration in .gsloth.config.json:
+  - binaryFormats.1.type: "video" is not a binary format type any model provider can receive. …
+```
+
+- **`video` has no replacement.** No provider accepts a video attachment through Gaunt Sloth;
+  remove the entry.
+- **`binary` becomes `file`.** `binary` was a catch-all bucket, consulted only after every other
+  entry failed to match the extension; `file` is the type that actually reaches a model, and the one
+  PDFs already use. Move those extensions onto your `file` entry — noting that it matches in order
+  with the rest rather than last. Whether a provider then accepts the file's MIME type is its own
+  decision, and one it tells you about.
+
+```json
+{
+  "binaryFormats": [
+    { "type": "image", "extensions": ["png", "jpg"] },
+    { "type": "file", "extensions": ["pdf", "bin"] }
+  ]
+}
+```
+
 ## Interactive slash commands (renames)
 
 Inside `chat`/`code` sessions (both the TUI and the plain `--no-tui` readline surface, which now
@@ -728,4 +759,6 @@ share one command registry):
     `"debug"` to keep the preamble you had (K).
 11. Decide whether you want local session history, which is now on by default and writes to
     `~/.gsloth/history.db`; set `history.enabled: false` if you do not (L).
-12. Run `gth config validate` (and optionally `gth config print`) to confirm the result.
+12. Remove any `binaryFormats` entry of type `video`, and move a `binary` entry's extensions onto
+    your `file` entry (M).
+13. Run `gth config validate` (and optionally `gth config print`) to confirm the result.

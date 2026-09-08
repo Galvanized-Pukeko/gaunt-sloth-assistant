@@ -11,7 +11,8 @@
  * 2. Parses the special string format from ToolMessage content
  * 3. Adds a HumanMessage carrying the binary content block to the model call that follows the tool
  *    result — to that REQUEST only, never to the conversation (the `wrapModelCall` hook below)
- * 4. Refuses a non-image attachment bound for a provider measured to discard it silently
+ * 4. Refuses a format type no provider can receive at all (see {@link isDeliverableFormatType}),
+ *    and a non-image attachment bound for a provider measured to discard it silently
  *    (see {@link nonImageBinaryFateFor})
  * 5. Says, in the user's terms, that an attachment rode a request the provider rejected, and that
  *    the conversation is unaffected (see `noteRejectedAttachment`)
@@ -23,6 +24,7 @@
 import { createMiddleware, type AgentMiddleware } from 'langchain';
 import path from 'node:path';
 import type { GthConfig } from '@gaunt-sloth/core/config.js';
+import { DELIVERABLE_BINARY_FORMAT_TYPES } from '@gaunt-sloth/core/config/schema.js';
 import { debugLog } from '@gaunt-sloth/core/utils/debugUtils.js';
 import {
   attachTerminationReason,
@@ -143,6 +145,25 @@ export function nonImageBinaryFateFor(provider: string): NonImageBinaryFate {
       }
       return 'unmeasured';
   }
+}
+
+/**
+ * CFG-68 — whether a format type can be delivered to ANY provider at all.
+ *
+ * `@langchain/core@1.2.9`'s `convertToProviderContentBlock` (`dist/messages/content/data.js`)
+ * dispatches `text`, `image`, `audio` and `file`, and its final line throws
+ * `Unable to convert content block type '<type>' to provider-specific format: not recognized.`
+ * for anything else. Every vendor package's converter reaches the request body through it, so
+ * `video` and `binary` have no working path on any provider — which is what separates this from
+ * {@link nonImageBinaryFateFor}, where the answer depends on which client is installed.
+ *
+ * The set is `DELIVERABLE_BINARY_FORMAT_TYPES`, the same tuple the config schema accepts, so the
+ * gate a user meets and the gate a request meets cannot drift apart.
+ *
+ * Exported so the refusal's vocabulary can be unit-tested directly.
+ */
+export function isDeliverableFormatType(formatType: string): boolean {
+  return (DELIVERABLE_BINARY_FORMAT_TYPES as readonly string[]).includes(formatType);
 }
 
 interface ParsedBinaryContent {
@@ -397,6 +418,34 @@ export function createBinaryContentInjectionMiddleware(
             // tripwire, correctly placed rather than widely load-bearing: it covers that config
             // shape today and whatever label measures as discarding tomorrow. Do NOT read the
             // narrow reach as a reason to widen it by analogy — measure, then add an arm.
+            //
+            // CFG-68 — a format type NO provider can receive is refused FIRST, ahead of the
+            // per-provider check, because the two failures need different advice and only one of
+            // them is true here. The refusal below ends "use a provider that accepts <format>
+            // attachments"; for `video` and `binary` there is no such provider, so that sentence
+            // would send the user round a loop of providers that all throw. What they need is the
+            // `binaryFormats` line they wrote.
+            //
+            // Naming the FILE and the CONFIGURED TYPE is the whole of it: what the user meets
+            // otherwise is LangChain's `Unable to convert content block type 'video' to
+            // provider-specific format: not recognized.` — a block type they never typed, no
+            // filename, and nothing connecting it to the config entry that cannot work.
+            //
+            // `binaryData.formatType` verbatim, never `getFormatLabel`, which maps an
+            // unrecognised type to `file` — the one word that would make this message describe a
+            // type the user did not configure, and one that would have worked.
+            if (!isDeliverableFormatType(binaryData.formatType)) {
+              const filename = path.basename(binaryData.path);
+              throw new Error(
+                `Cannot send "${filename}" (${binaryData.media_type}): gth_read_binary read it as ` +
+                  `binary format type "${binaryData.formatType}", which no model provider can ` +
+                  `receive. Attachments reach a model as ` +
+                  `${DELIVERABLE_BINARY_FORMAT_TYPES.join(', ')}; a block of any other type is ` +
+                  `rejected when the request is built, whichever provider is configured. Remove ` +
+                  `the "${binaryData.formatType}" entry from binaryFormats, or declare that ` +
+                  `extension under one of ${DELIVERABLE_BINARY_FORMAT_TYPES.join(', ')}.`
+              );
+            }
             if (
               binaryData.formatType !== 'image' &&
               nonImageBinaryFateFor(provider) === 'silently-discarded'

@@ -25,6 +25,7 @@ import {
   findApprovalsGrammarIssues,
   findApprovalsRaterProfiles,
   findDeprecatedConfigIssues,
+  findUndeliverableBinaryFormatIssues,
   findUnknownTopLevelKeys,
   formatConfigValidationError,
   formatDeprecatedConfigIssues,
@@ -151,6 +152,19 @@ function validateRawConfigLayer<T extends Record<string, unknown>>(
     if (deprecatedIssues.length > 0) {
       throw new ConfigDiscoveryError(
         `Invalid configuration in ${sourceLabel}:\n${formatDeprecatedConfigIssues(deprecatedIssues)}`,
+        { sourceLabel }
+      );
+    }
+
+    // CFG-68 — a `binaryFormats` entry naming a format type no provider can receive. Also before
+    // the parse, and for a mechanical reason: the `false | array` union around that field collapses
+    // the schema's own message and the index of the offending entry into one `Invalid input`.
+    // Checked here and in `gth config validate` alike, so the validator cannot green-light a
+    // config a real run refuses.
+    const binaryFormatIssues = findUndeliverableBinaryFormatIssues(raw);
+    if (binaryFormatIssues.length > 0) {
+      throw new ConfigDiscoveryError(
+        `Invalid configuration in ${sourceLabel}:\n${formatDeprecatedConfigIssues(binaryFormatIssues)}`,
         { sourceLabel }
       );
     }

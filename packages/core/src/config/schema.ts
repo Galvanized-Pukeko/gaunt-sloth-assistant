@@ -93,8 +93,46 @@ const customCommandConfigSchema = z.object({
 const customToolsConfigSchema = z.record(z.string(), customCommandConfigSchema);
 const customToolsOrFalseSchema = z.union([z.literal(false), customToolsConfigSchema]);
 
+/**
+ * CFG-68 — the `binaryFormats` types an attachment can actually be DELIVERED in.
+ *
+ * `video` and `binary` are deliberately absent. `@langchain/core`'s
+ * `convertToProviderContentBlock` dispatches `text`, `image`, `audio` and `file` and throws for
+ * every other block type, so those two named a format with **no working path on any provider**:
+ * the config validated, `gth_read_binary` read the file, and the run then died at the provider
+ * boundary with a message naming a LangChain block type rather than the file the user attached.
+ * A value that cannot work anywhere is refused here, at the path the user wrote it.
+ *
+ * **Exported so the injection boundary can refuse the same set rather than a second copy of it.**
+ * `binaryContentInjectionMiddleware` imports this tuple: config validation is the gate a user
+ * meets, but the middleware's format type comes off the `gth_read_binary` result STRING, which a
+ * replayed session or an embedder-built config can carry without any loader having validated it.
+ * Two hand-written lists would drift, and the one that drifted would be the one deciding whether
+ * a request is built.
+ */
+export const DELIVERABLE_BINARY_FORMAT_TYPES = ['image', 'file', 'audio'] as const;
+
+/**
+ * CFG-68 — why a `binaryFormats` entry naming any other type is refused, in the user's terms.
+ *
+ * One function because the same sentence has to come from two places: the enum below, and
+ * {@link findUndeliverableBinaryFormatIssues}, which is what actually reaches the user (see its
+ * docblock for the union collapse that makes the enum's own message unreachable).
+ */
+export function undeliverableBinaryFormatMessage(type: unknown): string {
+  const vocabulary = DELIVERABLE_BINARY_FORMAT_TYPES.join(', ');
+  return (
+    `${JSON.stringify(type)} is not a binary format type any model provider can receive. ` +
+    `Attachments reach a model as ${vocabulary}; a block of any other type is rejected when the ` +
+    `request is built — on every provider, after the file has already been read. Use one of ` +
+    `${vocabulary}, or remove the entry.`
+  );
+}
+
 const binaryFormatConfigSchema = z.object({
-  type: z.enum(['image', 'file', 'audio', 'video', 'binary']),
+  type: z.enum(DELIVERABLE_BINARY_FORMAT_TYPES, {
+    error: (issue) => undeliverableBinaryFormatMessage(issue.input),
+  }),
   extensions: z.array(z.string()),
   maxSize: z.number().optional(),
   mimeTypes: z.record(z.string(), z.string()).optional(),
@@ -1761,6 +1799,55 @@ export function findApprovalsGrammarIssues(raw: Record<string, unknown>): Deprec
 }
 
 /**
+ * CFG-68 — every `binaryFormats` entry naming a format type no provider can receive, found on the
+ * RAW input, with the path that names the offending entry.
+ *
+ * **This exists because the schema's own rejection is unreadable, not because a second opinion is
+ * wanted.** `binaryFormats` is a `z.union([false, array])`, and a union whose branches all fail
+ * collapses to a single `Invalid input` issue at the union's own path: the narrowed `type` enum
+ * does refuse the value, but its message and the INDEX of the entry carrying it are both lost, so
+ * the user is told `binaryFormats: Invalid input` about an array. Measured on
+ * `{ binaryFormats: [{ type: 'image', ... }, { type: 'video', ... }] }`. Checked here — before the
+ * parse, exactly as {@link findApprovalsGrammarIssues} arranges for its own — the message that
+ * explains the fix is the only one they read.
+ *
+ * PURE: it only reads the object.
+ */
+export function findUndeliverableBinaryFormatIssues(
+  raw: Record<string, unknown>
+): DeprecatedConfigIssue[] {
+  const issues: DeprecatedConfigIssue[] = [];
+
+  const collect = (binaryFormats: unknown, prefix: string): void => {
+    // `false` (the off switch) and any non-array shape are the schema's business, not this scan's.
+    if (!Array.isArray(binaryFormats)) return;
+    binaryFormats.forEach((entry, index) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+      const type = (entry as Record<string, unknown>).type;
+      if (typeof type !== 'string') return;
+      if ((DELIVERABLE_BINARY_FORMAT_TYPES as readonly string[]).includes(type)) return;
+      issues.push({
+        path: `${prefix}.${index}.type`,
+        message: undeliverableBinaryFormatMessage(type),
+      });
+    });
+  };
+
+  collect(raw.binaryFormats, 'binaryFormats');
+
+  const commands = raw.commands;
+  if (commands && typeof commands === 'object' && !Array.isArray(commands)) {
+    for (const [name, cmd] of Object.entries(commands as Record<string, unknown>)) {
+      if (cmd && typeof cmd === 'object' && !Array.isArray(cmd)) {
+        collect((cmd as Record<string, unknown>).binaryFormats, `commands.${name}.binaryFormats`);
+      }
+    }
+  }
+
+  return issues;
+}
+
+/**
  * CFG-26 — one `approvals.rater` reference found in a raw config, with the dotted config path it
  * was found at (`approvals.rater` or `commands.<name>.approvals.rater`).
  */
@@ -1901,6 +1988,18 @@ export function validateRawGthConfig(
         ok: false,
         warnings: [],
         errorMessage: formatDeprecatedConfigIssues(deprecatedIssues),
+      };
+    }
+
+    // CFG-68 — a `binaryFormats` entry whose type no provider can receive. Before the parse for a
+    // mechanical reason: the union around this field collapses the schema's own message and the
+    // entry's index. See findUndeliverableBinaryFormatIssues.
+    const binaryFormatIssues = findUndeliverableBinaryFormatIssues(raw);
+    if (binaryFormatIssues.length > 0) {
+      return {
+        ok: false,
+        warnings: [],
+        errorMessage: formatDeprecatedConfigIssues(binaryFormatIssues),
       };
     }
 

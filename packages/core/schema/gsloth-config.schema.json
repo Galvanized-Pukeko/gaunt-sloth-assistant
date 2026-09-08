@@ -76,9 +76,7 @@
                 "enum": [
                   "image",
                   "file",
-                  "audio",
-                  "video",
-                  "binary"
+                  "audio"
                 ]
               },
               "extensions": {
@@ -961,9 +959,7 @@
                         "enum": [
                           "image",
                           "file",
-                          "audio",
-                          "video",
-                          "binary"
+                          "audio"
                         ]
                       },
                       "extensions": {
@@ -1287,9 +1283,7 @@
                         "enum": [
                           "image",
                           "file",
-                          "audio",
-                          "video",
-                          "binary"
+                          "audio"
                         ]
                       },
                       "extensions": {
@@ -1582,9 +1576,7 @@
                         "enum": [
                           "image",
                           "file",
-                          "audio",
-                          "video",
-                          "binary"
+                          "audio"
                         ]
                       },
                       "extensions": {
@@ -1877,9 +1869,7 @@
                         "enum": [
                           "image",
                           "file",
-                          "audio",
-                          "video",
-                          "binary"
+                          "audio"
                         ]
                       },
                       "extensions": {
@@ -2172,9 +2162,7 @@
                         "enum": [
                           "image",
                           "file",
-                          "audio",
-                          "video",
-                          "binary"
+                          "audio"
                         ]
                       },
                       "extensions": {
@@ -2467,9 +2455,7 @@
                         "enum": [
                           "image",
                           "file",
-                          "audio",
-                          "video",
-                          "binary"
+                          "audio"
                         ]
                       },
                       "extensions": {

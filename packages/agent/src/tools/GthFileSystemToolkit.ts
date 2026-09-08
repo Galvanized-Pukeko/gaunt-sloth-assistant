@@ -8,6 +8,7 @@ import { createTwoFilesPatch } from 'diff';
 import { shouldIgnoreFile } from '@gaunt-sloth/core/utils/aiignoreUtils.js';
 import { getCurrentWorkDir } from '@gaunt-sloth/core/utils/systemUtils.js';
 import type { BinaryFormatConfig, BinaryFormatType } from '@gaunt-sloth/core/config.js';
+import { DELIVERABLE_BINARY_FORMAT_TYPES } from '@gaunt-sloth/core/config/schema.js';
 import { getFormatForExtension, getMimeType, readBinaryFile } from '#src/tools/binaryUtils.js';
 
 /**
@@ -97,8 +98,11 @@ const ReadFileArgsSchema = z.object({
 
 const ReadBinaryArgsSchema = z.object({
   path: z.string().describe('Path to the binary file to read'),
+  // CFG-68 — the hint offers only the format types a provider can actually receive, the same set
+  // `binaryFormats` accepts. It used to offer `video`, which no config can declare and no provider
+  // can be sent: a hint the model can pick and nothing can honour.
   formatHint: z
-    .enum(['image', 'file', 'audio', 'video'])
+    .enum(DELIVERABLE_BINARY_FORMAT_TYPES)
     .optional()
     .describe(
       'Optional hint for the format type. If not provided, determined from file extension via config.'
@@ -942,7 +946,7 @@ export default class GthFileSystemToolkit extends BaseToolkit {
       {
         name: 'gth_read_binary',
         description:
-          'Read a binary file (image, file, audio, video) and return its base64-encoded content. ' +
+          'Read a binary file (image, file, audio) and return its base64-encoded content. ' +
           'Only works for file types configured in binaryFormats.',
         schema: ReadBinaryArgsSchema,
       },

@@ -5,7 +5,7 @@
  * the target provider can decode. These tests pin the per-provider IMAGE block shape (the GS2-75 fix:
  * route the image case through `imageBlockFor` so OpenAI reasoning models on the Responses API get a
  * valid `image_url` block instead of the standard `source_type` data block, which @langchain/openai
- * mis-serialises to an invalid Responses image part), and prove that the file/video/audio path and
+ * mis-serialises to an invalid Responses image part), and prove that the file/audio path and
  * non-OpenAI providers are untouched. The registry wiring (that the factory threads the resolved
  * provider in) is checked at the end.
  *
@@ -17,10 +17,18 @@
  * exposes so it measures the defect rather than the fix.
  */
 import { describe, expect, it } from 'vitest';
-import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages';
+import {
+  AIMessage,
+  convertToProviderContentBlock,
+  HumanMessage,
+  ToolMessage,
+  type BaseMessage,
+} from '@langchain/core/messages';
 import type { GthConfig } from '#src/config.js';
+import { DELIVERABLE_BINARY_FORMAT_TYPES } from '@gaunt-sloth/core/config/schema.js';
 import {
   createBinaryContentInjectionMiddleware,
+  isDeliverableFormatType,
   nonImageBinaryFateFor,
   type BinaryContentInjectionMiddlewareSettings,
 } from '#src/middleware/binaryContentInjectionMiddleware.js';
@@ -281,16 +289,22 @@ describe('binary-content-injection — refuses a non-image binary a provider wou
     expect(calls).toBe(0);
   });
 
-  it('audio and video are refused on the same provider for the same reason', async () => {
-    for (const [type, mime, file] of [
-      ['audio', 'audio/mpeg', '/tmp/briefing.mp3'],
-      ['video', 'video/mp4', '/tmp/clip.mp4'],
-    ] as const) {
-      const mw = await mwFor('xai-responses');
-      await expect(runModelCall(mw, binaryRound(type, mime, B64, file))).rejects.toThrow(
-        new RegExp(file.split('/').pop()!.replace('.', '\\.'))
-      );
-    }
+  // `audio` is what exercises this arm, and the second assertion is what keeps it exercised.
+  // CFG-68's universal check runs FIRST and answers for `video` and `binary`, so a row for either
+  // of those would pass here with the `xai-responses` case deleted from `nonImageBinaryFateFor` —
+  // a cell that could no longer fail for its own reason. The video case is pinned in the CFG-68
+  // block below instead, and this one asserts the sentence only the per-provider measurement
+  // produces.
+  it('audio is refused on the same provider for the same reason', async () => {
+    const mw = await mwFor('xai-responses');
+    await expect(
+      runModelCall(mw, binaryRound('audio', 'audio/mpeg', B64, '/tmp/briefing.mp3'))
+    ).rejects.toThrow(/briefing\.mp3/);
+
+    const mw2 = await mwFor('xai-responses');
+    await expect(
+      runModelCall(mw2, binaryRound('audio', 'audio/mpeg', B64, '/tmp/briefing.mp3'))
+    ).rejects.toThrow(/replaces every non-image attachment with an empty text part/);
   });
 
   // The other half of the fix: an IMAGE on the same provider must still work exactly as CFG-45 left
@@ -345,6 +359,128 @@ describe('binary-content-injection — refuses a non-image binary a provider wou
         data: B64,
         metadata: { filename: 'doc.pdf' },
       });
+    }
+  });
+});
+
+/**
+ * CFG-68 — `video` and `binary` are format types NO provider can receive.
+ *
+ * **The handler here is LangChain's own dispatcher, and that is the point of the block.** Every
+ * vendor converter reaches a request body through `convertToProviderContentBlock`, so running the
+ * injected block through it reproduces what the provider boundary does, with no network and no
+ * vendor client. It is what makes the filename assertions DISCRIMINATING rather than merely
+ * agreeable: delete the refusal and these cells do not fail on a technicality, they fail carrying
+ * `Unable to convert content block type 'video' to provider-specific format: not recognized.` —
+ * the message CFG-68 exists to replace, naming a block type the user never typed and no file at
+ * all.
+ */
+describe('binary-content-injection — a format type no provider can receive (CFG-68)', () => {
+  /**
+   * Convert every block of the injected message exactly as a provider client does. The converter
+   * implements all four `fromStandard*Block` methods and returns the block untouched, so the only
+   * thing that can throw is the dispatcher failing to recognise the block type — never a gap in
+   * this stub.
+   */
+  function convertLikeAProvider(sent: BaseMessage[]): AIMessage {
+    const last = sent[sent.length - 1];
+    const blocks = Array.isArray(last?.content) ? last.content : [];
+    for (const block of blocks) {
+      convertToProviderContentBlock(
+        block as never,
+        {
+          providerName: 'spec-provider',
+          fromStandardTextBlock: (b: unknown) => b,
+          fromStandardImageBlock: (b: unknown) => b,
+          fromStandardAudioBlock: (b: unknown) => b,
+          fromStandardFileBlock: (b: unknown) => b,
+        } as never
+      );
+    }
+    return new AIMessage('ok');
+  }
+
+  it.each([
+    ['video', 'video/mp4', '/tmp/clips/site-survey.mp4', 'site-survey.mp4'],
+    ['binary', 'application/octet-stream', '/tmp/dumps/firmware.bin', 'firmware.bin'],
+  ])(
+    '%s → an error naming the attached file and the configured format type',
+    async (type, mime, filePath, filename) => {
+      const mw = await mwFor('openai');
+      const call = () =>
+        runModelCall(mw, binaryRound(type, mime, B64, filePath), convertLikeAProvider);
+
+      // The file the user attached, which LangChain's own message never mentions.
+      await expect(call()).rejects.toThrow(new RegExp(filename.replace('.', '\\.')));
+      // The format type as CONFIGURED, quoted.
+      await expect(call()).rejects.toThrow(new RegExp(`"${type}"`));
+      // And NOT the normalised label. `getFormatLabel` maps an unrecognised type to `file`, so a
+      // message built from it would quote a type the user did not configure — and one that would
+      // have worked. `file` appears in the message only as part of the unquoted vocabulary list,
+      // so a QUOTED "file" can arrive by no other route than that substitution. Measured: the
+      // assertion above alone does not catch it, because the message names the configured type
+      // twice and the substitution only reaches the first.
+      await expect(call()).rejects.not.toThrow(/"file"/);
+      // And not LangChain's vocabulary: `content block type` is the phrase the user should never
+      // meet here, whichever block type it is applied to.
+      await expect(call()).rejects.not.toThrow(/content block type/);
+    }
+  );
+
+  // The refusal sits ahead of the model call, so it can assert the thing the message only
+  // describes. A refusal thrown after the call would satisfy the cells above and still have built
+  // a request that costs a round trip to reject.
+  it('the refused attachment never reaches the model at all', async () => {
+    const mw = await mwFor('openai');
+    let calls = 0;
+    await expect(
+      runModelCall(mw, binaryRound('video', 'video/mp4', B64, '/tmp/clips/site-survey.mp4'), () => {
+        calls++;
+        return new AIMessage('the model should never have been asked');
+      })
+    ).rejects.toThrow(/site-survey\.mp4/);
+    expect(calls).toBe(0);
+  });
+
+  // CFG-68 refuses before the per-provider measurement, because "use a provider that accepts video
+  // attachments" is advice no provider can satisfy. This pins the ORDER: on the one label measured
+  // to discard silently, a video attachment gets the universal message, not that advice.
+  it('on xai-responses a video gets the universal refusal, not the change-provider advice', async () => {
+    const mw = await mwFor('xai-responses');
+    await expect(
+      runModelCall(mw, binaryRound('video', 'video/mp4', B64, '/tmp/clips/site-survey.mp4'))
+    ).rejects.toThrow(/no model provider can receive/);
+  });
+
+  /**
+   * CONTROL — this must SURVIVE every mutation the cells above are controlled with. The three
+   * deliverable types still convert through the same dispatcher that rejects the other two, which
+   * is what stops the refusal growing into "no attachment works": a check keyed on anything
+   * broader than the measured set reds here.
+   */
+  it('CONTROL — image, file and audio are still injected and still convert', async () => {
+    for (const [type, mime, filePath] of [
+      ['image', PNG_MIME, '/tmp/photo.png'],
+      ['file', 'application/pdf', '/tmp/doc.pdf'],
+      ['audio', 'audio/mpeg', '/tmp/briefing.mp3'],
+    ] as const) {
+      const mw = await mwFor('');
+      const result = await runModelCall(
+        mw,
+        binaryRound(type, mime, B64, filePath),
+        convertLikeAProvider
+      );
+      expect(result.calls).toBe(1);
+      expect(injectedBlock(result)).toMatchObject({ type, source_type: 'base64', mime_type: mime });
+    }
+  });
+
+  it('the refused vocabulary is exactly the two types the config schema also refuses', () => {
+    for (const type of DELIVERABLE_BINARY_FORMAT_TYPES) {
+      expect(isDeliverableFormatType(type)).toBe(true);
+    }
+    for (const type of ['video', 'binary', 'text', '']) {
+      expect(isDeliverableFormatType(type)).toBe(false);
     }
   });
 });

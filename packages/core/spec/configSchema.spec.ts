@@ -30,6 +30,29 @@ function readJson(path: string): Record<string, unknown> {
 const MIGRATION_DOC_URL =
   'https://github.com/pukeko-robotics/gaunt-sloth/blob/main/docs/MIGRATION.md';
 
+/**
+ * Every `binaryFormats[]` entry schema's `type` enum in the emitted JSON Schema — one at the root
+ * and one per command block. Identified by the entry object's own shape (`type` + `extensions`,
+ * which nothing else in the document pairs) rather than by string-matching the document, so a
+ * `"video"` appearing anywhere else — a description, say — can neither pass the cell nor fail it.
+ */
+function collectBinaryFormatTypeEnums(node: unknown): string[][] {
+  if (Array.isArray(node)) return node.flatMap(collectBinaryFormatTypeEnums);
+  if (!node || typeof node !== 'object') return [];
+  const record = node as Record<string, unknown>;
+  const found: string[][] = [];
+
+  const properties = record.properties as Record<string, unknown> | undefined;
+  if (properties && typeof properties === 'object' && properties.extensions) {
+    const typeSchema = properties.type as Record<string, unknown> | undefined;
+    if (typeSchema && Array.isArray(typeSchema.enum)) {
+      found.push(typeSchema.enum as string[]);
+    }
+  }
+
+  return [...found, ...Object.values(record).flatMap(collectBinaryFormatTypeEnums)];
+}
+
 describe('config schema (GS2-1 B1)', () => {
   describe('parse success / failure', () => {
     it('parses a minimal valid config', () => {
@@ -283,6 +306,83 @@ describe('config schema (GS2-1 B1)', () => {
           gth_gh_read_file: {},
         });
       }
+    });
+  });
+
+  /**
+   * CFG-68 — `video` and `binary` were accepted `binaryFormats` types with no working path on ANY
+   * provider. `@langchain/core`'s `convertToProviderContentBlock` dispatches text/image/audio/file
+   * and throws for everything else, so the config validated, `gth_read_binary` read the file, and
+   * the run died at the provider boundary naming a LangChain block type.
+   *
+   * Asserted through `validateRawGthConfig`, which is what the loader and `gth config validate`
+   * both run — and, here, the difference between a fix and the appearance of one. The narrowed
+   * enum alone rejects the value but says `binaryFormats: Invalid input`, because the surrounding
+   * `false | array` union swallows the branch's message and the entry's index. So these cells
+   * assert the PATH and the offending VALUE rather than `ok === false`: a rejection naming neither
+   * leaves the user counting array entries to find the one that is wrong.
+   */
+  describe('undeliverable binaryFormats types (CFG-68)', () => {
+    it.each(['video', 'binary'])(
+      'rejects a %s entry, naming the path, the value and the vocabulary',
+      (type) => {
+        const result = validateRawGthConfig({
+          llm: { type: 'anthropic' },
+          binaryFormats: [
+            { type: 'image', extensions: ['png'] },
+            { type, extensions: ['mp4', 'bin'] },
+          ],
+        });
+        expect(result.ok).toBe(false);
+        expect(result.errorMessage).toContain('binaryFormats.1.type');
+        expect(result.errorMessage).toContain(`"${type}" is not a binary format type`);
+        expect(result.errorMessage).toContain('image, file, audio');
+      }
+    );
+
+    it('names the per-command path when the entry is under commands.<cmd>', () => {
+      const result = validateRawGthConfig({
+        llm: { type: 'anthropic' },
+        commands: { review: { binaryFormats: [{ type: 'video', extensions: ['mp4'] }] } },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.errorMessage).toContain('commands.review.binaryFormats.0.type');
+    });
+
+    // The schema is narrowed too, so a config reaching the parse by any other route is still
+    // refused — this is the half the pre-parse scan would otherwise be the only guard for.
+    it.each(['video', 'binary'])('the schema itself also refuses %s', (type) => {
+      expect(
+        rawGthConfigSchema.safeParse({
+          llm: { type: 'anthropic' },
+          binaryFormats: [{ type, extensions: ['mp4'] }],
+        }).success
+      ).toBe(false);
+    });
+
+    // The JSON Schema is what an editor completes `type` from, so it is the third place the
+    // vocabulary is stated and the one a user meets before any validation runs.
+    it('the emitted JSON Schema offers only the deliverable three', () => {
+      const enums = collectBinaryFormatTypeEnums(generateConfigJsonSchema());
+      expect(enums.length).toBeGreaterThan(0);
+      for (const values of enums) {
+        expect(values).toEqual(['image', 'file', 'audio']);
+      }
+    });
+
+    // CONTROL — the three deliverable types and the `false` off switch are untouched. A narrowing
+    // that took a working format type, or the whole key, with it reds here.
+    it('CONTROL — image, file and audio entries, and `false`, still validate', () => {
+      for (const type of ['image', 'file', 'audio']) {
+        const result = validateRawGthConfig({
+          llm: { type: 'anthropic' },
+          binaryFormats: [{ type, extensions: ['png'] }],
+        });
+        expect(result.ok).toBe(true);
+      }
+      expect(validateRawGthConfig({ llm: { type: 'anthropic' }, binaryFormats: false }).ok).toBe(
+        true
+      );
     });
   });
 
