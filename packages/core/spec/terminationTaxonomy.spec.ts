@@ -7,6 +7,11 @@
  * vocabulary itself: that retryability is two facts rather than one, that the context-overflow
  * predicate is the typed class and not the asymmetric error code, that the substring fallback
  * survives a provider rewording its 400, and that the reason travels on a thrown error.
+ *
+ * CFG-73 adds the precedence between those last two: a committed reason outranks the text, so the
+ * feeder obeys the rule this module states for every consumer instead of exempting itself. The
+ * substring arms are what an unclassified error still gets, and their ordering is pinned here too —
+ * it was examined and kept, and nothing made undoing it fail.
  */
 import { describe, expect, it } from 'vitest';
 import { ContextOverflowError, addLangChainErrorFields } from '@langchain/core/errors';
@@ -229,6 +234,37 @@ describe('[[EXT-159]] the exception feeder', () => {
     });
   });
 
+  /**
+   * CFG-73 — the arm ordering, pinned so that undoing it reds.
+   *
+   * `status === 400` deliberately sits BEHIND the specific-cause prose arms instead of up with the
+   * other status codes, and that is the ordering CFG-73 examined and kept. 400 is a bucket rather
+   * than a cause: providers return it for a bad API key, an expired grant and an exhausted quota
+   * alike, and the prose is the only thing that tells those apart. Lifting the status would collapse
+   * all three into `invalid_request`, whose posture names no remedy at all — so a user holding a
+   * wrong key would be told there is nothing to be done, instead of `fix-credentials`.
+   *
+   * Nothing covered this before. The table's `'a plain 400'` case carries no specific-cause prose,
+   * and the context-overflow-in-a-400 case is settled by the typed arm long before the status is
+   * consulted — so a reorder passed the whole suite silently.
+   */
+  it.each([
+    ['a bad key Google returns as a 400', 'API key not valid. Please pass a valid API key.'],
+    ['an OAuth grant that expired', 'invalid_grant: token has been expired or revoked'],
+  ])('keeps %s out of the invalid-request bucket', (_label, message) => {
+    const error = Object.assign(new Error(message), { status: 400 });
+    expect(classifyThrownTermination(error).category).toBe('auth_failed');
+    // The remedy is what the ordering protects: `invalid_request` names none.
+    expect(terminationPosture('auth_failed').remedy).toBe('fix-credentials');
+    expect(terminationPosture('invalid_request').remedy).toBeUndefined();
+  });
+
+  it('keeps a quota refusal carried in a 400 out of the invalid-request bucket', () => {
+    const error = Object.assign(new Error('Quota exceeded for this project'), { status: 400 });
+    expect(classifyThrownTermination(error).category).toBe('rate_limited');
+    expect(terminationPosture('rate_limited').remedy).toBe('back-off');
+  });
+
   /** The payload SDKs nest under `error` / `response` is read, not only the top-level message. */
   it('reads a nested provider payload', () => {
     const error = { response: { status: 429 }, message: 'request failed' };
@@ -254,6 +290,143 @@ describe('[[EXT-159]] the exception feeder', () => {
       }
     );
     expect(() => classifyThrownTermination(hostile)).not.toThrow();
+  });
+});
+
+describe('[[CFG-73]] a committed reason outranks the prose', () => {
+  /** The provider rejection Groq returns for a `file` part, in its own words. */
+  const REJECTION =
+    '400 status code (no body) {"error":{"message":"messages.4.content.1 : expected one of ' +
+    "'text', 'image_url', 'document'\",\"type\":\"invalid_request_error\"}}";
+
+  /**
+   * The note the binary-attachment middleware prepends, with the classification already committed.
+   *
+   * This is the measured shape, not an invented one: the note names the file so the user can see
+   * which one was refused, and the filename is data nobody in the tree controls.
+   */
+  function rejectionNoting(fileName: string): Error {
+    const error: Error & { status?: number } = new Error(
+      `The provider "groq" would not accept this request. It carried the attachment ${fileName}, ` +
+        `which gth_read_binary read and added to that one request only. ${REJECTION}`
+    );
+    error.status = 400;
+    return attachTerminationReason(
+      error,
+      terminationReason('middleware.binary-attachment-rejected', 'exception', {
+        category: 'invalid_request',
+        provider: 'groq',
+        detail: '400',
+      })
+    );
+  }
+
+  /**
+   * THE PIN. Six of seven ordinary filenames flipped the category of a rejection that classified
+   * `invalid_request` before the name was interpolated, and every category they flipped it to is a
+   * retryable posture — so the user was told to send again a request the provider refuses
+   * identically every time, and an overflow-matching name sent the runner off to compact first.
+   *
+   * Each case proves its own text is genuinely hostile before asserting the fix, by stripping the
+   * committed reason and watching the feeder answer the other category. Without that half the
+   * assertion could pass on a message that never carried the token at all.
+   */
+  it.each([
+    ['api-timeout-investigation.pdf', 'timeout'],
+    ['contract - terminated.pdf', 'network_error'],
+    ['forbidden-zones-map.pdf', 'auth_failed'],
+    ['rate limit escalation.pdf', 'rate_limited'],
+    ['internal error postmortem.pdf', 'provider_error'],
+    ['prompt is too long - notes.pdf', 'context_overflow'],
+  ])('%s no longer reads back as %s', (fileName, wouldHaveBeen) => {
+    const annotated = rejectionNoting(fileName);
+
+    // The same text with nothing committed: this is what the feeder used to answer, and it is what
+    // makes the assertion below capable of failing.
+    expect(classifyThrownTermination(new Error(annotated.message)).category).toBe(wouldHaveBeen);
+
+    expect(classifyThrownTermination(annotated).category).toBe('invalid_request');
+  });
+
+  /**
+   * A committed reason outranks a status code and a typed class too, not only prose.
+   *
+   * Both of those are evidence ABOUT the failure; a committed reason is a classification OF it,
+   * made by a site that watched it happen. Ranking them in tiers — typed beats committed, prose
+   * does not — is a precedence nobody could hold in their head, and `attachTerminationReason` is
+   * already first-write-wins, so the earliest site is the truest one by construction. The typed
+   * case here is real: pressing Esc during a turn that would also have overflowed ends the run
+   * because the user stopped it, and `cancelled` is the honest answer.
+   */
+  it('outranks a status code and a typed class, not only prose', () => {
+    const rateLimitShape = Object.assign(new Error('slow down'), { status: 429 });
+    attachTerminationReason(
+      rateLimitShape,
+      terminationReason('runner.turn-error', 'exception', 'tool_error')
+    );
+    expect(classifyThrownTermination(rateLimitShape).category).toBe('tool_error');
+
+    const overflowShape = new ContextOverflowError('prompt is too long');
+    attachTerminationReason(
+      overflowShape,
+      terminationReason('agent.stream-cancelled', 'control', 'cancelled')
+    );
+    expect(classifyThrownTermination(overflowShape).category).toBe('cancelled');
+  });
+
+  /**
+   * The provider and the detail travel with the category, and nothing else does: a classification
+   * is `{category, provider?, detail?}`, and the site and source belong to whoever attaches one.
+   */
+  it('carries the committed provider and detail through, and adds nothing of its own', () => {
+    const error = new Error('socket hang up');
+    attachTerminationReason(
+      error,
+      terminationReason('middleware.binary-attachment-rejected', 'exception', {
+        category: 'invalid_request',
+        provider: 'groq',
+        detail: '400',
+      })
+    );
+
+    expect(classifyThrownTermination(error)).toEqual({
+      category: 'invalid_request',
+      provider: 'groq',
+      detail: '400',
+    });
+  });
+
+  /**
+   * Consumers read a committed reason through {@link terminationReasonOf}, which follows one cause
+   * link — so the feeder follows the same one. Any other answer would let the two disagree about a
+   * wrapped failure, which is the whole class of defect this taxonomy exists to remove.
+   */
+  it('follows the same cause link its consumers do', () => {
+    const inner = new Error('the real fault');
+    attachTerminationReason(
+      inner,
+      terminationReason('runner.stream-error', 'exception', 'auth_failed')
+    );
+    const wrapper = new Error('Agent processing failed: the request timed out', { cause: inner });
+
+    expect(classifyThrownTermination(wrapper).category).toBe('auth_failed');
+    expect(terminationReasonOf(wrapper)?.category).toBe('auth_failed');
+  });
+
+  /**
+   * Fail-soft on the shape. The reason rides on an ordinary non-enumerable property, so anything
+   * could be parked there; a value carrying no category must fall back to the text rather than
+   * become a category the taxonomy does not define.
+   */
+  it('falls back to the text when what is parked on the property is not a reason', () => {
+    const error = new Error('Request timed out');
+    Object.defineProperty(error, 'gthTerminationReason', {
+      value: { site: 'runner.turn-error' },
+      enumerable: false,
+      configurable: true,
+    });
+
+    expect(classifyThrownTermination(error).category).toBe('timeout');
   });
 });
 
