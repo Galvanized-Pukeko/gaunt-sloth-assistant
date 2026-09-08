@@ -26,7 +26,12 @@ import {
 } from '#src/middleware/binaryContentInjectionMiddleware.js';
 import { imageBlockFor } from '#src/middleware/frontendImageInjectionMiddleware.js';
 import { resolveMiddleware } from '#src/middleware/registry.js';
-import { classifyThrownTermination } from '@gaunt-sloth/core/core/terminationReason.js';
+import {
+  attachTerminationReason,
+  classifyThrownTermination,
+  terminationReason,
+  terminationReasonOf,
+} from '@gaunt-sloth/core/core/terminationReason.js';
 
 /** A tiny valid 1×1 base64 PNG-ish payload — content is opaque to the middleware. */
 const B64 =
@@ -510,35 +515,132 @@ describe('binary-content-injection — a rejected attachment cannot outlive its 
     const mw = await mwFor('groq');
     const error: any = await runModelCall(
       mw,
-      binaryRound('file', 'application/pdf', B64, '/tmp/test.pdf'),
+      binaryRound('file', 'application/pdf', B64, HOSTILE_NAMES[0]),
       () => {
         throw providerRejection();
       }
     ).catch((thrown) => thrown);
 
-    expect(error.message).toMatch(/"test\.pdf" \(application\/pdf\)/);
+    expect(error.message).toMatch(/"api-timeout-investigation\.pdf" \(application\/pdf\)/);
     expect(error.message).toMatch(/"groq"/);
     expect(error.message).toMatch(/NOT part of the conversation/);
     // The vendor's own words are kept, not replaced: they are what a bug report needs.
     expect(error.message).toContain('invalid_request_error');
   });
 
-  it('the note leaves the failure classified as it was — a retry still will not help', async () => {
+  /**
+   * The filenames a user can hand this middleware, chosen because each one contains a token the
+   * exception classifier matches BEFORE it reaches the invalid-request arm.
+   *
+   * They are the input the pin must use. A benign name like `test.pdf` cannot exercise the hazard
+   * at all, so a cell built on one asserts something that could not have failed — while the half of
+   * the note that carries real risk is exactly the half the user controls.
+   */
+  const HOSTILE_NAMES = [
+    '/tmp/api-timeout-investigation.pdf', // 'timeout'  → would classify timeout
+    '/tmp/contract - terminated.pdf', //     'terminated' → would classify network_error
+    '/tmp/forbidden-zones-map.pdf', //       'forbidden'  → would classify auth_failed
+    '/tmp/rate limit escalation.pdf', //     'rate limit' → would classify rate_limited
+    '/tmp/internal error postmortem.pdf', // 'internal error' → would classify provider_error
+  ];
+
+  /**
+   * How every consumer of a thrown termination reads it: the attached value first, the text only
+   * when nothing has been committed. Copied from `GthAgentRunner.handleContextOverflow`, and
+   * `classifyThrownAt` has the same shape — those two are the only readers in the tree.
+   *
+   * The cell below asserts through this rather than calling the text feeder directly, because the
+   * feeder alone is not what decides anything: it is the fallback for an unclassified error.
+   */
+  function categoryAsAConsumerReadsIt(error: unknown): string {
+    return terminationReasonOf(error)?.category ?? classifyThrownTermination(error).category;
+  }
+
+  it('a filename cannot change what the failure IS — every hostile name still reads invalid_request', async () => {
+    // The classification is committed as a value before the note is written, so what the file is
+    // called cannot reach the decision. Without that, each of these names re-classifies the failure
+    // into something the user is told to RETRY — the exact opposite of what this node is for, and
+    // for an overflow-matching name it would send the runner off to compact and retry.
+    expect(categoryAsAConsumerReadsIt(providerRejection())).toBe('invalid_request');
+
+    for (const filePath of HOSTILE_NAMES) {
+      const mw = await mwFor('groq');
+      const error = await runModelCall(
+        mw,
+        binaryRound('file', 'application/pdf', B64, filePath),
+        () => {
+          throw providerRejection();
+        }
+      ).catch((thrown) => thrown);
+
+      // The note really is present, and really does carry the hostile name — otherwise this cell
+      // would pass on a middleware that protected the classification by saying nothing.
+      expect((error as Error).message).toMatch(/NOT part of the conversation/);
+      expect((error as Error).message).toContain(filePath.split('/').pop());
+      expect(categoryAsAConsumerReadsIt(error)).toBe('invalid_request');
+      expect(terminationReasonOf(error)?.retryableAsIs).toBe(false);
+    }
+  });
+
+  /**
+   * KNOWN RESIDUAL, pinned as a fact rather than asserted as desirable.
+   *
+   * `classifyThrownTermination` called DIRECTLY on an error that already carries a reason still
+   * substring-matches the text, so it reads the filename and answers `timeout` here. No consumer
+   * does that — both read the attached value first (see {@link categoryAsAConsumerReadsIt}) — and
+   * the note cannot be made both safe and useful by wording: dropping the filename to protect a
+   * substring match would defeat the one thing the note exists to say, since most real filenames
+   * contain one of these tokens.
+   *
+   * Closing it properly belongs to the classifier, not here: it would prefer the committed value
+   * over the prose, the way its own docblock says every consumer should. That is a core change with
+   * a blast radius over every error in the system, so it is NOT taken as a side effect of this node.
+   * This cell exists so the residual is visible and deliberate; when the classifier is fixed, this
+   * is the cell that reds and should then be deleted.
+   */
+  it('KNOWN RESIDUAL — the bare text feeder still reads the filename (no consumer calls it that way)', async () => {
     const mw = await mwFor('groq');
     const error = await runModelCall(
       mw,
-      binaryRound('file', 'application/pdf', B64, '/tmp/test.pdf'),
+      binaryRound('file', 'application/pdf', B64, HOSTILE_NAMES[0]),
       () => {
         throw providerRejection();
       }
     ).catch((thrown) => thrown);
 
-    // Both sides, so this reads as "unchanged" rather than "happens to be right": the raw provider
-    // error and the annotated one classify the same. The note is prose added to the text the
-    // classifier reads, and a word like "quota" or "unauthorized" in it would silently restate a
-    // permanent rejection as something worth retrying.
-    expect(classifyThrownTermination(providerRejection()).category).toBe('invalid_request');
-    expect(classifyThrownTermination(error).category).toBe('invalid_request');
+    expect(classifyThrownTermination(error).category).toBe('timeout');
+    expect(categoryAsAConsumerReadsIt(error)).toBe('invalid_request');
+  });
+
+  it('the reason it attaches names this site and does not overwrite an inner one', async () => {
+    const mw = await mwFor('groq');
+    const error = await runModelCall(
+      mw,
+      binaryRound('file', 'application/pdf', B64, HOSTILE_NAMES[0]),
+      () => {
+        throw providerRejection();
+      }
+    ).catch((thrown) => thrown);
+    expect(terminationReasonOf(error)?.site).toBe('middleware.binary-attachment-rejected');
+    expect(terminationReasonOf(error)?.provider).toBe('groq');
+    // The posture is what a surface prints beside the note; a retry hint here would contradict it.
+    expect(terminationReasonOf(error)?.retryableAsIs).toBe(false);
+
+    // First-write-wins: a site that classified this failure before us keeps it.
+    const preClassified = providerRejection();
+    attachTerminationReason(
+      preClassified,
+      terminationReason('runner.turn-error', 'exception', { category: 'invalid_request' })
+    );
+    const mw2 = await mwFor('groq');
+    const error2 = await runModelCall(
+      mw2,
+      binaryRound('file', 'application/pdf', B64, HOSTILE_NAMES[0]),
+      () => {
+        throw preClassified;
+      }
+    ).catch((thrown) => thrown);
+    expect(terminationReasonOf(error2)?.site).toBe('runner.turn-error');
   });
 
   it('CONTROL — a failure that is not a rejection of the request is passed on untouched', async () => {

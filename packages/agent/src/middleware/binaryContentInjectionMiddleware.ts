@@ -10,7 +10,7 @@
  * 1. Detects the gth_read_binary tool calls
  * 2. Parses the special string format from ToolMessage content
  * 3. Adds a HumanMessage carrying the binary content block to the model call that follows the tool
- *    result — to that REQUEST only, never to the conversation (see {@link wrapModelCall} below)
+ *    result — to that REQUEST only, never to the conversation (the `wrapModelCall` hook below)
  * 4. Refuses a non-image attachment bound for a provider measured to discard it silently
  *    (see {@link nonImageBinaryFateFor})
  * 5. Says, in the user's terms, that an attachment rode a request the provider rejected, and that
@@ -24,7 +24,12 @@ import { createMiddleware, type AgentMiddleware } from 'langchain';
 import path from 'node:path';
 import type { GthConfig } from '@gaunt-sloth/core/config.js';
 import { debugLog } from '@gaunt-sloth/core/utils/debugUtils.js';
-import { classifyThrownTermination } from '@gaunt-sloth/core/core/terminationReason.js';
+import {
+  attachTerminationReason,
+  classifyThrownTermination,
+  terminationReason,
+  terminationReasonOf,
+} from '@gaunt-sloth/core/core/terminationReason.js';
 import { HumanMessage, isToolMessage } from '@langchain/core/messages';
 import type { BaseMessage, MessageContent } from '@langchain/core/messages';
 import { imageBlockFor } from '#src/middleware/frontendImageInjectionMiddleware.js';
@@ -256,13 +261,23 @@ function collectTrailingBinaryContent(messages: readonly BaseMessage[]): ParsedB
  * send the user chasing the wrong thing. The claims made are true even when the attachment was not
  * what the provider objected to — the request did carry it, and it is not in the conversation.
  *
- * The original error is annotated and rethrown rather than replaced, so the status, name, cause and
- * any classification already attached survive: {@link classifyThrownTermination} reads the text, so
- * a wrapper would decide the category from prose alone. **The added sentence therefore has to avoid
- * every token that classifies EARLIER than the invalid-request arm** — rate/quota, auth, timeout,
- * network and provider-fault wording — or the note itself would restate the failure as a different
- * kind and cost the user the one fact this category carries: that sending it again will not help.
- * `binaryContentInjectionMiddleware.spec.ts` pins that with the classifier itself.
+ * The original error is annotated and rethrown rather than replaced, so its status, name and cause
+ * survive for anyone reading it.
+ *
+ * **The classification is committed as a VALUE before the text is touched, and that is not a
+ * nicety.** `classifyThrownTermination` substring-matches the error's text, and the timeout,
+ * network, auth, rate-limit and context-overflow arms are all tried BEFORE the invalid-request one
+ * — so a note is not inert prose, it is input to the classifier. The note carries a **filename**,
+ * which is user data nobody here controls: `api-timeout-investigation.pdf` reads back as a timeout,
+ * `contract - terminated.pdf` as a dropped connection, `forbidden-zones.pdf` as an auth failure.
+ * The user would then be told to retry a request that can never succeed, and a name matching the
+ * overflow arm would send the runner off to compact the history and try again.
+ *
+ * Sanitising the filename would be an enumeration of today's pattern lists — it would go quietly
+ * stale the next time one grows. So the fix is the rule this module already states: the prose is
+ * never the carrier. Both consumers prefer an attached reason over re-reading the text
+ * (`GthAgentRunner.classifyThrownAt` and `handleContextOverflow`), so attaching one first makes the
+ * note unable to change what the failure IS, whatever it is named.
  *
  * Fail-soft in both directions: a non-Error throw and an unwritable `message` leave the failure
  * exactly as it arrived, because explaining one must never become a second one.
@@ -270,7 +285,17 @@ function collectTrailingBinaryContent(messages: readonly BaseMessage[]): ParsedB
 function noteRejectedAttachment(error: unknown, attachments: string[], provider: string): unknown {
   try {
     if (attachments.length === 0 || !(error instanceof Error)) return error;
-    if (classifyThrownTermination(error).category !== 'invalid_request') return error;
+    // An inner site that already classified this failure saw it first and keeps it.
+    const classification = terminationReasonOf(error) ?? classifyThrownTermination(error);
+    if (classification.category !== 'invalid_request') return error;
+    attachTerminationReason(
+      error,
+      terminationReason('middleware.binary-attachment-rejected', 'exception', {
+        category: classification.category,
+        ...(classification.detail === undefined ? {} : { detail: classification.detail }),
+        ...(provider ? { provider } : {}),
+      })
+    );
     const providerLabel = provider ? `"${provider}"` : 'the model provider';
     const noun = attachments.length === 1 ? 'attachment' : 'attachments';
     error.message =

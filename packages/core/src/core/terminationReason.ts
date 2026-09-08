@@ -163,7 +163,18 @@ export type GthTerminationSite =
   /** The tool-error budget's `jumpTo: 'end'`. */
   | 'middleware.tool-error-budget'
   /** The tool-loop guard's `jumpTo: 'end'`. */
-  | 'middleware.tool-loop-guard';
+  | 'middleware.tool-loop-guard'
+  /**
+   * A model call carrying an injected binary attachment was rejected by the provider, and the
+   * binary-content-injection middleware added an explanation to the error's text.
+   *
+   * The site exists because that middleware is a WRITER of the text this module's classifier
+   * reads, which makes it the one place a classification must be committed as a value first —
+   * a filename is user data, and `holiday-timeout.pdf` in the prose would otherwise be read back
+   * as a timeout. `attachTerminationReason` is first-write-wins, so an inner site that already
+   * classified the same failure still keeps it.
+   */
+  | 'middleware.binary-attachment-rejected';
 
 /**
  * Which feeder produced the classification.
