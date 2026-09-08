@@ -54,16 +54,17 @@ vi.mock('express', () => {
   // banner, which it prints only once the socket says it is bound, so a mock that returns nothing
   // or never calls back leaves every cell here hanging on a promise that cannot settle. The
   // callback goes on a later turn because node's does, and the module consults the server the call
-  // returns.
+  // returns. It is the THIRD argument — `listen(port, host, cb)` — and a mock reading it second
+  // would pass a string to `queueMicrotask` and hang rather than fail.
   const app = {
     use: vi.fn(),
     post: mockPostFn,
     get: vi.fn(),
-    listen: vi.fn((port: number, cb: () => void) => {
+    listen: vi.fn((port: number, host: string, cb: () => void) => {
       queueMicrotask(cb);
       return {
         listening: true,
-        address: () => ({ address: '::', family: 'IPv6', port }),
+        address: () => ({ address: host, family: host.includes(':') ? 'IPv6' : 'IPv4', port }),
         on: vi.fn(),
       };
     }),

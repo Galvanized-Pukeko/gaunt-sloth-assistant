@@ -132,8 +132,16 @@ Middleware provides hooks to intercept and control agent execution at critical p
 
 `startAgUiServer()` ([packages/agent/src/modules/apiAgUiModule.ts](packages/agent/src/modules/apiAgUiModule.ts))
 exposes the agent over the AG-UI protocol at `POST /agents/:agentId/run`,
-streaming typed SSE events. It is intended for **local clients only** (a local
-web UI talking to a local CLI agent); do not expose it to public networks.
+streaming typed SSE events.
+
+**The endpoint is unauthenticated, so the bind is the only thing limiting who
+can run the agent.** It defaults to IPv4 loopback and widens only on an explicit
+`--host` / `commands.api.host`. Everything the server says about that — the
+banner's address and which of the three reachability sentences it prints — is
+read off `server.address()` once the socket is bound, never off the value that
+was requested: a message describing an intention rather than the mechanism is
+worse than none, because it converts an unexamined risk into an
+examined-and-dismissed one. Keep any new startup output on that footing.
 
 Request handling:
 - A request carrying `forwardedProps.command.resume` resumes a graph suspended

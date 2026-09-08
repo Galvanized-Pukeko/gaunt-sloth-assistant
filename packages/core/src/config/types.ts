@@ -392,6 +392,13 @@ export interface GthConfig {
        */
       approvals?: ApprovalsConfig;
       port?: number;
+      /**
+       * The interface the AG-UI server binds. Defaulted at the read site rather than in
+       * `DEFAULT_CONFIG` — see `DEFAULT_AGUI_HOST` in `@gaunt-sloth/agent`'s `apiAgUiModule`, which
+       * is IPv4 loopback. Set `0.0.0.0` (or `::` for IPv6 as well) to accept connections from the
+       * network; the endpoint has no authentication, so that is a deliberate exposure.
+       */
+      host?: string;
       cors?: {
         allowOrigin?: string;
         allowMethods?: string;

@@ -331,13 +331,72 @@ function terminationOf(agent: GthAbstractAgent | null | undefined): GthTerminati
   }
 }
 
-export async function startAgUiServer(config: GthConfig, port: number): Promise<void> {
+/**
+ * The interface the AG-UI server binds when nothing says otherwise: IPv4 loopback.
+ *
+ * A default is a decision someone inherits rather than makes, so this one is the safe half of the
+ * choice — the server is an **unauthenticated** agent endpoint, and a wildcard default puts it on
+ * the coffee-shop wifi, the office LAN and the container's published port without anyone deciding
+ * that. The LAN client is a real user and keeps a door: `--host` / `commands.api.host`.
+ *
+ * It is deliberately NOT in `DEFAULT_CONFIG`. The value has to hold for a programmatic caller of
+ * {@link startAgUiServer} whose config never went through the loader, and one definition at the
+ * bind site cannot drift from a second one in the defaults table. `DEFAULT_CONFIG`'s `prompts` key
+ * is absent for the same reason: defaulted at the read site.
+ */
+export const DEFAULT_AGUI_HOST = '127.0.0.1';
+
+/**
+ * Is `address` a loopback address — one only this machine can reach?
+ *
+ * The whole `127.0.0.0/8` block, not just `127.0.0.1`: `--host 127.0.0.2` is as local as
+ * `127.0.0.1`, and a check that missed it would print the reachable-from-the-network warning for a
+ * server nothing off the machine can reach. IPv6 loopback is the single address `::1`, and node
+ * reports an IPv4 socket accepted over a dual-stack listener in the `::ffff:` mapped form.
+ *
+ * Takes what `server.address()` returned, never what was requested.
+ */
+function isLoopbackAddress(address: string): boolean {
+  const mapped = address.toLowerCase().replace(/^::ffff:/, '');
+  return mapped === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(mapped);
+}
+
+/** Is `address` the wildcard — every network interface on this machine? */
+function isWildcardAddress(address: string): boolean {
+  return address === '0.0.0.0' || address === '::' || address === '::ffff:0.0.0.0';
+}
+
+/**
+ * `address` as the host part of a URL: an IPv6 literal is bracketed, everything else is itself.
+ * A colon is what distinguishes the two — an IPv4 address and a hostname never contain one.
+ */
+function formatUrlHost(address: string): string {
+  return address.includes(':') ? `[${address}]` : address;
+}
+
+/**
+ * Start the AG-UI server.
+ *
+ * `host` is the interface to bind, and its precedence is the argument (what the caller's `--host`
+ * flag said), then `commands.api.host`, then {@link DEFAULT_AGUI_HOST}. It is passed to `listen`
+ * unvalidated, on purpose: there is no silent wrong answer to prevent here the way there is for a
+ * port (`listen(NaN)` binds an arbitrary port, where a host node cannot resolve raises on the
+ * `error` event and is rejected below), and any list of accepted literals would refuse `::`, a
+ * specific interface address, or a hostname — all legitimate. An **empty** host is the one value
+ * that is rewritten, because `listen` treats it as falsy and binds the wildcard, which is the
+ * opposite of anything an empty value could have meant.
+ */
+export async function startAgUiServer(
+  config: GthConfig,
+  port: number,
+  host?: string
+): Promise<void> {
   const app = express();
   app.use(express.json({ limit: '5mb' }));
 
-  displayInfo(
-    'WARNING: AG-UI server is intended for local clients only. Do not expose to public networks.'
-  );
+  const requested = host ?? config.commands?.api?.host;
+  const requestedHost =
+    typeof requested === 'string' && requested.trim() !== '' ? requested.trim() : DEFAULT_AGUI_HOST;
 
   // CORS — configured via commands.api.cors in config
   const corsOrigin = config.commands?.api?.cors?.allowOrigin ?? 'http://localhost:3000';
@@ -829,20 +888,53 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
     // `server.listening` says whether the bind happened, and the `error` event carries why it did
     // not. Announcing a server on a port another process holds is worse than a wrong message — the
     // per-worktree port allocation that keeps two lanes apart depends on a collision being loud.
-    const server = app.listen(port, () => {
+    const server = app.listen(port, requestedHost, () => {
       if (!server.listening) {
         // The bind failed. The `error` handler below has the reason and rejects; saying anything
         // here would be the banner this guard exists to withhold.
         return;
       }
       settled = true;
-      // The port comes off the bound socket rather than from the argument, because the two are not
-      // always the same number: port 0 asks the OS to choose one, and repeating the 0 would name an
-      // endpoint that connects to nothing.
+      // Everything below is read off the bound socket rather than from the arguments, because the
+      // two are not always the same: port 0 asks the OS to choose one, and a host such as
+      // `localhost` is a name the resolver turns into whichever address actually got bound.
+      // Repeating the request would name an endpoint that connects to nothing, and — the reason
+      // this server had a security bug — would describe a reachability the socket does not have.
       const address = server.address();
-      const boundPort = typeof address === 'object' && address !== null ? address.port : port;
-      displayInfo(`AG-UI server listening at http://localhost:${boundPort}`);
-      displayInfo(`AG-UI endpoint: POST http://localhost:${boundPort}/agents/{agentId}/run`);
+      const bound = typeof address === 'object' && address !== null ? address : null;
+      if (!bound) {
+        // `address()` gave a pipe path, or nothing. It cannot happen behind the `listening` guard
+        // with a numeric port, and if it ever did, the one thing not to do is fall back to the
+        // requested host and claim a reachability nothing measured. Name the port asked for and
+        // make no claim about the interface at all.
+        displayInfo(`AG-UI server listening on port ${port}`);
+        resolve();
+        return;
+      }
+      const urlHost = formatUrlHost(bound.address);
+      displayInfo(`AG-UI server listening at http://${urlHost}:${bound.port}`);
+      displayInfo(`AG-UI endpoint: POST http://${urlHost}:${bound.port}/agents/{agentId}/run`);
+      // Three addresses, three sentences, because a sentence naming one condition that fires for
+      // two of them is false on the ones it does not describe. The wildcard and a specific
+      // non-loopback interface are both reachable off this machine and differ only in what makes
+      // them so; loopback is not reachable off it at all.
+      if (isLoopbackAddress(bound.address)) {
+        displayInfo(
+          `AG-UI server is bound to ${bound.address}, a loopback address, so only clients on this ` +
+            `machine can reach it. To accept connections from the network, pass --host 0.0.0.0 ` +
+            `(or :: for IPv6 as well) or set commands.api.host.`
+        );
+      } else {
+        displayWarning(
+          `WARNING: AG-UI server is bound to ${bound.address}, ` +
+            (isWildcardAddress(bound.address)
+              ? 'which is every network interface on this machine, '
+              : 'which is not a loopback address, ') +
+            `so any host that can route to it can reach this server on port ${bound.port}. ` +
+            `The endpoint is unauthenticated: reaching it is enough to run the agent with the ` +
+            `tools this configuration gives it.`
+        );
+      }
       resolve();
     });
 
@@ -855,7 +947,14 @@ export async function startAgUiServer(config: GthConfig, port: number): Promise<
         return;
       }
       settled = true;
-      reject(new Error(`AG-UI server failed to listen on port ${port}: ${err.message}`));
+      // The host is named too: a host that does not resolve, or an address this machine does not
+      // hold, fails through here, and a message carrying only the port cannot say which of the two
+      // it was.
+      reject(
+        new Error(
+          `AG-UI server failed to listen on port ${port} (host ${requestedHost}): ${err.message}`
+        )
+      );
     });
   });
 }

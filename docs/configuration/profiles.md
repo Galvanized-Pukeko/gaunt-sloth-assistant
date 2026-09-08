@@ -171,6 +171,7 @@ The `api ag-ui` command reads its settings from `commands.api` in your config fi
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `commands.api.port` | `number` | `3000` | Port the AG-UI server listens on |
+| `commands.api.host` | `string` | `"127.0.0.1"` | Interface the AG-UI server binds. The default is loopback, so only clients on the same machine can reach it; `"0.0.0.0"` (or `"::"` for IPv6 as well) accepts connections from the network, which — since the endpoint has no authentication — exposes the agent to anything that can route to it |
 | `commands.api.cors.allowOrigin` | `string` | `"http://localhost:3000"` | `Access-Control-Allow-Origin` header value |
 | `commands.api.cors.allowMethods` | `string` | `"POST, GET, OPTIONS"` | `Access-Control-Allow-Methods` header value |
 | `commands.api.cors.allowHeaders` | `string` | `"Content-Type, Accept"` | `Access-Control-Allow-Headers` header value |
@@ -196,7 +197,8 @@ The `api ag-ui` command reads its settings from `commands.api` in your config fi
 }
 ```
 
-> **Note:** The port flag `--port` on the CLI overrides `commands.api.port`.
+> **Note:** The CLI flags override the config file — `--port` over `commands.api.port`, `--host`
+> over `commands.api.host`.
 
 ## Agent Backend (`agent.backend`)
 

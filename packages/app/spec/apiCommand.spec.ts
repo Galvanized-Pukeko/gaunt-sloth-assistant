@@ -54,23 +54,35 @@ describe('gth api ag-ui --port (CFG-62)', () => {
 
   it('passes a numeric --port to the server as a number', async () => {
     await run('--port', '4000');
-    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4000);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4000, undefined);
   });
 
   it('with no --port, uses the configured port, and 3000 when nothing is configured', async () => {
     await run();
-    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, undefined);
 
     startAgUiServerMock.mockClear();
     const bare = {};
     initConfigMock.mockResolvedValue(bare);
     await run();
-    expect(startAgUiServerMock).toHaveBeenCalledWith(bare, 3000);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(bare, 3000, undefined);
   });
 
   it('--port 0 is port 0 (let the OS pick), not the configured port', async () => {
     await run('--port', '0');
-    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 0);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 0, undefined);
+  });
+
+  it('CFG-67: --host reaches the server, and its absence is an absence', async () => {
+    // The host's precedence lives in the server, so what this door owes is that the flag arrives
+    // and that not typing it arrives as nothing — the value the server reads `commands.api.host`
+    // for. A door that substituted its own default here would silently outrank the config file.
+    await run('--host', '0.0.0.0');
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, '0.0.0.0');
+
+    startAgUiServerMock.mockClear();
+    await run();
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, undefined);
   });
 
   it('refuses --port abc at parse time, before the config is read or the server is started', async () => {

@@ -44,7 +44,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { networkInterfaces, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -77,6 +77,46 @@ function freePort(): Promise<number> {
   });
 }
 
+/**
+ * An IPv4 address this machine holds on a real network interface — the LAN address a second box
+ * would dial, and the one address that separates a loopback bind from a wildcard one.
+ *
+ * Enumerated from the machine's own interfaces rather than hardcoded: a runner's private address
+ * differs across the Linux, macOS and Windows cells, and any literal would be wrong on two of the
+ * three. IPv4 because the opt-in these cells pass is `0.0.0.0`.
+ *
+ * Returns `undefined` when the machine has nothing but loopback. No cell skips on that — the
+ * exposure cell below fails and says so, which is the honest outcome for an environment that
+ * cannot express the measurement.
+ */
+function lanAddress(): string | undefined {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family === 'IPv4' && !address.internal) return address.address;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * `GET /health` on one address, or the reason nothing came back.
+ *
+ * Bounded, and reported as "no answer" rather than by errno: a refusal is `ECONNREFUSED` here and
+ * a different string on win32, and a host-firewall that drops instead of refusing produces a
+ * timeout rather than an error at all. What both cells actually assert is whether an HTTP response
+ * exists, which is the same question on every platform.
+ */
+async function healthFrom(address: string, port: number): Promise<number | 'no answer'> {
+  try {
+    const response = await fetch(`http://${address}:${port}/health`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    return response.status;
+  } catch {
+    return 'no answer';
+  }
+}
+
 /** A port held open for the length of a cell, so a server starting on it must collide. */
 interface HeldPort {
   port: number;
@@ -86,17 +126,19 @@ interface HeldPort {
 /**
  * Take a port and keep it.
  *
- * The holder is bound with **no host**, which is the wildcard address — the same one
- * `app.listen(port)` asks for. A holder on `127.0.0.1` alone leaves the outcome to the platform's
- * rules for overlapping binds, which is how a collision cell passes here and flakes on the Windows
- * runner. The OS picks the number, so the cell reserves nothing and assumes nothing about what
- * else is live on the machine — the port it collides on is one it is holding itself.
+ * The holder binds **exactly the address the server under test will bind** — IPv4 loopback, which
+ * is what an unconfigured `gaunt-sloth-api` asks for. Identical address and port is the one
+ * collision every platform agrees on; a holder on a *different* address that merely overlaps (the
+ * wildcard against loopback, say) leaves the outcome to that platform's rules for overlapping
+ * binds, which is how a collision cell passes here and flakes on the Windows runner. The OS picks
+ * the number, so the cell reserves nothing and assumes nothing about what else is live on the
+ * machine — the port it collides on is one it is holding itself.
  */
 function holdPort(): Promise<HeldPort> {
   return new Promise((resolveHold, rejectHold) => {
     const holder = createServer();
     holder.on('error', rejectHold);
-    holder.listen(0, () => {
+    holder.listen(0, '127.0.0.1', () => {
       const address = holder.address();
       const port = typeof address === 'object' && address ? address.port : 0;
       if (!port) {
@@ -206,8 +248,14 @@ async function waitForHealth(
   );
 }
 
-/** The banner, and the port it names. */
-const LISTENING_BANNER = /AG-UI server listening at http:\/\/localhost:(\d+)/;
+/**
+ * The banner, and the port it names.
+ *
+ * The host is pinned to the loopback literal rather than matched loosely, because the banner is
+ * the claim under test in half these cells: a pattern that accepted any host would keep passing on
+ * a server that bound the wildcard and said so.
+ */
+const LISTENING_BANNER = /AG-UI server listening at http:\/\/127\.0\.0\.1:(\d+)/;
 
 /**
  * Wait for the startup banner and read the port out of it.
@@ -330,7 +378,7 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
       // The ordinary free-port path, kept as the control: the server announces itself, names the
       // port it is really on, and is STILL RUNNING. "Exits 0" for a server that is meant to keep
       // serving is exactly this — it has not exited at all, where the collision path exits.
-      expect(transcript()).toContain(`AG-UI server listening at http://localhost:${flagPort}`);
+      expect(transcript()).toContain(`AG-UI server listening at http://127.0.0.1:${flagPort}`);
       expect(child.exitCode).toBeNull();
     },
     CELL_TIMEOUT_MS
@@ -420,6 +468,85 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
     CELL_TIMEOUT_MS
   );
 
+  it(
+    'CFG-67: with no host configured, loopback answers and this machine LAN address does not',
+    async () => {
+      // The refusal is the assertion. A cell asserting only that loopback answers does not
+      // discriminate at all: a wildcard bind — what this server used to do while telling the user
+      // it was for local clients only — answers on loopback too. The LAN address is the one
+      // address the two binds disagree about.
+      //
+      // Liveness first, so the silence measured second is the socket's and not a server that had
+      // not finished starting: nothing is asked of the LAN address until /health has answered on
+      // loopback.
+      const lan = lanAddress();
+      const port = await freePort();
+      const { dir, home } = makeDirs('loopback');
+      writeFixtureConfig(join(dir, '.gsloth.config.json'));
+
+      const { child, transcript } = startServer(['ag-ui', '--port', String(port)], dir, home);
+      expect(await waitForHealth(port, child, transcript)).toBe(200);
+
+      // The refusal comes FIRST among the claims, because it is the one this cell exists for. An
+      // ordering that checked the banner first would report a widened bind as a wording problem
+      // and never reach the socket at all.
+      expect(
+        lan,
+        'this machine reports no non-loopback IPv4 interface, so it cannot express the difference ' +
+          'between a loopback bind and a wildcard one'
+      ).toBeDefined();
+      expect(
+        await healthFrom(lan as string, port),
+        `${lan}:${port} answered, so the server is reachable from the network; it said:\n${transcript()}`
+      ).toBe('no answer');
+
+      // And the banner is the server's claim about that same socket, so the two are checked
+      // against each other rather than each on its own.
+      expect(transcript()).toContain(`AG-UI server listening at http://127.0.0.1:${port}`);
+      expect(transcript()).toContain('a loopback address');
+    },
+    CELL_TIMEOUT_MS
+  );
+
+  it(
+    'CFG-67: --host 0.0.0.0 still reaches the LAN, and says the server is exposed',
+    async () => {
+      // The control. Defaulting to loopback is only correct if the deliberate opt-in still works —
+      // breaking the phone, the second dev box or the container network is the failure this whole
+      // change exists to avoid. It probes the SAME address the cell above requires silence from,
+      // so an environment that cannot route to its own interface reds here, loudly, instead of
+      // letting that one pass for the wrong reason.
+      const lan = lanAddress();
+      const port = await freePort();
+      const { dir, home } = makeDirs('wildcard');
+      writeFixtureConfig(join(dir, '.gsloth.config.json'));
+
+      const { child, transcript } = startServer(
+        ['ag-ui', '--port', String(port), '--host', '0.0.0.0'],
+        dir,
+        home
+      );
+      expect(await waitForHealth(port, child, transcript)).toBe(200);
+
+      expect(
+        lan,
+        'this machine reports no non-loopback IPv4 interface, so it cannot express the difference ' +
+          'between a loopback bind and a wildcard one'
+      ).toBeDefined();
+      expect(
+        await healthFrom(lan as string, port),
+        `nothing answered on ${lan}:${port}; the server said:\n${transcript()}`
+      ).toBe(200);
+
+      // And it says so. The warning names the mechanism — the address bound and that reaching it
+      // needs no credential — rather than an intention about who ought to connect.
+      expect(transcript()).toContain('every network interface on this machine');
+      expect(transcript()).toContain('unauthenticated');
+      expect(transcript()).not.toContain('only clients on this machine');
+    },
+    CELL_TIMEOUT_MS
+  );
+
   it('exits non-zero and names the path when --config points at a file that is not there', () => {
     const { dir, home } = makeDirs('missing');
     // A config that IS discoverable from the working directory, so a fallback to discovery would
@@ -471,9 +598,11 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
     expect(result.status).toBe(0);
     expect(output).toContain('--port');
+    expect(output).toContain('--host');
     expect(output).toContain('--config');
     // The precedence the docs state, stated at the door too, so the two cannot drift apart.
     expect(output).toContain('Port precedence: --port, then commands.api.port');
+    expect(output).toContain('Host precedence: --host, then commands.api.host');
   });
 
   it('refuses an unrecognised flag instead of ignoring it', () => {

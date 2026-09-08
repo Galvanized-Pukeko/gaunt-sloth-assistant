@@ -59,12 +59,19 @@ const mockExpressApp = {
  * `listening` and `address()` are the two things the module trusts instead of the callback, so a
  * mock that omits them cannot exercise the code under test; `emit` lets a cell fire the `error`
  * event that a real failed bind delivers.
+ *
+ * The address is a parameter and not the requested host, because the socket's address is the whole
+ * subject here: a fake that echoed back whatever was asked for could not tell a banner derived from
+ * `address()` from one derived from the argument, which is the distinction these cells exist to
+ * make. It defaults to IPv4 loopback — what an unconfigured server now binds — and a cell that
+ * cares about the wildcard or a LAN interface names it.
  */
-function makeFakeServer(port: number, listening = true) {
+function makeFakeServer(port: number, listening = true, address = '127.0.0.1') {
   const listeners: Record<string, Array<(..._args: unknown[]) => void>> = {};
+  const family = address.includes(':') ? 'IPv6' : 'IPv4';
   return {
     listening,
-    address: () => (listening ? { address: '::', family: 'IPv6', port } : null),
+    address: () => (listening ? { address, family, port } : null),
     on(event: string, cb: (..._args: unknown[]) => void) {
       (listeners[event] ??= []).push(cb);
       return this;
@@ -80,9 +87,13 @@ function makeFakeServer(port: number, listening = true) {
  * on a later turn. A mock that called back inline would run the callback before `app.listen` has
  * returned, so the server it consults would not exist yet — an artefact of the mock, not of the
  * code.
+ *
+ * The arity matters. `app.listen(port, host, cb)` puts the callback third, so a mock that still
+ * read it second would hand `queueMicrotask` a string and never settle the boot promise — a hang
+ * rather than a failure, and one that reads like a defect in the code under test.
  */
-function fakeListen(port: number, cb: () => void, listening = true) {
-  const server = makeFakeServer(port, listening);
+function fakeListen(port: number, cb: () => void, listening = true, address?: string) {
+  const server = makeFakeServer(port, listening, address);
   queueMicrotask(cb);
   return server;
 }
@@ -198,7 +209,9 @@ describe('apiAgUiModule', () => {
     gthLangChainAgentInitMock.mockResolvedValue(undefined);
     gthLangChainAgentStreamWithEventsMock.mockReturnValue(emptyStream());
     gthLangChainAgentStreamWithEventsResumeMock.mockReturnValue(emptyStream());
-    mockListenFn.mockImplementation((port: number, cb: () => void) => fakeListen(port, cb));
+    mockListenFn.mockImplementation((port: number, host: string, cb: () => void) =>
+      fakeListen(port, cb, true, host)
+    );
     mockEncoderInstance = {
       getContentType: vi.fn().mockReturnValue('text/event-stream'),
       encode: vi.fn((event) => JSON.stringify(event)),
@@ -302,13 +315,22 @@ describe('apiAgUiModule', () => {
     expect(mockNext).not.toHaveBeenCalled();
   });
 
-  it('should display local-only warning on startup', async () => {
+  it('states no intention about who may reach the server', async () => {
+    // The startup line used to say the server was "intended for local clients only" while the
+    // socket was bound to every interface. What replaces it is a statement about the socket, made
+    // once the socket exists — see the CFG-67 block at the foot of this file for the three
+    // sentences and the addresses that select between them. An intention is asserted here to be
+    // ABSENT because a warning describing one rather than the mechanism is worse than no warning:
+    // it converts an unexamined risk into an examined-and-dismissed one.
     const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
     await startAgUiServer(baseConfig, 3000);
 
-    expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
-      expect.stringContaining('local clients only')
-    );
+    const lines = [
+      ...consoleUtilsMock.displayInfo.mock.calls,
+      ...consoleUtilsMock.displayWarning.mock.calls,
+    ].map(([line]) => String(line));
+    expect(lines.some((line) => line.includes('intended for'))).toBe(false);
+    expect(lines.some((line) => line.includes('local clients only'))).toBe(false);
   });
 
   // ─── /agents/:agentId/run endpoint ─────────────────────────────────────────
@@ -1327,7 +1349,7 @@ describe('apiAgUiModule', () => {
       // What a failed bind looks like from inside express: the callback runs, the server is not
       // listening, and the reason arrives on the `error` event.
       let failing: ReturnType<typeof makeFakeServer> | undefined;
-      mockListenFn.mockImplementation((port: number, cb: () => void) => {
+      mockListenFn.mockImplementation((port: number, _host: string, cb: () => void) => {
         failing = makeFakeServer(port, false);
         queueMicrotask(() => {
           cb();
@@ -1344,7 +1366,7 @@ describe('apiAgUiModule', () => {
     });
 
     it('names the port the socket actually got, not the 0 that asked for any port', async () => {
-      mockListenFn.mockImplementation((_port: number, cb: () => void) => {
+      mockListenFn.mockImplementation((_port: number, _host: string, cb: () => void) => {
         // Port 0 means "any free port"; the OS answers with a real one, and only `address()`
         // knows which.
         const server = makeFakeServer(45123);
@@ -1356,13 +1378,34 @@ describe('apiAgUiModule', () => {
       await startAgUiServer(baseConfig, 0);
 
       const banners = consoleUtilsMock.displayInfo.mock.calls.map(([line]) => String(line));
-      expect(banners).toContain('AG-UI server listening at http://localhost:45123');
-      expect(banners.some((line) => line.includes('localhost:0'))).toBe(false);
+      expect(banners).toContain('AG-UI server listening at http://127.0.0.1:45123');
+      expect(banners.some((line) => line.includes(':0'))).toBe(false);
+    });
+
+    it('names the address the socket got, not the host that was asked for', async () => {
+      // The same distinction one field over, and the reason a host is not simply echoed back into
+      // the banner: `localhost` is a NAME, and which address it resolves to is the resolver's
+      // answer, not the caller's. A banner built from the argument would print `localhost` on a
+      // socket bound to `127.0.0.1` — true here by luck, and false the moment the name resolves
+      // to `::1` or to anything else.
+      mockListenFn.mockImplementation((port: number, _host: string, cb: () => void) => {
+        const server = makeFakeServer(port, true, '127.0.0.1');
+        queueMicrotask(cb);
+        return server;
+      });
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, 'localhost');
+
+      expect(mockListenFn).toHaveBeenCalledWith(3000, 'localhost', expect.any(Function));
+      const banners = consoleUtilsMock.displayInfo.mock.calls.map(([line]) => String(line));
+      expect(banners).toContain('AG-UI server listening at http://127.0.0.1:3000');
+      expect(banners.some((line) => line.includes('localhost:3000'))).toBe(false);
     });
 
     it('reports a failure that arrives after the server is already up', async () => {
       let started: ReturnType<typeof makeFakeServer> | undefined;
-      mockListenFn.mockImplementation((port: number, cb: () => void) => {
+      mockListenFn.mockImplementation((port: number, _host: string, cb: () => void) => {
         started = makeFakeServer(port);
         queueMicrotask(cb);
         return started;
@@ -1376,6 +1419,177 @@ describe('apiAgUiModule', () => {
       expect(consoleUtilsMock.displayError).toHaveBeenCalledWith(
         expect.stringContaining('socket hang up')
       );
+    });
+
+    it('names the host as well as the port when the bind fails', async () => {
+      // A host that does not resolve, or an address this machine does not hold, fails through the
+      // same handler an occupied port does. A message carrying only the port cannot say which.
+      mockListenFn.mockImplementation((port: number, _host: string, cb: () => void) => {
+        const failing = makeFakeServer(port, false);
+        queueMicrotask(() => {
+          cb();
+          failing.emit('error', new Error('listen EADDRNOTAVAIL 10.0.0.9'));
+        });
+        return failing;
+      });
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await expect(startAgUiServer(baseConfig, 4321, '10.0.0.9')).rejects.toThrow('10.0.0.9');
+    });
+  });
+
+  // ─── CFG-67: which interface is bound, and what the server says about it ────
+
+  describe('the interface it binds, and the reachability it claims', () => {
+    /** Every line the module printed, whatever severity it chose. */
+    const linesPrinted = () =>
+      [
+        ...consoleUtilsMock.displayInfo.mock.calls,
+        ...consoleUtilsMock.displayWarning.mock.calls,
+      ].map(([line]) => String(line));
+
+    it('binds IPv4 loopback when nothing configures a host', async () => {
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000);
+
+      expect(mockListenFn).toHaveBeenCalledWith(3000, '127.0.0.1', expect.any(Function));
+    });
+
+    it('binds commands.api.host when no argument is given', async () => {
+      const config = {
+        commands: { api: { port: 3000, host: '0.0.0.0' } },
+      } as Partial<GthConfig> as GthConfig;
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(config, 3000);
+
+      expect(mockListenFn).toHaveBeenCalledWith(3000, '0.0.0.0', expect.any(Function));
+    });
+
+    it('binds the argument over commands.api.host', async () => {
+      // The flag is the most specific statement of intent there is, and it has to be able to
+      // narrow as well as widen — a config that opened the server to the network must not survive
+      // a `--host 127.0.0.1` typed on this run.
+      const config = {
+        commands: { api: { port: 3000, host: '0.0.0.0' } },
+      } as Partial<GthConfig> as GthConfig;
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(config, 3000, '127.0.0.1');
+
+      expect(mockListenFn).toHaveBeenCalledWith(3000, '127.0.0.1', expect.any(Function));
+    });
+
+    it('falls back to loopback for an empty host rather than letting listen widen it', async () => {
+      // `listen(port, '')` treats the empty string as no host at all and binds the WILDCARD, so an
+      // empty value would silently mean the most exposed thing it could mean.
+      const config = {
+        commands: { api: { port: 3000, host: '   ' } },
+      } as Partial<GthConfig> as GthConfig;
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(config, 3000, '');
+
+      expect(mockListenFn).toHaveBeenCalledWith(3000, '127.0.0.1', expect.any(Function));
+    });
+
+    it('says only this machine can reach a loopback bind, and warns about nothing', async () => {
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000);
+
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+        expect.stringContaining('bound to 127.0.0.1, a loopback address, so only clients on this')
+      );
+      expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
+    });
+
+    it('treats the whole 127.0.0.0/8 block as loopback, not just 127.0.0.1', async () => {
+      // A predicate that matched the one familiar address would call this a network interface and
+      // print, of a socket nothing off the machine can reach, that anything routing to it can.
+      mockListenFn.mockImplementation((port: number, host: string, cb: () => void) =>
+        fakeListen(port, cb, true, host)
+      );
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, '127.0.0.2');
+
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+        expect.stringContaining('bound to 127.0.0.2, a loopback address')
+      );
+      expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
+    });
+
+    it('treats ::1 as loopback', async () => {
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, '::1');
+
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+        expect.stringContaining('bound to ::1, a loopback address')
+      );
+      // An IPv6 literal is bracketed in a URL, or the port reads as another group of the address.
+      expect(linesPrinted()).toContain('AG-UI server listening at http://[::1]:3000');
+      expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
+    });
+
+    it('warns that a wildcard bind is every interface and is unauthenticated', async () => {
+      // `--host 0.0.0.0` on a dual-stack machine can land on `::`, so the sentence is built from
+      // what came back, not from what was asked for.
+      mockListenFn.mockImplementation((port: number, _host: string, cb: () => void) => {
+        const server = makeFakeServer(port, true, '::');
+        queueMicrotask(cb);
+        return server;
+      });
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, '0.0.0.0');
+
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('bound to ::, which is every network interface on this machine')
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('unauthenticated')
+      );
+      expect(linesPrinted()).toContain('AG-UI server listening at http://[::]:3000');
+      expect(linesPrinted().some((line) => line.includes('only clients on this machine'))).toBe(
+        false
+      );
+    });
+
+    it('warns for a specific non-loopback interface without calling it every interface', async () => {
+      // The third path, and the one a two-branch sentence gets wrong: 192.168.1.5 is neither
+      // loopback nor the wildcard. It is reachable off this machine, so the warning fires — but
+      // saying it is bound to every interface would be false.
+      mockListenFn.mockImplementation((port: number, host: string, cb: () => void) =>
+        fakeListen(port, cb, true, host)
+      );
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, '192.168.1.5');
+
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('bound to 192.168.1.5, which is not a loopback address')
+      );
+      expect(linesPrinted().some((line) => line.includes('every network interface'))).toBe(false);
+      expect(linesPrinted().some((line) => line.includes('only clients on this machine'))).toBe(
+        false
+      );
+    });
+
+    it('claims no reachability at all when the socket reports no address', async () => {
+      // Unreachable behind the `listening` guard, and honest anyway: the one thing not to do with
+      // a socket that will not say what it bound is to answer with what was requested.
+      mockListenFn.mockImplementation((port: number, _host: string, cb: () => void) => {
+        const server = { ...makeFakeServer(port), address: () => null };
+        queueMicrotask(cb);
+        return server;
+      });
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, '0.0.0.0');
+
+      expect(linesPrinted()).toContain('AG-UI server listening on port 3000');
+      expect(linesPrinted().some((line) => line.includes('0.0.0.0'))).toBe(false);
+      expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
     });
   });
 });

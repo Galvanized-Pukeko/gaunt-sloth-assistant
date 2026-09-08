@@ -993,15 +993,35 @@ gth workflow workflows/triage.mjs --args '{"label":"bug","limit":20}'
 
 Start an [AG-UI](https://github.com/ag-ui-protocol/ag-ui) compatible HTTP server that exposes the Gaunt Sloth agent over the standard AG-UI protocol.
 
-> **Local use only.** The server has no authentication. Do not expose it to public networks.
+```bash
+gth api ag-ui [--port <port>] [--host <host>]
+```
+
+The server binds `127.0.0.1`, so out of the box only clients on the same machine can reach it. On
+startup it prints the address it actually bound and says which of the two situations you are in.
+
+### Serving a client on another machine
+
+To let a phone, a second dev box, or a container network reach the agent, bind a network interface
+with `--host`:
 
 ```bash
-gth api ag-ui [--port <port>]
+gth api ag-ui --host 0.0.0.0 --port 4000
 ```
+
+> **The endpoint has no authentication.** Anything that can route to `0.0.0.0:4000` can run the
+> agent with the tools your configuration gives it, so bind a network interface only on a network
+> you trust. The server prints a warning naming the address it bound whenever that address is not
+> loopback.
+
+Use `::` instead of `0.0.0.0` to accept IPv6 connections as well.
 
 ### Options
 - `--port <port>` – Port to listen on. The port comes from `--port` when given, otherwise from
   `commands.api.port` in the config, otherwise `3000`.
+- `--host <host>` – Interface to bind. It comes from `--host` when given, otherwise from
+  `commands.api.host` in the config, otherwise `127.0.0.1`. Any value node's `listen` accepts works
+  — an address, `0.0.0.0`, `::`, or a hostname.
 
 ### The standalone server: `gaunt-sloth-api`
 
@@ -1009,14 +1029,15 @@ gth api ag-ui [--port <port>]
 a machine without the full `gth` CLI:
 
 ```bash
-gaunt-sloth-api [ag-ui] [--port <port>] [--config <path>]
+gaunt-sloth-api [ag-ui] [--port <port>] [--host <host>] [--config <path>]
 ```
 
 - `--port <port>` – Port to listen on, in the precedence above.
+- `--host <host>` – Interface to bind, in the precedence above.
 - `-c, --config <path>` – The configuration file to run under. Naming one skips discovery from the
   working directory rather than falling back to it, so a path that is not there ends the run with an
   error instead of a server quietly running the wrong configuration.
-- `-h, --help` – Usage, the flags, and the precedence rule.
+- `-h, --help` – Usage, the flags, and the precedence rules.
 
 `ag-ui` is the only api-type and is the default, so `gaunt-sloth-api` on its own is the same as
 `gaunt-sloth-api ag-ui`. A flag the server does not recognise is refused rather than ignored.
@@ -1073,6 +1094,9 @@ gth api ag-ui
 
 # Start on a custom port
 gth api ag-ui --port 4000
+
+# Accept connections from the network, not just this machine
+gth api ag-ui --host 0.0.0.0 --port 4000
 
 # Use a project-specific config
 gth -c ./my-project/.gsloth.config.json api ag-ui --port 3000

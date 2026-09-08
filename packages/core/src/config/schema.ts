@@ -854,6 +854,11 @@ const apiCommandSchema = z.object({
   // concatenate.
   approvals: approvalsSchema.optional(),
   port: z.number().optional(),
+  // The interface the AG-UI server binds. Absent means IPv4 loopback, so the unauthenticated
+  // endpoint is reachable only from this machine unless someone says otherwise; `0.0.0.0` (or `::`
+  // for IPv6 as well) opens it to the network. Any string node's `listen` accepts is valid — an
+  // address, `::`, or a hostname — so this is not an enum.
+  host: z.string().optional(),
   cors: z
     .object({
       allowOrigin: z.string().optional(),

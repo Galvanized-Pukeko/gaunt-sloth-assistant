@@ -37,8 +37,11 @@ await startAgUiServer(config, config.commands?.api?.port ?? 3000);
 // POST /agents/:agentId/run now streams typed AG-UI SSE events
 ```
 
-The server is intended for **local clients only** (a local web UI talking to a local agent); do
-not expose it to public networks. Port and CORS come from `commands.api.*` in the config — see
+The server binds `127.0.0.1`, so only clients on the same machine can reach it. Pass a third
+argument — `startAgUiServer(config, port, '0.0.0.0')` — or set `commands.api.host` to accept
+connections from the network; **the endpoint has no authentication**, so anything that can route to
+it can run the agent with the tools your configuration gives it. Port, host and CORS come from
+`commands.api.*` in the config — see
 [the configuration guide](https://github.com/pukeko-robotics/gaunt-sloth/blob/main/docs/configuration/index.md).
 
 ## Binaries
@@ -46,7 +49,8 @@ not expose it to public networks. Port and CORS come from `commands.api.*` in th
 - **`gaunt-sloth-api`** — starts the AG-UI server standalone (the code above as a command):
   `gaunt-sloth-api ag-ui --port 4000 --config ./.gsloth.config.json`. `ag-ui` is the only api-type
   and is the default, so the bare `gaunt-sloth-api` is the same command. The port is taken from
-  `--port`, else `commands.api.port`, else 3000; a `--config` path that does not exist ends the run
+  `--port`, else `commands.api.port`, else 3000, and the interface from `--host`, else
+  `commands.api.host`, else `127.0.0.1`; a `--config` path that does not exist ends the run
   with an error rather than falling back to the config discovered from the working directory. Full
   reference:
   [the api ag-ui command](https://github.com/pukeko-robotics/gaunt-sloth/blob/main/docs/COMMANDS.md#api-ag-ui).
