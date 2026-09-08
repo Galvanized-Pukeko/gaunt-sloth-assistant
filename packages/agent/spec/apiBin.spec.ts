@@ -540,7 +540,12 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
 
       // And it says so. The warning names the mechanism — the address bound and that reaching it
       // needs no credential — rather than an intention about who ought to connect.
-      expect(transcript()).toContain('every network interface on this machine');
+      //
+      // The family is part of the mechanism, so it is part of the assertion: `0.0.0.0` is every
+      // IPv4 interface and no IPv6 one (measured — a client dialling `[::1]` is refused against
+      // this bind and answered against a `::` one), and the bare "every network interface"
+      // describes `::`.
+      expect(transcript()).toContain('every IPv4 network interface on this machine');
       expect(transcript()).toContain('unauthenticated');
       expect(transcript()).not.toContain('only clients on this machine');
     },

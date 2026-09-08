@@ -998,7 +998,23 @@ gth api ag-ui [--port <port>] [--host <host>]
 ```
 
 The server binds `127.0.0.1`, so out of the box only clients on the same machine can reach it. On
-startup it prints the address it actually bound and says which of the two situations you are in.
+startup it prints the address it actually bound, and a sentence naming what can reach that address.
+
+### A local client that gets "connection refused"
+
+`127.0.0.1` is **IPv4** loopback, and one `listen` binds one address. So a client on this same
+machine that dials `http://localhost:<port>`, gets `::1` back from the resolver and does not fall
+back to IPv4 is refused, even though it is local. Browsers and Node's `fetch` retry over IPv4 and
+are unaffected; a client that does not is the one that sees this.
+
+Bind IPv6 loopback instead, which is still this machine only:
+
+```bash
+gth api ag-ui --host ::1 --port 4000
+```
+
+`--host ::` serves both families, but it is a wildcard — it accepts connections from the network
+as well, so use it only if you want that too.
 
 ### Serving a client on another machine
 
@@ -1020,8 +1036,9 @@ Use `::` instead of `0.0.0.0` to accept IPv6 connections as well.
 - `--port <port>` – Port to listen on. The port comes from `--port` when given, otherwise from
   `commands.api.port` in the config, otherwise `3000`.
 - `--host <host>` – Interface to bind. It comes from `--host` when given, otherwise from
-  `commands.api.host` in the config, otherwise `127.0.0.1`. Any value node's `listen` accepts works
-  — an address, `0.0.0.0`, `::`, or a hostname.
+  `commands.api.host` in the config, otherwise `127.0.0.1` — IPv4 loopback, so a local client that
+  reaches this machine over IPv6 needs `--host ::1`. Any value node's `listen` accepts works — an
+  address, `0.0.0.0` (every IPv4 interface), `::` (both families, network included), or a hostname.
 
 ### The standalone server: `gaunt-sloth-api`
 

@@ -343,6 +343,15 @@ function terminationOf(agent: GthAbstractAgent | null | undefined): GthTerminati
  * {@link startAgUiServer} whose config never went through the loader, and one definition at the
  * bind site cannot drift from a second one in the defaults table. `DEFAULT_CONFIG`'s `prompts` key
  * is absent for the same reason: defaulted at the read site.
+ *
+ * Exported, and deliberately imported nowhere in this repo — it is not a dangling export. An
+ * embedder calling {@link startAgUiServer} directly has no flag and no loader to tell it what an
+ * omitted host means, and `@gaunt-sloth/agent`'s exports map reaches this module, so the value is
+ * readable rather than guessable; `GthConfig`'s `commands.api.host` docblock sends readers here by
+ * name. The two CLI doors do not import it on purpose: each passes `undefined` when its flag is
+ * absent so the default is applied once, below, and neither door can outrank the config file with
+ * a default of its own. `apiCommand.ts` also loads this module lazily, inside the action, so a
+ * static import for a help string would pull the agent into command registration.
  */
 export const DEFAULT_AGUI_HOST = '127.0.0.1';
 
@@ -351,8 +360,13 @@ export const DEFAULT_AGUI_HOST = '127.0.0.1';
  *
  * The whole `127.0.0.0/8` block, not just `127.0.0.1`: `--host 127.0.0.2` is as local as
  * `127.0.0.1`, and a check that missed it would print the reachable-from-the-network warning for a
- * server nothing off the machine can reach. IPv6 loopback is the single address `::1`, and node
- * reports an IPv4 socket accepted over a dual-stack listener in the `::ffff:` mapped form.
+ * server nothing off the machine can reach. IPv6 loopback is the single address `::1`.
+ *
+ * The `::ffff:` mapped form is stripped because it is a bindable host in its own right, not
+ * because of anything a dual-stack listener does to an accepted connection: `--host
+ * ::ffff:127.0.0.1` binds, and `server.address()` hands that string back verbatim. Measured, such
+ * a socket refuses both the LAN address and `[::1]`, so it is loopback — and without the strip the
+ * server would tell the user a loopback-only socket is not a loopback address.
  *
  * Takes what `server.address()` returned, never what was requested.
  */
@@ -361,9 +375,23 @@ function isLoopbackAddress(address: string): boolean {
   return mapped === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(mapped);
 }
 
-/** Is `address` the wildcard — every network interface on this machine? */
-function isWildcardAddress(address: string): boolean {
-  return address === '0.0.0.0' || address === '::' || address === '::ffff:0.0.0.0';
+/**
+ * Which family of interfaces `address` binds when it is a wildcard, or `null` when it names one
+ * particular interface.
+ *
+ * The two wildcards are not the same claim, and one sentence covering both is false for one of
+ * them. Measured on a real socket, a client dialling `[::1]` is REFUSED against a `0.0.0.0` bind
+ * and answered against a `::` bind: `0.0.0.0` is every IPv4 interface and no IPv6 one, while `::`
+ * on a dual-stack host takes both families. `::ffff:0.0.0.0` binds and reports verbatim exactly as
+ * `0.0.0.0` does, refusing `[::1]` the same way, so it carries the IPv4 claim rather than the
+ * dual-stack one.
+ *
+ * Takes what `server.address()` returned, never what was requested.
+ */
+function wildcardFamilyOf(address: string): 'ipv4' | 'dual' | null {
+  if (address === '0.0.0.0' || address === '::ffff:0.0.0.0') return 'ipv4';
+  if (address === '::') return 'dual';
+  return null;
 }
 
 /**
@@ -914,10 +942,12 @@ export async function startAgUiServer(
       const urlHost = formatUrlHost(bound.address);
       displayInfo(`AG-UI server listening at http://${urlHost}:${bound.port}`);
       displayInfo(`AG-UI endpoint: POST http://${urlHost}:${bound.port}/agents/{agentId}/run`);
-      // Three addresses, three sentences, because a sentence naming one condition that fires for
-      // two of them is false on the ones it does not describe. The wildcard and a specific
+      // Four addresses, four sentences, because a sentence naming one condition that fires for
+      // more of them is false on the ones it does not describe. A wildcard and a specific
       // non-loopback interface are both reachable off this machine and differ only in what makes
-      // them so; loopback is not reachable off it at all.
+      // them so; loopback is not reachable off it at all. The two wildcards differ from each
+      // other as well, which is why `0.0.0.0` gets its own clause: it is every IPv4 interface and
+      // no IPv6 one, so calling it every network interface describes `::` instead.
       if (isLoopbackAddress(bound.address)) {
         displayInfo(
           `AG-UI server is bound to ${bound.address}, a loopback address, so only clients on this ` +
@@ -925,11 +955,18 @@ export async function startAgUiServer(
             `(or :: for IPv6 as well) or set commands.api.host.`
         );
       } else {
+        const wildcard = wildcardFamilyOf(bound.address);
+        let scope: string;
+        if (wildcard === 'ipv4') {
+          scope = 'which is every IPv4 network interface on this machine, ';
+        } else if (wildcard === 'dual') {
+          scope = 'which is every network interface on this machine, ';
+        } else {
+          scope = 'which is not a loopback address, ';
+        }
         displayWarning(
           `WARNING: AG-UI server is bound to ${bound.address}, ` +
-            (isWildcardAddress(bound.address)
-              ? 'which is every network interface on this machine, '
-              : 'which is not a loopback address, ') +
+            scope +
             `so any host that can route to it can reach this server on port ${bound.port}. ` +
             `The endpoint is unauthenticated: reaching it is enough to run the agent with the ` +
             `tools this configuration gives it.`

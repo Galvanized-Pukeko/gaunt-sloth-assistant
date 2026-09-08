@@ -137,7 +137,7 @@ streaming typed SSE events.
 **The endpoint is unauthenticated, so the bind is the only thing limiting who
 can run the agent.** It defaults to IPv4 loopback and widens only on an explicit
 `--host` / `commands.api.host`. Everything the server says about that — the
-banner's address and which of the three reachability sentences it prints — is
+banner's address and which reachability sentence it prints — is
 read off `server.address()` once the socket is bound, never off the value that
 was requested: a message describing an intention rather than the mechanism is
 worse than none, because it converts an unexamined risk into an

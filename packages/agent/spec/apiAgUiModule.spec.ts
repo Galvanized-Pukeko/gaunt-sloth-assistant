@@ -1483,12 +1483,31 @@ describe('apiAgUiModule', () => {
     it('falls back to loopback for an empty host rather than letting listen widen it', async () => {
       // `listen(port, '')` treats the empty string as no host at all and binds the WILDCARD, so an
       // empty value would silently mean the most exposed thing it could mean.
+      //
+      // This cell drives the ARGUMENT path only. `''` is not nullish, so `??` short-circuits and
+      // the config value below is never read — which is why the whitespace-only CONFIG value needs
+      // the separate cell that follows, and why this one no longer sets a config host at all: one
+      // that looked like it covered both spellings is how the trim went unpinned.
+      const config = {
+        commands: { api: { port: 3000 } },
+      } as Partial<GthConfig> as GthConfig;
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(config, 3000, '');
+
+      expect(mockListenFn).toHaveBeenCalledWith(3000, '127.0.0.1', expect.any(Function));
+    });
+
+    it('trims a whitespace-only commands.api.host down to loopback', async () => {
+      // The CONFIG path, with NO argument, so the `??` reaches the config value and the guard's
+      // `.trim()` is the only thing that can produce the expected bind. Without it the host is
+      // `'   '` and `listen` is asked for a host nothing can resolve.
       const config = {
         commands: { api: { port: 3000, host: '   ' } },
       } as Partial<GthConfig> as GthConfig;
 
       const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
-      await startAgUiServer(config, 3000, '');
+      await startAgUiServer(config, 3000);
 
       expect(mockListenFn).toHaveBeenCalledWith(3000, '127.0.0.1', expect.any(Function));
     });
@@ -1531,6 +1550,25 @@ describe('apiAgUiModule', () => {
       expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
     });
 
+    it('treats the ::ffff: mapped form of a loopback address as loopback', async () => {
+      // `--host ::ffff:127.0.0.1` is a bindable host and `server.address()` returns it verbatim,
+      // so this is a live path and not a defensive one. Measured on a real socket, it refuses both
+      // the LAN address and `[::1]` — it IS loopback-only. Without the mapped-form strip the
+      // server would tell the user that a socket nothing off this machine can reach is not a
+      // loopback address and that anything routing to it can reach the agent.
+      mockListenFn.mockImplementation((port: number, host: string, cb: () => void) =>
+        fakeListen(port, cb, true, host)
+      );
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, '::ffff:127.0.0.1');
+
+      expect(consoleUtilsMock.displayInfo).toHaveBeenCalledWith(
+        expect.stringContaining('bound to ::ffff:127.0.0.1, a loopback address')
+      );
+      expect(consoleUtilsMock.displayWarning).not.toHaveBeenCalled();
+    });
+
     it('warns that a wildcard bind is every interface and is unauthenticated', async () => {
       // `--host 0.0.0.0` on a dual-stack machine can land on `::`, so the sentence is built from
       // what came back, not from what was asked for.
@@ -1555,6 +1593,55 @@ describe('apiAgUiModule', () => {
       );
     });
 
+    it('calls a 0.0.0.0 bind every IPv4 interface, not every interface', async () => {
+      // The two wildcards are different claims and one sentence cannot carry both. Measured on a
+      // real socket: `[::1]` is REFUSED against a `0.0.0.0` bind and answered against a `::` one.
+      // So "every network interface on this machine" — the sentence the `::` cell above pins — is
+      // a description of `::` printed over a socket that is IPv4-only, which is a false statement
+      // in a security warning.
+      mockListenFn.mockImplementation((port: number, host: string, cb: () => void) =>
+        fakeListen(port, cb, true, host)
+      );
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, '0.0.0.0');
+
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'bound to 0.0.0.0, which is every IPv4 network interface on this machine'
+        )
+      );
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining('unauthenticated')
+      );
+      // The dual-stack sentence must NOT appear for this address. Asserted as its own clause
+      // rather than left to the positive assertion above, because the IPv4 wording contains the
+      // dual-stack wording's every word but one.
+      expect(
+        linesPrinted().some((line) => /which is every network interface on this machine/.test(line))
+      ).toBe(false);
+    });
+
+    it('treats the ::ffff: mapped form of the IPv4 wildcard as the IPv4 wildcard', async () => {
+      // `--host ::ffff:0.0.0.0` binds and reports verbatim, and measured, it behaves exactly as
+      // `0.0.0.0` does — every IPv4 interface, `[::1]` refused. Without this arm the server calls
+      // a wildcard bind "not a loopback address": still a warning, but one naming a cause that is
+      // not the one in force, which is the defect this node exists to remove.
+      mockListenFn.mockImplementation((port: number, host: string, cb: () => void) =>
+        fakeListen(port, cb, true, host)
+      );
+
+      const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+      await startAgUiServer(baseConfig, 3000, '::ffff:0.0.0.0');
+
+      expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'bound to ::ffff:0.0.0.0, which is every IPv4 network interface on this machine'
+        )
+      );
+      expect(linesPrinted()).toContain('AG-UI server listening at http://[::ffff:0.0.0.0]:3000');
+    });
+
     it('warns for a specific non-loopback interface without calling it every interface', async () => {
       // The third path, and the one a two-branch sentence gets wrong: 192.168.1.5 is neither
       // loopback nor the wildcard. It is reachable off this machine, so the warning fires — but
@@ -1569,7 +1656,13 @@ describe('apiAgUiModule', () => {
       expect(consoleUtilsMock.displayWarning).toHaveBeenCalledWith(
         expect.stringContaining('bound to 192.168.1.5, which is not a loopback address')
       );
-      expect(linesPrinted().some((line) => line.includes('every network interface'))).toBe(false);
+      // Both wildcard sentences, not just one. A negative keyed on the dual-stack wording alone
+      // stops discriminating the moment the IPv4 wording exists, because "every IPv4 network
+      // interface" does not contain "every network interface" — the cell would then stay green
+      // while this address was misclassified as a wildcard, which is the whole thing it guards.
+      expect(linesPrinted().some((line) => /every (IPv4 )?network interface/.test(line))).toBe(
+        false
+      );
       expect(linesPrinted().some((line) => line.includes('only clients on this machine'))).toBe(
         false
       );

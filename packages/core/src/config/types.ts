@@ -397,6 +397,10 @@ export interface GthConfig {
        * `DEFAULT_CONFIG` — see `DEFAULT_AGUI_HOST` in `@gaunt-sloth/agent`'s `apiAgUiModule`, which
        * is IPv4 loopback. Set `0.0.0.0` (or `::` for IPv6 as well) to accept connections from the
        * network; the endpoint has no authentication, so that is a deliberate exposure.
+       *
+       * One `listen` binds one address, so the default is IPv4 loopback and not both loopbacks: a
+       * client on this machine that resolves `localhost` to `::1` and does not retry over IPv4 is
+       * refused. Set `::1` for that one — IPv6 loopback, still this machine only.
        */
       host?: string;
       cors?: {
