@@ -701,8 +701,11 @@ Invalid configuration in .gsloth.config.json:
 - **`binary` becomes `file`.** `binary` was a catch-all bucket, consulted only after every other
   entry failed to match the extension; `file` is the type that actually reaches a model, and the one
   PDFs already use. Move those extensions onto your `file` entry — noting that it matches in order
-  with the rest rather than last. Whether a provider then accepts the file's MIME type is its own
-  decision, and one it tells you about.
+  with the rest rather than last. **If the `binary` entry carried its own `maxSize` or `mimeTypes`,
+  retype that entry to `file` instead of merging it**, since both settings live on the entry rather
+  than on the type: merging drops them and silently adopts the other entry's cap and mappings.
+  Whether a provider then accepts the file's MIME type is its own decision, and one it tells you
+  about.
 
 ```json
 {
