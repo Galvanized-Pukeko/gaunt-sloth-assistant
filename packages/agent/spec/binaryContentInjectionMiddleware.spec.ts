@@ -685,8 +685,10 @@ describe('binary-content-injection — a rejected attachment cannot outlive its 
    * when nothing has been committed. Copied from `GthAgentRunner.handleContextOverflow`, and
    * `classifyThrownAt` has the same shape — those two are the only readers in the tree.
    *
-   * The cell below asserts through this rather than calling the text feeder directly, because the
-   * feeder alone is not what decides anything: it is the fallback for an unclassified error.
+   * The cell below asserts through this because it is the shape a consumer actually has. Since
+   * CFG-73 the bare feeder gives the same answer — it prefers the committed reason too — and the
+   * cell after it pins exactly that, so the two readings are held together rather than assumed
+   * equal.
    */
   function categoryAsAConsumerReadsIt(error: unknown): string {
     return terminationReasonOf(error)?.category ?? classifyThrownTermination(error).category;
@@ -719,33 +721,35 @@ describe('binary-content-injection — a rejected attachment cannot outlive its 
   });
 
   /**
-   * KNOWN RESIDUAL, pinned as a fact rather than asserted as desirable.
+   * CFG-73 — the same question asked of the BARE feeder, which is where CFG-69 left a residual.
    *
-   * `classifyThrownTermination` called DIRECTLY on an error that already carries a reason still
-   * substring-matches the text, so it reads the filename and answers `timeout` here. No consumer
-   * does that — both read the attached value first (see {@link categoryAsAConsumerReadsIt}) — and
-   * the note cannot be made both safe and useful by wording: dropping the filename to protect a
-   * substring match would defeat the one thing the note exists to say, since most real filenames
-   * contain one of these tokens.
+   * Under CFG-69 the middleware protected its two consumers by committing the value first, and
+   * `classifyThrownTermination` called directly on the annotated error still read the filename and
+   * answered `timeout`. CFG-73 closed that at the source: the feeder now prefers a committed reason
+   * over prose, so the bare call and the consumer call agree. This cell is the end-to-end form of
+   * that rule — the core pin in `terminationTaxonomy.spec.ts` asserts it on constructed errors,
+   * while this one drives the real middleware and the real note, so the two halves cannot drift.
    *
-   * Closing it properly belongs to the classifier, not here: it would prefer the committed value
-   * over the prose, the way its own docblock says every consumer should. That is a core change with
-   * a blast radius over every error in the system, so it is NOT taken as a side effect of this node.
-   * This cell exists so the residual is visible and deliberate; when the classifier is fixed, this
-   * is the cell that reds and should then be deleted.
+   * It is deliberately the same input the residual used, so a regression restores the residual's
+   * own answer here rather than passing quietly.
    */
-  it('KNOWN RESIDUAL — the bare text feeder still reads the filename (no consumer calls it that way)', async () => {
-    const mw = await mwFor('groq');
-    const error = await runModelCall(
-      mw,
-      binaryRound('file', 'application/pdf', B64, HOSTILE_NAMES[0]),
-      () => {
-        throw providerRejection();
-      }
-    ).catch((thrown) => thrown);
+  it('CFG-73 — the bare text feeder agrees with the consumers now, on every hostile name', async () => {
+    for (const filePath of HOSTILE_NAMES) {
+      const mw = await mwFor('groq');
+      const error = await runModelCall(
+        mw,
+        binaryRound('file', 'application/pdf', B64, filePath),
+        () => {
+          throw providerRejection();
+        }
+      ).catch((thrown) => thrown);
 
-    expect(classifyThrownTermination(error).category).toBe('timeout');
-    expect(categoryAsAConsumerReadsIt(error)).toBe('invalid_request');
+      // The note is present and carries the hostile name, so the text a matcher would read really
+      // does contain the token — this cell cannot pass by the note having been made bland.
+      expect((error as Error).message).toContain(filePath.split('/').pop());
+      expect(classifyThrownTermination(error).category).toBe('invalid_request');
+      expect(categoryAsAConsumerReadsIt(error)).toBe('invalid_request');
+    }
   });
 
   it('the reason it attaches names this site and does not overwrite an inner one', async () => {

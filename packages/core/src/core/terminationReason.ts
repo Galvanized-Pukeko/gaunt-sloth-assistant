@@ -169,10 +169,13 @@ export type GthTerminationSite =
    * binary-content-injection middleware added an explanation to the error's text.
    *
    * The site exists because that middleware is a WRITER of the text this module's classifier
-   * reads, which makes it the one place a classification must be committed as a value first —
-   * a filename is user data, and `holiday-timeout.pdf` in the prose would otherwise be read back
-   * as a timeout. `attachTerminationReason` is first-write-wins, so an inner site that already
-   * classified the same failure still keeps it.
+   * reads. The note carries a **filename**, which is user data nobody there controls, so the
+   * middleware classifies the failure and commits the value BEFORE it touches the message: it is
+   * its own classifier's caller, and reading `holiday-timeout.pdf` back out of a note it had
+   * already written would answer `timeout` for a rejection. Committing first is what keeps that
+   * order honest; {@link classifyThrownTermination} then declines to read the message at all for
+   * anyone downstream. `attachTerminationReason` is first-write-wins, so an inner site that
+   * already classified the same failure still keeps it.
    */
   | 'middleware.binary-attachment-rejected';
 
@@ -533,13 +536,52 @@ export function isContextOverflow(error: unknown): boolean {
 /**
  * The exception feeder: classify a thrown value into the taxonomy.
  *
- * Order matters. The typed and named cases are decided first, because a context overflow is also an
- * HTTP 400 and an abort is also a `DOMException`; only once those are excluded does the status code
- * and then the prose get a say. Never throws: an unclassifiable value is `unknown`, which is a
- * recorded fact rather than a guess.
+ * **[[CFG-73]] A committed reason outranks everything else, prose included.** When
+ * {@link terminationReasonOf} answers for the thrown value, that answer is returned and no text is
+ * read at all. The site that attached it watched the failure happen, and this module's whole
+ * premise is that the message is not the carrier — so a feeder that reads the message anyway
+ * exempts itself from the rule it states for every consumer.
+ *
+ * The exemption was user-visible. A message is the one part of an error that untrusted data reaches:
+ * the binary-attachment middleware interpolates a **filename** into a provider rejection so the user
+ * can see which file was refused, and `api-timeout-investigation.pdf` or `contract - terminated.pdf`
+ * then read back out of the prose as a timeout or a dropped connection. Both are retryable postures,
+ * so the user is told to send again a request the provider will refuse identically every time, and a
+ * name matching an overflow pattern sends the runner off to compact the history first. Sanitising
+ * the text against the pattern lists would only enumerate today's patterns and go stale the next
+ * time one grows; preferring the committed value cannot go stale, because it does not depend on what
+ * the text says.
+ *
+ * **Everything below is the fallback for a value nobody classified**, and it is unchanged. Order
+ * still matters there. The typed and named cases are decided first, because a context overflow is
+ * also an HTTP 400 and an abort is also a `DOMException`; only once those are excluded does the
+ * status code and then the prose get a say.
+ *
+ * **The prose arms stay ahead of the invalid-request arm, and `status === 400` stays behind them.**
+ * 400 is a bucket rather than a cause — providers put a bad API key, an expired grant and an
+ * exhausted quota in it — so the specific arms are what recover the cause, and each of the
+ * categories they recover names a remedy `invalid_request` has none of. Lifting the status above
+ * them would trade `auth_failed` and its `fix-credentials` for a category that offers the user
+ * nothing, and it would not close the hazard either: any permutation of a substring matcher leaves
+ * some hostile substring that flips some category. Untrusted text reaching the matcher at all is the
+ * defect, and the committed reason is what closes it.
+ *
+ * Never throws: an unclassifiable value is `unknown`, which is a recorded fact rather than a guess.
  */
 export function classifyThrownTermination(error: unknown): GthTerminationClassification {
   try {
+    // A category already committed by a site that saw the failure. Guarded on the shape rather
+    // than trusted, so a foreign value parked on the property falls through to the fallback
+    // instead of becoming a category nothing in the taxonomy defines.
+    const committed = terminationReasonOf(error);
+    if (typeof committed?.category === 'string' && committed.category.length > 0) {
+      return {
+        category: committed.category,
+        ...(committed.provider === undefined ? {} : { provider: committed.provider }),
+        ...(committed.detail === undefined ? {} : { detail: committed.detail }),
+      };
+    }
+
     const name = errorName(error);
     const text = errorText(error);
     const status = httpStatus(error);

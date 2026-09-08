@@ -286,19 +286,20 @@ function collectTrailingBinaryContent(messages: readonly BaseMessage[]): ParsedB
  * survive for anyone reading it.
  *
  * **The classification is committed as a VALUE before the text is touched, and that is not a
- * nicety.** `classifyThrownTermination` substring-matches the error's text, and the timeout,
- * network, auth, rate-limit and context-overflow arms are all tried BEFORE the invalid-request one
- * — so a note is not inert prose, it is input to the classifier. The note carries a **filename**,
- * which is user data nobody here controls: `api-timeout-investigation.pdf` reads back as a timeout,
- * `contract - terminated.pdf` as a dropped connection, `forbidden-zones.pdf` as an auth failure.
- * The user would then be told to retry a request that can never succeed, and a name matching the
- * overflow arm would send the runner off to compact the history and try again.
+ * nicety.** For an error nobody has classified yet, `classifyThrownTermination` substring-matches
+ * the text, and its timeout, network, auth, rate-limit and context-overflow arms are all tried
+ * BEFORE the invalid-request one — so a note is not inert prose, it is input to the classifier this
+ * function itself calls one line earlier. The note carries a **filename**, which is user data nobody
+ * here controls: `api-timeout-investigation.pdf` reads back as a timeout, `contract - terminated.pdf`
+ * as a dropped connection, `forbidden-zones.pdf` as an auth failure. The user would then be told to
+ * retry a request that can never succeed, and a name matching the overflow arm would send the runner
+ * off to compact the history and try again.
  *
  * Sanitising the filename would be an enumeration of today's pattern lists — it would go quietly
  * stale the next time one grows. So the fix is the rule this module already states: the prose is
- * never the carrier. Both consumers prefer an attached reason over re-reading the text
- * (`GthAgentRunner.classifyThrownAt` and `handleContextOverflow`), so attaching one first makes the
- * note unable to change what the failure IS, whatever it is named.
+ * never the carrier. Classify first, commit the value, and only then write the note — after which
+ * (CFG-73) the classifier declines to read the message at all, so no reader downstream can be moved
+ * by what the file is called.
  *
  * Fail-soft in both directions: a non-Error throw and an unwritable `message` leave the failure
  * exactly as it arrived, because explaining one must never become a second one.
