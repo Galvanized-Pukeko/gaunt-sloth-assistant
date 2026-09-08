@@ -182,6 +182,42 @@ describe('binary-content-injection — non-image binaries on providers that do n
     }
   });
 
+  // Two `gth_read_binary` calls in ONE step land as adjacent trailing ToolMessages, and both files
+  // have to reach the model — a scan that stopped at the first match would drop one silently, with
+  // the model then answering about a file it was never shown.
+  //
+  // The ORDER asserted here is the one the code produces (the scan walks back from the end, so the
+  // last tool result is attached first) and is inherited rather than chosen. It is pinned as-is so
+  // a future change to it is a decision somebody makes on purpose, not a side effect.
+  it('two binary results in one step both reach the model', async () => {
+    const mw = await mwFor('openai');
+    const result = await runModelCall(mw, [
+      new AIMessage({
+        content: '',
+        tool_calls: [
+          { name: 'gth_read_binary', args: {}, id: 'call-a' },
+          { name: 'gth_read_binary', args: {}, id: 'call-b' },
+        ],
+      }),
+      new ToolMessage({
+        content: binaryToolContent('file', 'application/pdf', B64, '/tmp/first.pdf'),
+        tool_call_id: 'call-a',
+        name: 'gth_read_binary',
+      }),
+      new ToolMessage({
+        content: binaryToolContent('file', 'application/pdf', B64, '/tmp/second.pdf'),
+        tool_call_id: 'call-b',
+        name: 'gth_read_binary',
+      }),
+    ]);
+
+    const filenames = (result.messages ?? [])
+      .flatMap((message) => (Array.isArray(message.content) ? message.content : []))
+      .map((block: any) => block?.metadata?.filename)
+      .filter(Boolean);
+    expect(filenames).toEqual(['second.pdf', 'first.pdf']);
+  });
+
   it('is a no-op when there is no gth_read_binary ToolMessage', async () => {
     const mw = await mwFor('openai');
     const history = [new HumanMessage('hi'), new AIMessage('hello')];
