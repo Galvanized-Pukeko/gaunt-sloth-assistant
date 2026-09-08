@@ -659,12 +659,11 @@ export interface RawGthConfig extends Omit<GthConfig, 'llm' | 'consoleLevel'> {
  * hard config error, because no provider's message converter can build a request from it.
  *
  * `video` and `binary` stay in this union because the code that RECOGNISES and refuses them needs
- * to be able to name them. They still arrive — from a `gth_read_binary` result string in a
- * replayed session, or from a config an embedder built in code rather than loading — and the
- * injection boundary turns each into an error naming the file and the configured type. Deleting
- * them here would delete that handling instead of the values, and the first casualty is
- * `getFormatForExtension`'s last-resort bucket, whose loss replaces a message naming the file and
- * the format type with one naming neither.
+ * to be able to name them. They still arrive from a `GthConfig` an embedder built in code rather
+ * than loading, which no loader has validated, and the injection boundary turns each into an error
+ * naming the file and the configured type. Deleting them here would delete that handling instead of
+ * the values, and the first casualty is `getFormatForExtension`'s last-resort bucket, whose loss
+ * replaces a message naming the file and the format type with one naming neither.
  */
 export type BinaryFormatType = 'image' | 'file' | 'audio' | 'video' | 'binary';
 

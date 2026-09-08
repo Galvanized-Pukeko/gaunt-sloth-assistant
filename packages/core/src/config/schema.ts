@@ -105,10 +105,11 @@ const customToolsOrFalseSchema = z.union([z.literal(false), customToolsConfigSch
  *
  * **Exported so the injection boundary can refuse the same set rather than a second copy of it.**
  * `binaryContentInjectionMiddleware` imports this tuple: config validation is the gate a user
- * meets, but the middleware's format type comes off the `gth_read_binary` result STRING, which a
- * replayed session or an embedder-built config can carry without any loader having validated it.
- * Two hand-written lists would drift, and the one that drifted would be the one deciding whether
- * a request is built.
+ * meets, but the middleware's format type comes off the `gth_read_binary` result STRING, built from
+ * a `GthConfig` an embedder can construct in code without any loader having validated it. That
+ * second refusal is a tripwire, correctly placed rather than widely load-bearing — but two
+ * hand-written lists would drift, and the one that drifted would be the one deciding whether a
+ * request is built.
  */
 export const DELIVERABLE_BINARY_FORMAT_TYPES = ['image', 'file', 'audio'] as const;
 
