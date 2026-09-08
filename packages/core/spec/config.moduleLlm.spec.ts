@@ -152,6 +152,38 @@ export async function configure() {
       expect(config.streamOutput).toBe(true);
     });
 
+    it('routes the spec merged with the global layer, not the module layer on its own', async () => {
+      // ROUTING ORDER — the decision the cell above cannot see, because there the module layer is
+      // already the whole spec. `needsProviderRouting` is applied to the config AFTER
+      // `applyGlobalConfigBase` underlays it, so a `type` living only in the global layer and a
+      // `model` living only in the module layer build the model the user actually configured.
+      //
+      // Routing the composed module layer instead — moving the routing decision one line earlier —
+      // refuses this exact configuration outright with "LLM type not specified in config.", and
+      // drops the whole global layer from the routed path. Both halves are asserted below, because
+      // the ordering is otherwise pinned by nothing at all.
+      writeGlobalConfig({ llm: { type: 'anthropic' }, contentSource: 'text' });
+      writeProjectModuleConfig(`
+export async function configure() {
+  return { llm: { model: 'module-only-model' } };
+}
+`);
+
+      const { initConfig } = await import('#src/config.js');
+      const config = await initConfig({});
+
+      // The provider was handed BOTH layers: `type` exists only globally, `model` only in the
+      // module, so neither layer alone could have produced this call.
+      expect(ChatAnthropicMock).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'anthropic', model: 'module-only-model' })
+      );
+      expect((config.llm as unknown as FakeChatModel).invoke()).toBe('invoked:module-only-model');
+      // ...and the rest of the global layer survived the routed path rather than being dropped on
+      // the way through it. `contentSource` defaults to 'file', so a dropped layer fails loudly
+      // here instead of silently reverting the user to a default they never asked for.
+      expect(config.contentSource).toBe('text');
+    });
+
     it('a provider with no API key raises catchably instead of falling through the formats', async () => {
       // Routing put the module path in reach of the provider layer, so it inherits the CFG-35
       // hazard the JSON path already guards: `tryModuleConfig`'s catch exists to move on to the
