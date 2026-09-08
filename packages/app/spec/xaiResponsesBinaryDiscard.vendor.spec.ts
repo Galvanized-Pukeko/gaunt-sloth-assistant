@@ -15,6 +15,10 @@
  * third party's current behaviour is that its change arrives as a red cell rather than as a silent
  * shift underneath a decision that depended on it.
  *
+ * Two vendor facts are pinned here, and the first one is NOT CFG-63's alone: the provider label
+ * `_llmType()` reports, which both CFG-63's refusal arm and CFG-45's `imageBlockFor` arm key on
+ * (see that cell), and the converter's discard behaviour itself.
+ *
  * Hermetic: `globalThis.fetch` is replaced with a stub that captures the request body and throws
  * before anything is sent. No network, no API key, no vendor call. The middleware's own half of this
  * is pinned in `packages/agent/spec/binaryContentInjectionMiddleware.spec.ts`.
@@ -54,6 +58,32 @@ afterEach(() => {
 });
 
 describe('VENDOR PIN — @langchain/xai Responses converter (a red here means xAI CHANGED, not gth)', () => {
+  it('still reports the provider label BOTH arms key on: _llmType() === "xai-responses"', () => {
+    // THE STRING THAT CONNECTS THE VENDOR TO EVERY DECISION BELOW, and the only thing pinning it.
+    //
+    // `resolveVisionProvider` (`packages/agent/src/middleware/registry.ts`) falls back to
+    // `llm._llmType()`, so this literal is the label that reaches BOTH per-provider switches:
+    //
+    //   1. CFG-63 — `nonImageBinaryFateFor`'s `case 'xai-responses'` in
+    //      `packages/agent/src/middleware/binaryContentInjectionMiddleware.ts`, which returns
+    //      `silently-discarded` and is what makes the middleware refuse a non-image attachment.
+    //   2. CFG-45 — `imageBlockFor`'s `case 'xai-responses'` in
+    //      `packages/agent/src/middleware/frontendImageInjectionMiddleware.ts`, which returns the
+    //      `image_url` block this converter needs instead of the standard base64 block.
+    //
+    // Neither switch can match a label the vendor no longer emits. If xAI renames it, both arms fall
+    // to their `default`: CFG-63's refusal silently stops firing and the user is back to a confident
+    // answer about a file the model never received, and CFG-45's images fall to the standard block
+    // this same converter destroys. Measured: renaming this return value leaves every OTHER cell in
+    // the repo green, so without this line the rename is invisible.
+    //
+    // **A red here means xAI RENAMED the label — it does not mean gth broke.** The fix is to update
+    // both `case` labels to the vendor's new string (and this assertion), NOT to delete the
+    // assertion so the suite goes quiet.
+    const model = new ChatXAIResponses({ apiKey: 'cfg63-not-a-real-key', model: 'grok-4' });
+    expect(model._llmType()).toBe('xai-responses');
+  });
+
   it('still SILENTLY DISCARDS a non-image block, rewriting it to an empty input_text part', async () => {
     const captured = captureFetch();
     const model = new ChatXAIResponses({

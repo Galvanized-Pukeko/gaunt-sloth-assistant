@@ -46,9 +46,12 @@ export interface BinaryContentInjectionMiddlewareSettings {
  * - `silently-discarded` — the converter replaces the block with an empty part and builds a request
  *   as if nothing were attached. Nothing throws, nothing warns, and the model answers about content
  *   it never received. This is the only value that must be refused.
- * - `delivered-or-loud` — either the data reaches the request body, or the attempt fails where
- *   somebody sees it (a client-side throw, or a shape the provider's API rejects). Either way the
- *   user finds out; gth stays out of the way.
+ * - `delivered-or-loud` — the client either puts the data in the request body or fails where
+ *   somebody sees it (a client-side throw). What CFG-63 measured is the CLIENT half; gth stays out
+ *   of the way. **The known exception is `groq`**, whose client sends our block to the wire verbatim
+ *   and whose SERVER outcome was never measured — if Groq accepts the request and ignores the
+ *   unrecognised part, the user does not find out, which is the failure this check exists to catch.
+ *   Settling it needs one live call; see the `groq` arm below.
  * - `unmeasured` — the label is not enumerated below. Treated exactly as before this check existed.
  */
 export type NonImageBinaryFate = 'silently-discarded' | 'delivered-or-loud' | 'unmeasured';
@@ -249,12 +252,13 @@ export function createBinaryContentInjectionMiddleware(
             // GS2-74) get a valid `image_url` block instead of the standard `source_type` data block,
             // which @langchain/openai mis-serialises to an invalid Responses image part (GS2-75).
             //
-            // Everything else keeps the standard block, and CFG-63 measured what each provider then
-            // does with it — see {@link nonImageBinaryFateFor} for the per-provider evidence. The
-            // standard block is right, or at least loudly wrong, on every provider measured except
-            // one: `xai-responses` rewrites it to an empty text part and sends a request that looks
-            // complete. There is no better block to emit there, so the attachment is refused here
-            // instead, before the call.
+            // Everything else keeps the standard block, and CFG-63 measured what each provider's
+            // CLIENT then does with it — see {@link nonImageBinaryFateFor} for the per-provider
+            // evidence. One label is measured to discard it silently: `xai-responses` rewrites the
+            // block to an empty text part and sends a request that looks complete. There is no
+            // better block to emit there, so the attachment is refused here instead, before the
+            // call. One label is measured on the client side only: `groq` puts the block on the wire
+            // verbatim and what its server then does was not measured.
             //
             // Refusing from `beforeModel` is a deliberate departure from CFG-45's ruling that this
             // path must never throw, and the difference is the evidence. That ruling protects a
@@ -263,7 +267,8 @@ export function createBinaryContentInjectionMiddleware(
             // outcomes left are a refusal the user can act on and a confident answer about a file
             // the model never saw. The narrowness is the safeguard: only a MEASURED
             // `silently-discarded` label refuses, and everything else — including every
-            // unenumerated label and the `''` a module config yields — behaves exactly as before.
+            // unenumerated label, and the `''` that arises only when there is no `llm` or its
+            // `_llmType()` is missing or throws — behaves exactly as before.
             //
             // WHO THIS ACTUALLY FIRES FOR, measured rather than assumed: today only a module config
             // (`.gsloth.config.js`/`.mjs`/`.ts`) whose `configure()` returns a pre-built

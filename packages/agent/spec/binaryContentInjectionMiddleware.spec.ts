@@ -229,9 +229,14 @@ describe('binary-content-injection — refuses a non-image binary a provider wou
     }
   });
 
-  // CFG-45's ruling that this path stays permissive for an unmeasured label is unchanged: `''` is
-  // what `resolveVisionProvider` yields for a module config supplying an already-built LLM, and a
-  // refusal there would break configurations that work today.
+  // CFG-45's ruling that this path stays permissive for an unmeasured label is unchanged. Who
+  // actually lands here: any label `nonImageBinaryFateFor` does not enumerate — a custom or `fake`
+  // provider, a future vendor package, a LangChain class whose `_llmType()` nobody has measured —
+  // plus the empty string, which `resolveVisionProvider` yields only when there is no `llm` or its
+  // `_llmType()` is missing or throws. A module config supplying an already-built LLM does NOT
+  // generally give `''`; it gives that class's own label, which is exactly how `xai-responses`
+  // reaches the switch at all. Refusing on a label nobody has measured would break configurations
+  // that work today.
   it('CONTROL — an unenumerated label is unmeasured, and its attachment is still sent', async () => {
     for (const provider of ['', 'fake', 'some-future-provider']) {
       expect(nonImageBinaryFateFor(provider)).toBe('unmeasured');
