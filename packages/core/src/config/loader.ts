@@ -1108,11 +1108,31 @@ export async function initConfig(
 }
 
 /**
- * A module-config format (`configure()`-exporting JS/MJS/TS). Unlike JSON — which carries an
- * LLM *spec* that {@link tryJsonConfig} must instantiate — a module config returns an already
- * fully-constructed config (LLM included), so it goes straight to {@link mergeConfig}.
+ * A module-config format (`configure()`-exporting JS/MJS/TS). A module config may return EITHER an
+ * already-built model or the same raw LLM *spec* a JSON config carries; {@link needsProviderRouting}
+ * tells them apart and a raw spec is routed through {@link tryJsonConfig} exactly as the JSON path
+ * routes it, so the two documented formats agree about what a raw spec means.
  */
 type ModuleConfigFormat = 'js' | 'mjs' | 'ts';
+
+/**
+ * CFG-71 — does this `llm` config value still need a provider to build it?
+ *
+ * True for the raw `{ type, model }` spec a JSON config carries: plain data with no way to answer a
+ * call. False for anything usable as a model — an instance built by the user's own `configure()`
+ * (rejected by {@link isMergeableObject}) and equally a hand-rolled object literal with its own
+ * callable `invoke`, which is a working model whoever made it and must not be rebuilt.
+ *
+ * False when there is no `llm` at all, so a module config that configures everything else keeps
+ * behaving exactly as it does today rather than newly raising.
+ *
+ * A spec with no `type` routes too, deliberately: {@link tryJsonConfig} refuses it by name at load
+ * time ("LLM type not specified in config."), which is the outcome this node exists to reach. What
+ * must not stand is the third option — accepted, unrouted, and fatal only at the first call.
+ */
+function needsProviderRouting(llm: unknown): boolean {
+  return isMergeableObject(llm) && typeof (llm as { invoke?: unknown }).invoke !== 'function';
+}
 
 /**
  * Module-format fall-through order (lowest precedence among project formats; JSON is tried
@@ -1167,8 +1187,27 @@ async function tryModuleConfig(
         commandLineConfigOverrides.identityProfile
       );
       const mergedWithGlobal = await applyGlobalConfigBase(composedConfig);
+      // CFG-71 — route a returned raw LLM spec through the provider layer, exactly as the JSON
+      // branch of `initConfig` does. Routing happens AFTER the global base is applied, for the same
+      // reason it does there: the effective spec is the merged one, so a `type` in the global layer
+      // and a `model` in the module layer build the model the user actually configured.
+      if (needsProviderRouting((mergedWithGlobal as { llm?: unknown }).llm)) {
+        return await tryJsonConfig(
+          mergedWithGlobal as unknown as RawGthConfig,
+          commandLineConfigOverrides
+        );
+      }
       return await mergeConfig(mergedWithGlobal, commandLineConfigOverrides);
     } catch (e) {
+      // CFG-35 / CFG-71 — a provider that could not be built because no API key is resolvable is
+      // not a read failure, and this catch exists only to move on to the next config FORMAT. A
+      // module config reaches the provider layer whenever it returns a raw spec, so it needs the
+      // same re-raise the JSON branch of `initConfig` makes ahead of everything else: without it a
+      // missing key falls through `.mjs` and `.ts` and surfaces as the terminal "No configuration
+      // file found" — blaming an absent config for a missing key.
+      if (isMissingProviderKeyError(e)) {
+        throw e;
+      }
       // CFG-36 — a config that read fine and is MALFORMED (or names an unresolvable profile) is a
       // hard error, not a reason to try the next format. Re-raise before the fall-through, exactly
       // as the JSON branch in initConfig does.
@@ -1419,8 +1458,36 @@ function approvalsNeedFieldWiseMerge(sourceValue: unknown, targetValue: unknown)
 }
 
 /**
+ * CFG-71 — true when `value` is a MERGEABLE config object: plain data the merge may recurse into
+ * and rebuild, as opposed to an array or an object carrying behaviour.
+ *
+ * The distinction is load-bearing, not cosmetic. {@link deepMerge}'s recursion rebuilds a value as
+ * `{ ...target }` — an own-enumerable-key spread that keeps the data and DROPS THE PROTOTYPE, so a
+ * config value carrying methods comes out of a layer merge stripped of them. The value this bites
+ * is `llm`: a `configure()` module may legitimately return an already-built chat model, and a
+ * global config carrying an `llm` block is enough to make the two objects recurse together and
+ * flatten the model into a plain object whose `invoke` is gone. Nothing fails at load time — the
+ * run dies at the first call, far from the cause.
+ *
+ * The prototype test is realm-tolerant on purpose: a module config is loaded through jiti, and an
+ * object literal that crossed that boundary is still plain data and must still merge field-wise. A
+ * cross-realm `Object.prototype` is an object whose own prototype is `null`, which the last clause
+ * accepts; a class instance, whose chain reaches `Object.prototype` only by way of its own class
+ * prototype, is rejected by all three.
+ */
+function isMergeableObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(value) as object | null;
+  return proto === null || proto === Object.prototype || Object.getPrototypeOf(proto) === null;
+}
+
+/**
  * Deep merge two objects, with source overriding target properties.
- * Objects are merged recursively. Arrays REPLACE by default; arrays at an
+ * Plain objects are merged recursively; an object carrying behaviour (a class instance — see
+ * {@link isMergeableObject}) is REPLACED whole by the higher-precedence layer rather than recursed
+ * into, so it keeps its methods. Arrays REPLACE by default; arrays at an
  * {@link isAdditiveArrayField} path are concatenated (target-first) then de-duplicated by
  * value. Every other non-plain-object value is replaced by the source value.
  *
@@ -1452,15 +1519,9 @@ function deepMerge<T extends Record<string, unknown>>(
     const sourceValue = mergeApprovalsFieldWise ? expandApprovalsScalar(source[key]) : source[key];
     const targetValue = mergeApprovalsFieldWise ? expandApprovalsScalar(target[key]) : target[key];
 
-    if (
-      sourceValue &&
-      typeof sourceValue === 'object' &&
-      !Array.isArray(sourceValue) &&
-      targetValue &&
-      typeof targetValue === 'object' &&
-      !Array.isArray(targetValue)
-    ) {
-      // Recursively merge nested objects
+    if (isMergeableObject(sourceValue) && isMergeableObject(targetValue)) {
+      // Recursively merge nested PLAIN objects (an instance on either side falls through to the
+      // override branch below, which hands the source value over untouched — CFG-71).
       result[key] = deepMerge(
         targetValue as Record<string, unknown>,
         sourceValue as Record<string, unknown>,

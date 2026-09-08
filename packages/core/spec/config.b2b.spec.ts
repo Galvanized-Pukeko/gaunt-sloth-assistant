@@ -98,7 +98,14 @@ describe('config B2b behavior changes', () => {
 
   describe('.ts config format (Part 2)', () => {
     it('loads and validates a .ts config via async configure()', async () => {
-      const mockConfig = { llm: { type: 'anthropic' } };
+      // CFG-71 — a `.ts` config's `configure()` handing back an already-built model. A CLASS, so
+      // `invoke` sits on the prototype and a merge that flattened the instance would lose it.
+      class BuiltModelStub {
+        invoke(): string {
+          return 'invoked';
+        }
+      }
+      const mockConfig = { llm: new BuiltModelStub() };
       // Only the .ts file exists (no json/js/mjs).
       fsMock.existsSync.mockImplementation(
         (path: string) => !!path && path.includes('.gsloth.config.ts')
@@ -112,8 +119,12 @@ describe('config B2b behavior changes', () => {
       const { initConfig } = await import('#src/config.js');
       const config = await initConfig({});
 
-      // Module formats (js/mjs/ts) arrive pre-instantiated; llm passes through unchanged.
-      expect(config.llm).toEqual({ type: 'anthropic' });
+      // A model the module built itself passes through with its prototype intact. CFG-71 — this
+      // is NOT the same as "a module config is always pre-instantiated": a module may equally
+      // return a raw `{ type, model }` spec, which the loader now routes to its provider exactly
+      // as the JSON path does (pinned in `config.moduleLlm.spec.ts`).
+      expect(config.llm).toBeInstanceOf(BuiltModelStub);
+      expect((config.llm as unknown as BuiltModelStub).invoke()).toBe('invoked');
       // Defaults are merged in (validated through the same Zod path as js/mjs).
       expect(config.contentSource).toBe('file');
       expect(config.streamOutput).toBe(true);

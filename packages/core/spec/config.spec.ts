@@ -112,6 +112,25 @@ vi.mock('#src/utils/globalConfigUtils.js', () => globalConfigUtilsMock);
  */
 const MOCK_CWD = '/mock/current/dir';
 
+/**
+ * CFG-71 — the model a `configure()` module returns already built.
+ *
+ * The module formats (js/mjs/ts) are the route whose `configure()` may hand back a live model, and
+ * that pass-through is what the format cells below actually claim. It is a CLASS so `invoke` lives
+ * on the prototype: an instance is what the config merge must carry through without flattening, and
+ * a plain object with an own `invoke` would not exercise that.
+ *
+ * Keep this fixture built rather than a raw `{ type }` spec: a raw spec is ROUTED to its provider
+ * on this path exactly as on the JSON path, which would drag a real provider construction — and a
+ * real API key — into cells whose subject is format discovery and default merging. The routing is
+ * pinned in `config.moduleLlm.spec.ts`.
+ */
+class BuiltModelStub {
+  invoke(): string {
+    return 'invoked';
+  }
+}
+
 describe('config', async () => {
   beforeEach(async () => {
     // Reset mocks
@@ -246,7 +265,7 @@ describe('config', async () => {
     });
 
     it('Should try JS config when JSON config does not exist', async () => {
-      const mockConfig = { llm: { type: 'anthropic' } };
+      const mockConfig = { llm: new BuiltModelStub() };
       const mockConfigModule = {
         configure: vi.fn().mockResolvedValue(mockConfig),
       };
@@ -286,7 +305,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         builtInTools: ['gth_checklist', 'gth_grep'],
-        llm: { type: 'anthropic' },
+        // CFG-71 — the built instance arrives with its prototype (and so its methods) intact.
+        llm: expect.any(BuiltModelStub),
         contentSource: 'file',
         requirementSource: 'file',
         streamOutput: true,
@@ -384,7 +404,7 @@ describe('config', async () => {
       const mockConfigModule = {
         configure: vi.fn(),
       };
-      const mockConfig = { llm: { type: 'groq' } };
+      const mockConfig = { llm: new BuiltModelStub() };
       mockConfigModule.configure.mockResolvedValue(mockConfig);
 
       // Set up fs mocks for this specific test
@@ -421,7 +441,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         builtInTools: ['gth_checklist', 'gth_grep'],
-        llm: { type: 'groq' },
+        // CFG-71 — the built instance arrives with its prototype (and so its methods) intact.
+        llm: expect.any(BuiltModelStub),
         contentSource: 'file',
         requirementSource: 'file',
         streamOutput: true,
@@ -2321,7 +2342,7 @@ describe('config', async () => {
 
     it('Should handle custom JS config path', async () => {
       const customConfigPath = customPathPrefix + '.js';
-      const mockConfig = { llm: { type: 'anthropic' } };
+      const mockConfig = { llm: new BuiltModelStub() };
       const mockConfigModule = {
         configure: vi.fn().mockResolvedValue(mockConfig),
       };
@@ -2345,7 +2366,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         builtInTools: ['gth_checklist', 'gth_grep'],
-        llm: { type: 'anthropic' },
+        // CFG-71 — the built instance arrives with its prototype (and so its methods) intact.
+        llm: expect.any(BuiltModelStub),
         contentSource: 'file',
         requirementSource: 'file',
         streamOutput: true,
@@ -2407,7 +2429,7 @@ describe('config', async () => {
 
     it('Should handle custom MJS config path', async () => {
       const customConfigPath = customPathPrefix + '.mjs';
-      const mockConfig = { llm: { type: 'groq' } };
+      const mockConfig = { llm: new BuiltModelStub() };
       const mockConfigModule = {
         configure: vi.fn().mockResolvedValue(mockConfig),
       };
@@ -2431,7 +2453,8 @@ describe('config', async () => {
       expect(config).toEqual({
         consoleLevel: StatusLevel.INFO,
         builtInTools: ['gth_checklist', 'gth_grep'],
-        llm: { type: 'groq' },
+        // CFG-71 — the built instance arrives with its prototype (and so its methods) intact.
+        llm: expect.any(BuiltModelStub),
         contentSource: 'file',
         requirementSource: 'file',
         streamOutput: true,
