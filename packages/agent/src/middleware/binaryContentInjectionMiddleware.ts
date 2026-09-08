@@ -87,7 +87,10 @@ export type NonImageBinaryFate = 'silently-discarded' | 'delivered-or-loud' | 'u
  *   `content: message.content` verbatim, so the block reaches the wire unchanged and Groq's API
  *   decides. Not an in-process discard: the payload leaves the machine and the answer comes back
  *   from the server, which is where this one is knowable. **What that server does with it was not
- *   measured** — establishing it needs a live call, which this node forbids.
+ *   measured** — establishing it needs a live call, which this node forbids. So this arm asserts the
+ *   client half only. The specific possibility it cannot rule out is the one this whole check exists
+ *   to catch: Groq accepting the request and ignoring the unrecognised part, which would make `groq`
+ *   a second `silently-discarded` label. Anyone who can make one live call should settle it.
  *
  * Everything else is `unmeasured`. Like {@link imageBlockFor}'s fallback arm this must stay
  * permissive: `resolveVisionProvider` yields `''` for a module config that supplies an already-built
@@ -256,6 +259,18 @@ export function createBinaryContentInjectionMiddleware(
             // the model never saw. The narrowness is the safeguard: only a MEASURED
             // `silently-discarded` label refuses, and everything else — including every
             // unenumerated label and the `''` a module config yields — behaves exactly as before.
+            //
+            // WHO THIS ACTUALLY FIRES FOR, measured rather than assumed: today only a module config
+            // (`.gsloth.config.js`/`.mjs`/`.ts`) whose `configure()` returns a pre-built
+            // `ChatXAIResponses`. A JSON config cannot produce this label — the loader sets
+            // `modelProviderType` from `llm.type` and imports `#src/providers/<type>.js`, and there
+            // is no `xai-responses` module, while gth's own `xai` provider only ever builds
+            // `ChatXAI`. The module path never sets `modelProviderType`, so `resolveVisionProvider`
+            // falls back to `_llmType()`, which is where `xai-responses` comes from. That is the
+            // same narrow population CFG-45 shipped its `xai-responses` image arm for. So this is a
+            // tripwire, correctly placed rather than widely load-bearing: it covers that config
+            // shape today and whatever label measures as discarding tomorrow. Do NOT read the
+            // narrow reach as a reason to widen it by analogy — measure, then add an arm.
             if (
               binaryData.formatType !== 'image' &&
               nonImageBinaryFateFor(provider) === 'silently-discarded'
