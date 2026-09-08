@@ -8,6 +8,13 @@
  * mis-serialises to an invalid Responses image part), and prove that the file/video/audio path and
  * non-OpenAI providers are untouched. The registry wiring (that the factory threads the resolved
  * provider in) is checked at the end.
+ *
+ * CFG-69 adds the other half: the injection reaches the REQUEST and never the conversation. Every
+ * block expectation here therefore reads the block the model handler was actually called with
+ * ({@link runModelCall}), which is the same assertion as before against the value that now carries
+ * it. The state half — that a rejected attachment cannot be replayed on a later turn — is pinned in
+ * the CFG-69 block at the end, through a harness that drives whichever hooks the middleware
+ * exposes so it measures the defect rather than the fix.
  */
 import { describe, expect, it } from 'vitest';
 import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages';
@@ -19,6 +26,7 @@ import {
 } from '#src/middleware/binaryContentInjectionMiddleware.js';
 import { imageBlockFor } from '#src/middleware/frontendImageInjectionMiddleware.js';
 import { resolveMiddleware } from '#src/middleware/registry.js';
+import { classifyThrownTermination } from '@gaunt-sloth/core/core/terminationReason.js';
 
 /** A tiny valid 1×1 base64 PNG-ish payload — content is opaque to the middleware. */
 const B64 =
@@ -53,10 +61,34 @@ function binaryRound(
   ];
 }
 
-/** Invoke the (object-form) middleware's beforeModel hook. */
-async function runBeforeModel(mw: any, messages: unknown[]) {
-  const hook = typeof mw.beforeModel === 'function' ? mw.beforeModel : mw.beforeModel.hook;
-  return hook({ messages });
+/** Read a hook off the middleware, whichever form `createMiddleware` returned it in. */
+function hookOf(mw: any, name: string): any {
+  const hook = mw?.[name];
+  if (!hook) return undefined;
+  return typeof hook === 'function' ? hook : hook.hook;
+}
+
+/**
+ * Run one model call through the middleware and report what reached the model.
+ *
+ * `messages` is what the model handler was called with — the request as sent, which is where the
+ * injected attachment lives now that it is request-scoped rather than written into state. `calls`
+ * counts model calls: zero is what a refusal (CFG-63) must produce, and asserting it is stronger
+ * than asserting the throw alone, since the throw now sits on the path that would otherwise reach
+ * the provider.
+ */
+async function runModelCall(
+  mw: any,
+  messages: unknown[],
+  respond: (sent: BaseMessage[]) => unknown = () => new AIMessage('ok')
+): Promise<{ messages: BaseMessage[] | undefined; calls: number; response: unknown }> {
+  const seen: BaseMessage[][] = [];
+  const handler = async (request: any) => {
+    seen.push(request.messages);
+    return respond(request.messages);
+  };
+  const response = await hookOf(mw, 'wrapModelCall')({ messages, systemPrompt: '' }, handler);
+  return { messages: seen[seen.length - 1], calls: seen.length, response };
 }
 
 /** The injected HumanMessage's content block at index 1 (index 0 is the text preamble). */
@@ -77,7 +109,7 @@ async function mwFor(provider?: string) {
 describe('binary-content-injection — per-provider IMAGE block (GS2-75)', () => {
   it('openai → image_url:{url} (valid on the Responses API, unlike the standard block)', async () => {
     const mw = await mwFor('openai');
-    const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+    const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
     // Literal expected block — the real anti-regression anchor for the fix.
     expect(injectedBlock(result)).toEqual({
       type: 'image_url',
@@ -87,7 +119,7 @@ describe('binary-content-injection — per-provider IMAGE block (GS2-75)', () =>
 
   it('ollama → image_url as a data-URL STRING', async () => {
     const mw = await mwFor('ollama');
-    const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+    const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
     expect(injectedBlock(result)).toEqual({
       type: 'image_url',
       image_url: PNG_DATA_URL,
@@ -99,7 +131,7 @@ describe('binary-content-injection — per-provider IMAGE block (GS2-75)', () =>
   // which 400s a PNG outright). Both paths therefore share the provider-native block.
   it('anthropic → the provider-native base64 image block (RC-32)', async () => {
     const mw = await mwFor('anthropic');
-    const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+    const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
     expect(injectedBlock(result)).toEqual({
       type: 'image',
       source: { type: 'base64', media_type: PNG_MIME, data: B64 },
@@ -108,7 +140,7 @@ describe('binary-content-injection — per-provider IMAGE block (GS2-75)', () =>
 
   it("default (provider '' / undefined) → the standard base64 image block", async () => {
     for (const mw of [await mwFor(''), await mwFor(undefined)]) {
-      const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+      const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
       expect(injectedBlock(result)).toEqual({
         type: 'image',
         source_type: 'base64',
@@ -121,7 +153,7 @@ describe('binary-content-injection — per-provider IMAGE block (GS2-75)', () =>
   it('the injected image block tracks imageBlockFor (source of truth) across providers', async () => {
     for (const provider of ['openai', 'ollama', 'anthropic', 'google-genai', 'vertexai', '']) {
       const mw = await mwFor(provider);
-      const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+      const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
       expect(injectedBlock(result)).toEqual(imageBlockFor(provider, PNG_MIME, B64));
     }
   });
@@ -135,7 +167,7 @@ describe('binary-content-injection — non-image binaries on providers that do n
   it('a file (application/pdf) keeps the standard createContentBlock data-block, regardless of provider', async () => {
     for (const provider of ['openai', 'ollama', 'anthropic', '']) {
       const mw = await mwFor(provider);
-      const result = await runBeforeModel(
+      const result = await runModelCall(
         mw,
         binaryRound('file', 'application/pdf', B64, '/tmp/doc.pdf')
       );
@@ -152,9 +184,13 @@ describe('binary-content-injection — non-image binaries on providers that do n
 
   it('is a no-op when there is no gth_read_binary ToolMessage', async () => {
     const mw = await mwFor('openai');
-    expect(
-      await runBeforeModel(mw, [new HumanMessage('hi'), new AIMessage('hello')])
-    ).toBeUndefined();
+    const history = [new HumanMessage('hi'), new AIMessage('hello')];
+    const result = await runModelCall(mw, history);
+    // A no-op is now "the model was called with exactly the messages it would have been called with
+    // anyway" — the pass-through arm still has to make the call, so an absent return value would
+    // mean a turn that never reached the model.
+    expect(result.calls).toBe(1);
+    expect(result.messages).toEqual(history);
   });
 });
 
@@ -176,16 +212,32 @@ describe('binary-content-injection — refuses a non-image binary a provider wou
   it('xai-responses + a PDF → an error naming the file and the provider, instead of an empty part', async () => {
     const mw = await mwFor('xai-responses');
     await expect(
-      runBeforeModel(mw, binaryRound('file', 'application/pdf', B64, '/tmp/reports/q3-results.pdf'))
+      runModelCall(mw, binaryRound('file', 'application/pdf', B64, '/tmp/reports/q3-results.pdf'))
     ).rejects.toThrow(/q3-results\.pdf/);
 
     const mw2 = await mwFor('xai-responses');
     await expect(
-      runBeforeModel(
-        mw2,
-        binaryRound('file', 'application/pdf', B64, '/tmp/reports/q3-results.pdf')
-      )
+      runModelCall(mw2, binaryRound('file', 'application/pdf', B64, '/tmp/reports/q3-results.pdf'))
     ).rejects.toThrow(/xai-responses/);
+  });
+
+  // The refusal sits on the path to the provider, so it can assert the thing the message only
+  // describes: the request was never made. A refusal thrown AFTER the call would satisfy the cell
+  // above and still hand the attachment to the converter that empties it.
+  it('the refused attachment never reaches the model at all', async () => {
+    const mw = await mwFor('xai-responses');
+    let calls = 0;
+    await expect(
+      runModelCall(
+        mw,
+        binaryRound('file', 'application/pdf', B64, '/tmp/reports/q3-results.pdf'),
+        () => {
+          calls++;
+          return new AIMessage('the model should never have been asked');
+        }
+      )
+    ).rejects.toThrow(/q3-results\.pdf/);
+    expect(calls).toBe(0);
   });
 
   it('audio and video are refused on the same provider for the same reason', async () => {
@@ -194,7 +246,7 @@ describe('binary-content-injection — refuses a non-image binary a provider wou
       ['video', 'video/mp4', '/tmp/clip.mp4'],
     ] as const) {
       const mw = await mwFor('xai-responses');
-      await expect(runBeforeModel(mw, binaryRound(type, mime, B64, file))).rejects.toThrow(
+      await expect(runModelCall(mw, binaryRound(type, mime, B64, file))).rejects.toThrow(
         new RegExp(file.split('/').pop()!.replace('.', '\\.'))
       );
     }
@@ -205,7 +257,7 @@ describe('binary-content-injection — refuses a non-image binary a provider wou
   // rather than on the provider AND a non-image format, this cell reds.
   it('CONTROL — an image on xai-responses is still injected, exactly as CFG-45 left it', async () => {
     const mw = await mwFor('xai-responses');
-    const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+    const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
     expect(injectedBlock(result)).toEqual({ type: 'image_url', image_url: { url: PNG_DATA_URL } });
     expect(injectedBlock(result)).toEqual(imageBlockFor('xai-responses', PNG_MIME, B64));
   });
@@ -241,7 +293,7 @@ describe('binary-content-injection — refuses a non-image binary a provider wou
     for (const provider of ['', 'fake', 'some-future-provider']) {
       expect(nonImageBinaryFateFor(provider)).toBe('unmeasured');
       const mw = await mwFor(provider);
-      const result = await runBeforeModel(
+      const result = await runModelCall(
         mw,
         binaryRound('file', 'application/pdf', B64, '/tmp/doc.pdf')
       );
@@ -263,7 +315,7 @@ describe('binary-content-injection — registry wiring', () => {
       modelProviderType: 'openai',
     } as unknown as GthConfig);
     expect(mw.name).toBe('binary-content-injection');
-    const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+    const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
     expect(injectedBlock(result)).toEqual({ type: 'image_url', image_url: { url: PNG_DATA_URL } });
   });
 
@@ -272,7 +324,7 @@ describe('binary-content-injection — registry wiring', () => {
       llm: {},
       modelProviderType: 'ollama',
     } as unknown as GthConfig);
-    const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+    const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
     expect(injectedBlock(result)).toEqual({ type: 'image_url', image_url: PNG_DATA_URL });
   });
 
@@ -286,7 +338,187 @@ describe('binary-content-injection — registry wiring', () => {
     } as unknown as GthConfig);
     const mw = mws.find((m) => m.name === 'binary-content-injection');
     expect(mw).toBeDefined();
-    const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+    const result = await runModelCall(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
     expect(injectedBlock(result)).toEqual({ type: 'image_url', image_url: { url: PNG_DATA_URL } });
+  });
+});
+
+/**
+ * CFG-69 — one rejected attachment must not kill the session.
+ *
+ * The measured shape: a provider that rejects the injected block fails the turn, and then fails
+ * every later turn too — on the same message index, carrying no attachment and mentioning no file —
+ * because the injected message was written into the conversation and is re-sent forever. Two things
+ * put it there, and BOTH are pinned below, because either one alone leaves the session dead: the
+ * injection being a state update, and the scan matching a tool result the current call is no longer
+ * the continuation of.
+ *
+ * The instrument is a stubbed rejecting handler, never a vendor call. What Groq does is already
+ * measured and recorded in `nonImageBinaryFateFor`; what is under test here is what gth does about
+ * it, which a stub reproduces exactly.
+ */
+
+/** The rejection Groq returns for a `file` part, in its own words. */
+function providerRejection(): Error {
+  const error: Error & { status?: number } = new Error(
+    '400 status code (no body) {"error":{"message":"messages.4.content.1 : ' +
+      "for 'messages.4.content.1' expected one of 'text', 'image_url', 'document'\"," +
+      '"type":"invalid_request_error","code":"invalid_value"}}'
+  );
+  error.status = 400;
+  return error;
+}
+
+/** The structured (non-text) content blocks in a message list — an attachment, wherever it rides. */
+function binaryBlocksIn(messages: readonly BaseMessage[] | undefined): unknown[] {
+  return (messages ?? []).flatMap((message) =>
+    Array.isArray(message.content)
+      ? (message.content as { type?: string }[]).filter((block) => block?.type !== 'text')
+      : []
+  );
+}
+
+/**
+ * A miniature of how the graph carries messages between turns, driving whatever hooks the
+ * middleware exposes.
+ *
+ * That last part is what makes the cells below regression pins rather than tests of the new code:
+ * the harness runs `beforeModel` if there is one and `wrapModelCall` if there is one, so restoring
+ * either half of the defect is measured here instead of silently skipped.
+ *
+ * A `beforeModel` update REPLACES `state.messages`, because the full array is what that hook
+ * returns. It is applied before the model call and kept when the call throws — a completed graph
+ * node's update is committed whether or not the next node succeeds, which is exactly why the live
+ * failure kept naming the same index across three turns.
+ */
+function makeSession(mw: any) {
+  const session = {
+    messages: [] as BaseMessage[],
+    /** What the model handler was called with, one entry per model call. */
+    sent: [] as BaseMessage[][],
+    async turn(respond: (sent: BaseMessage[]) => unknown): Promise<unknown> {
+      const beforeModel = hookOf(mw, 'beforeModel');
+      if (beforeModel) {
+        const update = await beforeModel({ messages: session.messages });
+        if (update?.messages) session.messages = update.messages;
+      }
+      const handler = async (request: any) => {
+        session.sent.push(request.messages);
+        return respond(request.messages);
+      };
+      const request = { messages: session.messages, systemPrompt: '' };
+      const wrapModelCall = hookOf(mw, 'wrapModelCall');
+      const answer = wrapModelCall ? await wrapModelCall(request, handler) : await handler(request);
+      if (answer) session.messages = [...session.messages, answer as BaseMessage];
+      return answer;
+    },
+  };
+  return session;
+}
+
+describe('binary-content-injection — a rejected attachment cannot outlive its request (CFG-69)', () => {
+  it('THE PIN — after a provider rejects the attachment, the next unrelated message reaches the model', async () => {
+    const mw = await mwFor('groq');
+    const session = makeSession(mw);
+    session.messages = [
+      new HumanMessage('Use read binary tool to read test.pdf'),
+      ...binaryRound('file', 'application/pdf', B64, '/tmp/test.pdf'),
+    ];
+
+    // Turn 1: the provider rejects the block. This turn is expected to fail — it is the turn AFTER
+    // it that the user's session hangs on.
+    await expect(
+      session.turn(() => {
+        throw providerRejection();
+      })
+    ).rejects.toThrow();
+
+    // Turn 2: an ordinary message. No attachment, no file mentioned.
+    session.messages = [...session.messages, new HumanMessage('Did it work?')];
+    const answer = await session.turn(() => new AIMessage('it did not, the file was rejected'));
+
+    expect(session.sent).toHaveLength(2);
+    expect(binaryBlocksIn(session.sent[1])).toEqual([]);
+    expect((answer as AIMessage).content).toBe('it did not, the file was rejected');
+  });
+
+  it('the injected message is not in state on the turn after the one it was built for', async () => {
+    const mw = await mwFor('groq');
+    const session = makeSession(mw);
+    session.messages = [...binaryRound('file', 'application/pdf', B64, '/tmp/test.pdf')];
+
+    await session.turn(() => new AIMessage('a one page invoice'));
+
+    // The model saw the attachment on the call it was built for...
+    expect(binaryBlocksIn(session.sent[0])).toHaveLength(1);
+    // ...and the conversation carries no trace of it. The gth_read_binary ToolMessage stays, so the
+    // fact that the file was read is not lost — only the payload is.
+    expect(binaryBlocksIn(session.messages)).toEqual([]);
+    expect(session.messages.some((m) => (m as any).name === 'gth_read_binary')).toBe(true);
+  });
+
+  it('a call the tool result no longer trails does not re-attach it', async () => {
+    // The second half of the defect, on its own: with the tool result a couple of messages back,
+    // a scan of the last few messages still matches it and rebuilds the attachment onto a request
+    // that has nothing to do with it.
+    const mw = await mwFor('groq');
+    const result = await runModelCall(mw, [
+      ...binaryRound('file', 'application/pdf', B64, '/tmp/test.pdf'),
+      new HumanMessage('Did it work?'),
+    ]);
+    expect(result.calls).toBe(1);
+    expect(binaryBlocksIn(result.messages)).toEqual([]);
+  });
+
+  it('the error a user reads names the file and the provider and says the conversation is unaffected', async () => {
+    const mw = await mwFor('groq');
+    const error: any = await runModelCall(
+      mw,
+      binaryRound('file', 'application/pdf', B64, '/tmp/test.pdf'),
+      () => {
+        throw providerRejection();
+      }
+    ).catch((thrown) => thrown);
+
+    expect(error.message).toMatch(/"test\.pdf" \(application\/pdf\)/);
+    expect(error.message).toMatch(/"groq"/);
+    expect(error.message).toMatch(/NOT part of the conversation/);
+    // The vendor's own words are kept, not replaced: they are what a bug report needs.
+    expect(error.message).toContain('invalid_request_error');
+  });
+
+  it('the note leaves the failure classified as it was — a retry still will not help', async () => {
+    const mw = await mwFor('groq');
+    const error = await runModelCall(
+      mw,
+      binaryRound('file', 'application/pdf', B64, '/tmp/test.pdf'),
+      () => {
+        throw providerRejection();
+      }
+    ).catch((thrown) => thrown);
+
+    // Both sides, so this reads as "unchanged" rather than "happens to be right": the raw provider
+    // error and the annotated one classify the same. The note is prose added to the text the
+    // classifier reads, and a word like "quota" or "unauthorized" in it would silently restate a
+    // permanent rejection as something worth retrying.
+    expect(classifyThrownTermination(providerRejection()).category).toBe('invalid_request');
+    expect(classifyThrownTermination(error).category).toBe('invalid_request');
+  });
+
+  it('CONTROL — a failure that is not a rejection of the request is passed on untouched', async () => {
+    const mw = await mwFor('groq');
+    const raw = new Error('fetch failed');
+    const error = await runModelCall(
+      mw,
+      binaryRound('file', 'application/pdf', B64, '/tmp/test.pdf'),
+      () => {
+        throw raw;
+      }
+    ).catch((thrown) => thrown);
+
+    // A dropped connection on a turn that happened to carry an attachment is not about the
+    // attachment, and a note saying otherwise sends the user after the wrong thing.
+    expect(error).toBe(raw);
+    expect(error.message).toBe('fetch failed');
   });
 });

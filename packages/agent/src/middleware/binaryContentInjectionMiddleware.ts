@@ -9,9 +9,12 @@
  * This middleware:
  * 1. Detects the gth_read_binary tool calls
  * 2. Parses the special string format from ToolMessage content
- * 3. Injects HumanMessage with binary content blocks before next model call
+ * 3. Adds a HumanMessage carrying the binary content block to the model call that follows the tool
+ *    result — to that REQUEST only, never to the conversation (see {@link wrapModelCall} below)
  * 4. Refuses a non-image attachment bound for a provider measured to discard it silently
  *    (see {@link nonImageBinaryFateFor})
+ * 5. Says, in the user's terms, that an attachment rode a request the provider rejected, and that
+ *    the conversation is unaffected (see `noteRejectedAttachment`)
  *
  * This works around LangChain's limitation where ToolMessage doesn't properly
  * support binary content blocks for most providers.
@@ -21,8 +24,9 @@ import { createMiddleware, type AgentMiddleware } from 'langchain';
 import path from 'node:path';
 import type { GthConfig } from '@gaunt-sloth/core/config.js';
 import { debugLog } from '@gaunt-sloth/core/utils/debugUtils.js';
-import { ToolMessage, HumanMessage } from '@langchain/core/messages';
-import type { MessageContent } from '@langchain/core/messages';
+import { classifyThrownTermination } from '@gaunt-sloth/core/core/terminationReason.js';
+import { HumanMessage, isToolMessage } from '@langchain/core/messages';
+import type { BaseMessage, MessageContent } from '@langchain/core/messages';
 import { imageBlockFor } from '#src/middleware/frontendImageInjectionMiddleware.js';
 
 export interface BinaryContentInjectionMiddlewareSettings {
@@ -206,6 +210,82 @@ function getFormatLabel(formatType: string): string {
   return labels[formatType] || 'file';
 }
 
+/**
+ * The `gth_read_binary` results this model call is the direct continuation of: the trailing run of
+ * ToolMessages, which is exactly what a model call following tool execution ends with.
+ *
+ * **The window is the fix, not a tidy-up.** Scanning a fixed number of recent messages instead
+ * re-matches the same tool result on the NEXT turn, when the user has typed something unrelated and
+ * the ToolMessage has not yet aged out — so the attachment is rebuilt and re-sent on a request that
+ * has nothing to do with it. A provider that rejects the block then rejects every one of those
+ * turns too, which is the whole session-killing shape [[CFG-69]] exists to remove; scoping the
+ * injection by state alone would leave that half standing. Stopping at the first non-tool message
+ * also keeps the multi-attachment case intact: parallel `gth_read_binary` calls in one step land as
+ * adjacent ToolMessages and are all collected.
+ *
+ * `isToolMessage` rather than `instanceof ToolMessage`: the predicate is class-identity free, so a
+ * second `@langchain/core` copy in a consumer's tree cannot make a real tool result look like the
+ * end of the run and silently drop the attachment.
+ */
+function collectTrailingBinaryContent(messages: readonly BaseMessage[]): ParsedBinaryContent[] {
+  const found: ParsedBinaryContent[] = [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (!isToolMessage(msg)) break;
+    if (msg.name === 'gth_read_binary' && typeof msg.content === 'string') {
+      const parsedContent = parseBinaryContent(msg.content);
+      if (parsedContent) {
+        found.push(parsedContent);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Say what happened to the person watching, when a request carrying an attachment is rejected.
+ *
+ * What they get otherwise is the vendor's validation dump — an index into a message array
+ * (`messages.4.content.1`) that names neither the file nor the provider, and says nothing about
+ * whether the conversation is still usable. That last part is the question they actually have, and
+ * since the injection is request-scoped the answer is a definite yes.
+ *
+ * **Only a rejection of the request itself is annotated**, decided by the shared classifier rather
+ * than by a second opinion about error prose: a dropped connection or a rate limit on a turn that
+ * happened to carry an attachment is not about the attachment, and a note claiming otherwise would
+ * send the user chasing the wrong thing. The claims made are true even when the attachment was not
+ * what the provider objected to — the request did carry it, and it is not in the conversation.
+ *
+ * The original error is annotated and rethrown rather than replaced, so the status, name, cause and
+ * any classification already attached survive: {@link classifyThrownTermination} reads the text, so
+ * a wrapper would decide the category from prose alone. **The added sentence therefore has to avoid
+ * every token that classifies EARLIER than the invalid-request arm** — rate/quota, auth, timeout,
+ * network and provider-fault wording — or the note itself would restate the failure as a different
+ * kind and cost the user the one fact this category carries: that sending it again will not help.
+ * `binaryContentInjectionMiddleware.spec.ts` pins that with the classifier itself.
+ *
+ * Fail-soft in both directions: a non-Error throw and an unwritable `message` leave the failure
+ * exactly as it arrived, because explaining one must never become a second one.
+ */
+function noteRejectedAttachment(error: unknown, attachments: string[], provider: string): unknown {
+  try {
+    if (attachments.length === 0 || !(error instanceof Error)) return error;
+    if (classifyThrownTermination(error).category !== 'invalid_request') return error;
+    const providerLabel = provider ? `"${provider}"` : 'the model provider';
+    const noun = attachments.length === 1 ? 'attachment' : 'attachments';
+    error.message =
+      `The provider ${providerLabel} would not accept this request. It carried the ${noun} ` +
+      `${attachments.join(', ')}, which gth_read_binary read and added to that one request only — ` +
+      `so the ${noun} is NOT part of the conversation and your next message is unaffected. Ask ` +
+      `again without reading that file, or use a provider that accepts it. ` +
+      `What the provider said follows.\n` +
+      error.message;
+  } catch {
+    /* explaining a failure must never become a second failure */
+  }
+  return error;
+}
+
 export function createBinaryContentInjectionMiddleware(
   settings: BinaryContentInjectionMiddlewareSettings,
   _gthConfig: GthConfig
@@ -219,35 +299,44 @@ export function createBinaryContentInjectionMiddleware(
     createMiddleware({
       name: 'binary-content-injection',
 
-      // Before next model call, detect and inject HumanMessage with binary content
-      beforeModel: async (state) => {
-        const messages = state.messages || [];
+      // Add the binary content to the model call that follows the tool result — to the REQUEST,
+      // never to graph state.
+      //
+      // [[CFG-69]] — **the injection must never be a state update, and that is what this hook
+      // choice buys.** A `beforeModel` returning `{ messages }` writes the injected HumanMessage
+      // into the conversation, where it is re-sent on every later request. Measured live on `groq`,
+      // whose API rejects a non-image attachment with a 400 (see {@link nonImageBinaryFateFor}'s
+      // `groq` arm): the first turn failed on `messages.4`, and so did the next two, which carried
+      // no attachment and mentioned no file — the index never moved, because the offending content
+      // was in the history rather than in that turn, so no message the user could send would
+      // succeed. A provider's rejection is legible and correctly classified; what made it fatal was
+      // the content outliving the request it was built for.
+      //
+      // `wrapModelCall` is what scopes it: the injected message goes into `handler`'s request and is
+      // discarded when the call returns, so nothing this middleware builds can be replayed and
+      // there is no history to prune after a failure. The default-on middleware rule that history
+      // is not mutated is the same one, arrived at from the other side.
+      //
+      // **What the model sees afterwards:** the binary payload is visible on the model call that
+      // directly follows the read, and not on later ones — if the model reads a file, calls another
+      // tool, and then needs the bytes again, it re-reads the file. The `gth_read_binary`
+      // ToolMessage itself stays in history exactly as before, so the fact that the file was read,
+      // and its path, remain part of the conversation.
+      wrapModelCall: async (request, handler) => {
+        const messages = request.messages ?? [];
 
-        // Find recent ToolMessages from gth_read_binary
-        const binaryMessages: Array<{ message: ToolMessage; binaryData: ParsedBinaryContent }> = [];
+        // The gth_read_binary results this call continues from (the trailing ToolMessage run).
+        const binaryMessages = collectTrailingBinaryContent(messages);
 
-        // Check last few messages (usually just need to check the most recent)
-        for (let i = messages.length - 1; i >= Math.max(0, messages.length - 5); i--) {
-          const msg = messages[i];
-          if (
-            msg instanceof ToolMessage &&
-            msg.name === 'gth_read_binary' &&
-            typeof msg.content === 'string'
-          ) {
-            const parsedContent = parseBinaryContent(msg.content);
-            if (parsedContent) {
-              binaryMessages.push({ message: msg, binaryData: parsedContent });
-            }
-          }
-        }
-
-        // If we found binary content, inject HumanMessage(s)
+        // If we found binary content, add HumanMessage(s) to this request
         if (binaryMessages.length > 0) {
           debugLog(`Injecting ${binaryMessages.length} HumanMessage(s) with binary content`);
 
           const newMessages = [...messages];
+          // What rode this request, in the user's words, for `noteRejectedAttachment` below.
+          const attachments: string[] = [];
 
-          for (const { binaryData } of binaryMessages) {
+          for (const binaryData of binaryMessages) {
             const formatLabel = getFormatLabel(binaryData.formatType);
             // Images go through the per-provider builder so OpenAI reasoning models (Responses API,
             // GS2-74) get a valid `image_url` block instead of the standard `source_type` data block,
@@ -262,7 +351,7 @@ export function createBinaryContentInjectionMiddleware(
             // untouched — so its server half was measured live instead: it rejects with a 400 the
             // user reads, which is loud, so nothing is refused for it here.
             //
-            // Refusing from `beforeModel` is a deliberate departure from CFG-45's ruling that this
+            // Refusing from this hook is a deliberate departure from CFG-45's ruling that this
             // path must never throw, and the difference is the evidence. That ruling protects a
             // possibly-suboptimal block on a provider nobody has measured — it might still work.
             // Here the content is measured to be gone before the request is built, so the only
@@ -312,16 +401,19 @@ export function createBinaryContentInjectionMiddleware(
             });
 
             newMessages.push(humanMessage);
+            attachments.push(`"${path.basename(binaryData.path)}" (${binaryData.media_type})`);
           }
 
-          // Return the modified state with new messages
-          return {
-            messages: newMessages,
-          };
+          // Call the model with the attachment(s), and say what happened if it is rejected.
+          try {
+            return await handler({ ...request, messages: newMessages });
+          } catch (error) {
+            throw noteRejectedAttachment(error, attachments, provider);
+          }
         }
 
         // No binary content, pass through
-        return undefined;
+        return handler(request);
       },
     })
   );
