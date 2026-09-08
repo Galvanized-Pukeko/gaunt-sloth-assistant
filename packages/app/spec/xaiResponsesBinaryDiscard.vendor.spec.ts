@@ -74,8 +74,14 @@ describe('VENDOR PIN — @langchain/xai Responses converter (a red here means xA
     // Neither switch can match a label the vendor no longer emits. If xAI renames it, both arms fall
     // to their `default`: CFG-63's refusal silently stops firing and the user is back to a confident
     // answer about a file the model never received, and CFG-45's images fall to the standard block
-    // this same converter destroys. Measured: renaming this return value leaves every OTHER cell in
-    // the repo green, so without this line the rename is invisible.
+    // this same converter destroys.
+    //
+    // MEASURED, by renaming this return value in the installed package and running the whole unit
+    // suite: `1 failed | 8991 passed | 3 skipped (8995)` — the one failure being THIS cell. Every
+    // other cell in the repo stays green, so without this line the rename is invisible. The reason
+    // no other cell catches it is that they all pass the label as a literal string fixture (e.g.
+    // `imageBlockFor('xai-responses', …)` in `frontendImageInjectionMiddleware.spec.ts`) rather than
+    // asking the vendor class for it — a literal cannot notice that the vendor stopped agreeing.
     //
     // **A red here means xAI RENAMED the label — it does not mean gth broke.** The fix is to update
     // both `case` labels to the vendor's new string (and this assertion), NOT to delete the
