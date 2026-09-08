@@ -14,6 +14,7 @@ import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langcha
 import type { GthConfig } from '#src/config.js';
 import {
   createBinaryContentInjectionMiddleware,
+  nonImageBinaryFateFor,
   type BinaryContentInjectionMiddlewareSettings,
 } from '#src/middleware/binaryContentInjectionMiddleware.js';
 import { imageBlockFor } from '#src/middleware/frontendImageInjectionMiddleware.js';
@@ -126,7 +127,11 @@ describe('binary-content-injection — per-provider IMAGE block (GS2-75)', () =>
   });
 });
 
-describe('binary-content-injection — non-image binaries are untouched', () => {
+describe('binary-content-injection — non-image binaries on providers that do not discard them', () => {
+  // CONTROL for the CFG-63 block below: every provider here is measured `delivered-or-loud` or
+  // unenumerated, so all of these pass both before and after the refusal was added. They are what
+  // stops the refusal from growing: a change that started refusing more than the one measured
+  // discarding provider reds here.
   it('a file (application/pdf) keeps the standard createContentBlock data-block, regardless of provider', async () => {
     for (const provider of ['openai', 'ollama', 'anthropic', '']) {
       const mw = await mwFor(provider);
@@ -150,6 +155,99 @@ describe('binary-content-injection — non-image binaries are untouched', () => 
     expect(
       await runBeforeModel(mw, [new HumanMessage('hi'), new AIMessage('hello')])
     ).toBeUndefined();
+  });
+});
+
+/**
+ * CFG-63 — a provider whose converter silently discards a non-image block makes the model answer
+ * blind, so gth refuses before the call instead of sending a request that only looks complete.
+ *
+ * The enumeration behind `nonImageBinaryFateFor` was measured by handing each installed client the
+ * exact block this middleware emits, with `globalThis.fetch` replaced by a capture stub. Exactly one
+ * provider label discards; the rest deliver the payload or fail where somebody sees it. That is why
+ * this is a capability predicate rather than a per-provider block builder — for the one provider
+ * that needs a different block, no such block exists.
+ *
+ * The vendor half of this — that `@langchain/xai` really does still discard — is pinned separately
+ * in `packages/app/spec/xaiResponsesBinaryDiscard.vendor.spec.ts`, because only that package
+ * declares `@langchain/xai`.
+ */
+describe('binary-content-injection — refuses a non-image binary a provider would discard (CFG-63)', () => {
+  it('xai-responses + a PDF → an error naming the file and the provider, instead of an empty part', async () => {
+    const mw = await mwFor('xai-responses');
+    await expect(
+      runBeforeModel(mw, binaryRound('file', 'application/pdf', B64, '/tmp/reports/q3-results.pdf'))
+    ).rejects.toThrow(/q3-results\.pdf/);
+
+    const mw2 = await mwFor('xai-responses');
+    await expect(
+      runBeforeModel(
+        mw2,
+        binaryRound('file', 'application/pdf', B64, '/tmp/reports/q3-results.pdf')
+      )
+    ).rejects.toThrow(/xai-responses/);
+  });
+
+  it('audio and video are refused on the same provider for the same reason', async () => {
+    for (const [type, mime, file] of [
+      ['audio', 'audio/mpeg', '/tmp/briefing.mp3'],
+      ['video', 'video/mp4', '/tmp/clip.mp4'],
+    ] as const) {
+      const mw = await mwFor('xai-responses');
+      await expect(runBeforeModel(mw, binaryRound(type, mime, B64, file))).rejects.toThrow(
+        new RegExp(file.split('/').pop()!.replace('.', '\\.'))
+      );
+    }
+  });
+
+  // The other half of the fix: an IMAGE on the same provider must still work exactly as CFG-45 left
+  // it. This is the control that must SURVIVE — if the refusal were keyed on the provider alone
+  // rather than on the provider AND a non-image format, this cell reds.
+  it('CONTROL — an image on xai-responses is still injected, exactly as CFG-45 left it', async () => {
+    const mw = await mwFor('xai-responses');
+    const result = await runBeforeModel(mw, binaryRound('image', PNG_MIME, B64, IMG_PATH));
+    expect(injectedBlock(result)).toEqual({ type: 'image_url', image_url: { url: PNG_DATA_URL } });
+    expect(injectedBlock(result)).toEqual(imageBlockFor('xai-responses', PNG_MIME, B64));
+  });
+
+  it('the fate table matches the measurement: one label discards, the enumerated rest do not', () => {
+    expect(nonImageBinaryFateFor('xai-responses')).toBe('silently-discarded');
+    for (const provider of [
+      'anthropic',
+      'openai',
+      'openrouter',
+      'deepseek',
+      'xai',
+      'huggingface',
+      'groq',
+      'ollama',
+      'google-genai',
+      'vertexai',
+      'google',
+    ]) {
+      expect(nonImageBinaryFateFor(provider)).toBe('delivered-or-loud');
+    }
+  });
+
+  // CFG-45's ruling that this path stays permissive for an unmeasured label is unchanged: `''` is
+  // what `resolveVisionProvider` yields for a module config supplying an already-built LLM, and a
+  // refusal there would break configurations that work today.
+  it('CONTROL — an unenumerated label is unmeasured, and its attachment is still sent', async () => {
+    for (const provider of ['', 'fake', 'some-future-provider']) {
+      expect(nonImageBinaryFateFor(provider)).toBe('unmeasured');
+      const mw = await mwFor(provider);
+      const result = await runBeforeModel(
+        mw,
+        binaryRound('file', 'application/pdf', B64, '/tmp/doc.pdf')
+      );
+      expect(injectedBlock(result)).toEqual({
+        type: 'file',
+        source_type: 'base64',
+        mime_type: 'application/pdf',
+        data: B64,
+        metadata: { filename: 'doc.pdf' },
+      });
+    }
   });
 });
 
