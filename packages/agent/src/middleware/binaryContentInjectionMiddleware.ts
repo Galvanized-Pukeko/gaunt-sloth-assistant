@@ -92,10 +92,15 @@ export type NonImageBinaryFate = 'silently-discarded' | 'delivered-or-loud' | 'u
  *   to catch: Groq accepting the request and ignoring the unrecognised part, which would make `groq`
  *   a second `silently-discarded` label. Anyone who can make one live call should settle it.
  *
- * Everything else is `unmeasured`. Like {@link imageBlockFor}'s fallback arm this must stay
- * permissive: `resolveVisionProvider` yields `''` for a module config that supplies an already-built
- * LLM, and refusing there would break configurations that work today. It leaves a `debugLog` trace
- * instead, so an unenumerated label is discoverable in a `/debug-dump`.
+ * Everything else is `unmeasured`, and like {@link imageBlockFor}'s fallback arm it must stay
+ * permissive. Who lands there, precisely: any label this switch does not enumerate — a custom or
+ * `fake` provider, a future vendor package, a LangChain class whose `_llmType()` nobody has measured
+ * — plus the empty string, which `resolveVisionProvider` yields only when there is no `llm` or its
+ * `_llmType()` is missing or throws. (A module config supplying an already-built LLM does NOT
+ * generally give `''`: `modelProviderType` is unset there, so the `_llmType()` fallback runs and
+ * returns that class's own label — which is exactly how `xai-responses` arrives above.) Refusing on
+ * a label nobody has measured would break configurations that work today, so this leaves a
+ * `debugLog` trace instead and an unenumerated label is discoverable in a `/debug-dump`.
  *
  * Exported so each arm can be unit-tested directly.
  */
