@@ -994,7 +994,7 @@ gth workflow workflows/triage.mjs --args '{"label":"bug","limit":20}'
 Start an [AG-UI](https://github.com/ag-ui-protocol/ag-ui) compatible HTTP server that exposes the Gaunt Sloth agent over the standard AG-UI protocol.
 
 ```bash
-gth api ag-ui [--port <port>] [--host <host>]
+gth api ag-ui [--port <port>] [--host <host>] [--cors-origin <origin>]
 ```
 
 The server binds `127.0.0.1`, so out of the box only clients on the same machine can reach it. On
@@ -1032,6 +1032,22 @@ gth api ag-ui --host 0.0.0.0 --port 4000
 
 Use `::` instead of `0.0.0.0` to accept IPv6 connections as well.
 
+### Serving a web client that is not on the origin in your config
+
+A browser refuses a cross-origin request unless the server names the page's own origin in
+`Access-Control-Allow-Origin`, and the origin includes the port. So a client you moved — a second
+copy on the same machine, a dev server that took the next free port — is refused by a server still
+naming the origin from `commands.api.cors.allowOrigin`, however right the `--port` is.
+
+Name the origin the page is actually served from:
+
+```bash
+gth api ag-ui --port 4000 --cors-origin http://localhost:5556
+```
+
+The symptom without it is not an error message from this server: the request never arrives, and the
+browser's console reports the blocked preflight.
+
 ### Options
 - `--port <port>` – Port to listen on. The port comes from `--port` when given, otherwise from
   `commands.api.port` in the config, otherwise `3000`.
@@ -1039,6 +1055,9 @@ Use `::` instead of `0.0.0.0` to accept IPv6 connections as well.
   `commands.api.host` in the config, otherwise `127.0.0.1` — IPv4 loopback, so a local client that
   reaches this machine over IPv6 needs `--host ::1`. Any value node's `listen` accepts works — an
   address, `0.0.0.0` (every IPv4 interface), `::` (both families, network included), or a hostname.
+- `--cors-origin <origin>` – The browser origin allowed to call this server. It comes from
+  `--cors-origin` when given, otherwise from `commands.api.cors.allowOrigin` in the config,
+  otherwise `http://localhost:3000`. One origin, not a list: the header carries exactly one.
 
 ### The standalone server: `gaunt-sloth-api`
 
@@ -1046,11 +1065,12 @@ Use `::` instead of `0.0.0.0` to accept IPv6 connections as well.
 a machine without the full `gth` CLI:
 
 ```bash
-gaunt-sloth-api [ag-ui] [--port <port>] [--host <host>] [--config <path>]
+gaunt-sloth-api [ag-ui] [--port <port>] [--host <host>] [--cors-origin <origin>] [--config <path>]
 ```
 
 - `--port <port>` – Port to listen on, in the precedence above.
 - `--host <host>` – Interface to bind, in the precedence above.
+- `--cors-origin <origin>` – Browser origin allowed to call the server, in the precedence above.
 - `-c, --config <path>` – The configuration file to run under. Naming one skips discovery from the
   working directory rather than falling back to it, so a path that is not there ends the run with an
   error instead of a server quietly running the wrong configuration.
@@ -1114,6 +1134,9 @@ gth api ag-ui --port 4000
 
 # Accept connections from the network, not just this machine
 gth api ag-ui --host 0.0.0.0 --port 4000
+
+# Allow a web client served from a port other than the one in the config
+gth api ag-ui --port 4000 --cors-origin http://localhost:5556
 
 # Use a project-specific config
 gth -c ./my-project/.gsloth.config.json api ag-ui --port 3000

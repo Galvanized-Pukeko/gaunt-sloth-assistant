@@ -198,7 +198,9 @@ The `api ag-ui` command reads its settings from `commands.api` in your config fi
 ```
 
 > **Note:** The CLI flags override the config file — `--port` over `commands.api.port`, `--host`
-> over `commands.api.host`.
+> over `commands.api.host`, `--cors-origin` over `commands.api.cors.allowOrigin`. The origin has a
+> flag because it is the other half of the port: whatever moves the web client changes its origin at
+> the same moment, and the thing that moved it cannot rewrite this file.
 
 ## Agent Backend (`agent.backend`)
 

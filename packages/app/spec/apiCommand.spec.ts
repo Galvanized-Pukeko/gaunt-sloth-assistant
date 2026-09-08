@@ -54,23 +54,23 @@ describe('gth api ag-ui --port (CFG-62)', () => {
 
   it('passes a numeric --port to the server as a number', async () => {
     await run('--port', '4000');
-    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4000, undefined);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4000, undefined, undefined);
   });
 
   it('with no --port, uses the configured port, and 3000 when nothing is configured', async () => {
     await run();
-    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, undefined);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, undefined, undefined);
 
     startAgUiServerMock.mockClear();
     const bare = {};
     initConfigMock.mockResolvedValue(bare);
     await run();
-    expect(startAgUiServerMock).toHaveBeenCalledWith(bare, 3000, undefined);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(bare, 3000, undefined, undefined);
   });
 
   it('--port 0 is port 0 (let the OS pick), not the configured port', async () => {
     await run('--port', '0');
-    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 0, undefined);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 0, undefined, undefined);
   });
 
   it('CFG-67: --host reaches the server, and its absence is an absence', async () => {
@@ -78,11 +78,29 @@ describe('gth api ag-ui --port (CFG-62)', () => {
     // and that not typing it arrives as nothing — the value the server reads `commands.api.host`
     // for. A door that substituted its own default here would silently outrank the config file.
     await run('--host', '0.0.0.0');
-    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, '0.0.0.0');
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, '0.0.0.0', undefined);
 
     startAgUiServerMock.mockClear();
     await run();
-    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, undefined);
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, undefined, undefined);
+  });
+
+  it('OPS-16: --cors-origin reaches the server, and its absence is an absence', async () => {
+    // Same division of labour as --host above: the precedence is the server's, so this door owes
+    // only that the typed origin arrives verbatim and that an untyped one arrives as nothing. A
+    // door that substituted a default of its own would outrank commands.api.cors.allowOrigin for
+    // every user who never passed the flag.
+    await run('--cors-origin', 'http://localhost:5556');
+    expect(startAgUiServerMock).toHaveBeenCalledWith(
+      config,
+      4100,
+      undefined,
+      'http://localhost:5556'
+    );
+
+    startAgUiServerMock.mockClear();
+    await run();
+    expect(startAgUiServerMock).toHaveBeenCalledWith(config, 4100, undefined, undefined);
   });
 
   it('refuses --port abc at parse time, before the config is read or the server is started', async () => {

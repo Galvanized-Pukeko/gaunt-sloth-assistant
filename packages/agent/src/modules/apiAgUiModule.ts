@@ -413,11 +413,35 @@ function formatUrlHost(address: string): string {
  * specific interface address, or a hostname — all legitimate. An **empty** host is the one value
  * that is rewritten, because `listen` treats it as falsy and binds the wildcard, which is the
  * opposite of anything an empty value could have meant.
+ *
+ * `corsOrigin` is the browser origin allowed to call this server, and it takes the same shape of
+ * precedence: the argument (the caller's `--cors-origin` flag), then `commands.api.cors.allowOrigin`,
+ * then the default below. It is resolved here rather than at either CLI door for the reason
+ * {@link DEFAULT_AGUI_HOST} gives about the host — one definition, reached by both doors and by a
+ * programmatic caller alike.
+ *
+ * **Why an argument at all**, when the header value is already a config key: the port and the origin
+ * are one decision. Whatever moves the web client — a per-worktree port allocation, a second client
+ * on the same machine, a `WEB_PORT` in a `.env` — changes its origin at the same moment, and a
+ * config file cannot be rewritten by the thing that computed the port. Without the override the
+ * client relocates and every request it makes is then refused by a preflight still naming the origin
+ * it no longer has (OPS-16).
+ *
+ * **Singular**, matching the config key it overrides rather than the ADK server's plural
+ * `--adk.web.cors.origins`: that server matches an incoming origin against a list and echoes the one
+ * that matched, while this one sets the header verbatim, and `Access-Control-Allow-Origin` carries
+ * exactly one origin. A list here would produce a header no browser accepts.
+ *
+ * A **blank** origin falls through to the config rather than being sent, because an empty
+ * `Access-Control-Allow-Origin` matches nothing and would block every browser client — the opposite
+ * of what supplying the flag can have meant. That is the same reasoning as the empty host above and
+ * the opposite outcome, since there the empty value had a live meaning to `listen` worth overriding.
  */
 export async function startAgUiServer(
   config: GthConfig,
   port: number,
-  host?: string
+  host?: string,
+  corsOrigin?: string
 ): Promise<void> {
   const app = express();
   app.use(express.json({ limit: '5mb' }));
@@ -426,13 +450,17 @@ export async function startAgUiServer(
   const requestedHost =
     typeof requested === 'string' && requested.trim() !== '' ? requested.trim() : DEFAULT_AGUI_HOST;
 
-  // CORS — configured via commands.api.cors in config
-  const corsOrigin = config.commands?.api?.cors?.allowOrigin ?? 'http://localhost:3000';
+  // CORS — the origin from the argument, then commands.api.cors in config, then the default; the
+  // other two headers are config-only, since neither tracks where the client moved to.
+  const requestedCorsOrigin =
+    typeof corsOrigin === 'string' && corsOrigin.trim() !== '' ? corsOrigin.trim() : undefined;
+  const allowOrigin =
+    requestedCorsOrigin ?? config.commands?.api?.cors?.allowOrigin ?? 'http://localhost:3000';
   const corsMethods = config.commands?.api?.cors?.allowMethods ?? 'POST, GET, OPTIONS';
   const corsHeaders = config.commands?.api?.cors?.allowHeaders ?? 'Content-Type, Accept';
 
   app.use((_req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
     res.setHeader('Access-Control-Allow-Methods', corsMethods);
     res.setHeader('Access-Control-Allow-Headers', corsHeaders);
     if (_req.method === 'OPTIONS') {

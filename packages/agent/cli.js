@@ -2,7 +2,7 @@
 
 /**
  * CLI for gaunt-sloth-api.
- * Usage: gaunt-sloth-api [api-type] [--port <port>] [--host <host>] [--config <path>]
+ * Usage: gaunt-sloth-api [api-type] [--port <port>] [--host <host>] [--cors-origin <origin>] [--config <path>]
  *
  * Starts an API server. Currently supports 'ag-ui' type.
  *
@@ -11,6 +11,11 @@
  * covers a programmatic caller as well as this door, and the two doors cannot drift. The flag is
  * passed through unvalidated: an unresolvable host raises on the socket's `error` event and ends the
  * run, where a list of accepted literals would refuse `::`, an interface address or a hostname.
+ *
+ * `--cors-origin` is resolved the same way and for the same reason. It exists because the port and
+ * the browser origin are one decision: a launcher that moves the web client knows its new origin and
+ * cannot rewrite the config file that pins the old one, so without the flag the client relocates and
+ * every request it makes is refused by a preflight naming an origin it no longer has (OPS-16).
  *
  * Port precedence is the flag, then `commands.api.port` from the config file, then 3000. `--config`
  * names the configuration outright: it reaches `initConfig` as `customConfigPath`, which skips
@@ -36,26 +41,31 @@ import { displayError, displayInfo } from '@gaunt-sloth/core/utils/consoleUtils.
 /** The port used when neither `--port` nor `commands.api.port` says otherwise. */
 const DEFAULT_PORT = 3000;
 
-const USAGE = `Usage: gaunt-sloth-api [api-type] [--port <port>] [--host <host>] [--config <path>]
+const USAGE = `Usage: gaunt-sloth-api [api-type] [--port <port>] [--host <host>] [--cors-origin <origin>] [--config <path>]
 
 Starts an API server. The only api-type is 'ag-ui', which is also the default.
 
 Options:
-  --port <port>        Port to listen on (1-65535).
-  --host <host>        Interface to bind. Default 127.0.0.1, which only this machine can reach;
-                       0.0.0.0 (or :: for IPv6 as well) accepts connections from the network.
-                       The server has no authentication, so that is a deliberate exposure.
-  -c, --config <path>  Path to a configuration file. The file must exist; naming one skips
-                       discovery from the working directory rather than falling back to it.
-  -h, --help           Show this message.
+  --port <port>          Port to listen on (1-65535).
+  --host <host>          Interface to bind. Default 127.0.0.1, which only this machine can reach;
+                         0.0.0.0 (or :: for IPv6 as well) accepts connections from the network.
+                         The server has no authentication, so that is a deliberate exposure.
+  --cors-origin <origin> Browser origin allowed to call this server, sent back as
+                         Access-Control-Allow-Origin. One origin, not a list. Use it when the
+                         page is served from somewhere other than the origin in the config.
+  -c, --config <path>    Path to a configuration file. The file must exist; naming one skips
+                         discovery from the working directory rather than falling back to it.
+  -h, --help             Show this message.
 
 Port precedence: --port, then commands.api.port from the config file, then ${DEFAULT_PORT}.
 Host precedence: --host, then commands.api.host from the config file, then 127.0.0.1.
+CORS origin precedence: --cors-origin, then commands.api.cors.allowOrigin from the config file.
 
 Examples:
   $ gaunt-sloth-api
   $ gaunt-sloth-api ag-ui --port 4000
   $ gaunt-sloth-api ag-ui --host 0.0.0.0 --port 4000
+  $ gaunt-sloth-api ag-ui --port 4000 --cors-origin http://localhost:5556
   $ gaunt-sloth-api ag-ui --port 4000 --config ./.gsloth.config.json`;
 
 /**
@@ -84,6 +94,7 @@ function parseCliArgs() {
       options: {
         port: { type: 'string' },
         host: { type: 'string' },
+        'cors-origin': { type: 'string' },
         config: { type: 'string', short: 'c' },
         help: { type: 'boolean', short: 'h' },
       },
@@ -120,7 +131,7 @@ async function main() {
 
     if (apiType === 'ag-ui') {
       displayInfo('Starting AG-UI API server...');
-      await startAgUiServer(config, port, values.host);
+      await startAgUiServer(config, port, values.host, values['cors-origin']);
     } else {
       displayError(`Unknown API type: ${apiType}. Supported types: ag-ui`);
       process.exit(1);

@@ -287,6 +287,62 @@ describe('apiAgUiModule', () => {
     expect(mockNext).toHaveBeenCalled();
   });
 
+  // OPS-16 — the CORS origin argument, at the read site where its precedence is resolved. The
+  // measurement that matters is the preflight one in packages/agent/spec/apiBin.spec.ts, over a
+  // real socket through the real bin; these three cells pin the resolution itself, which a spawned
+  // server cannot show separately from everything else it does.
+  //
+  // Each names the origin it expects as a literal. Reading it back from the same config the code
+  // reads would pass whether or not the argument is honoured — the argument's whole job is to
+  // disagree with that config.
+  const corsConfigFor = (allowOrigin: string) =>
+    ({
+      commands: { api: { cors: { allowOrigin } } },
+    }) as Partial<GthConfig> as GthConfig;
+
+  /** The Access-Control-Allow-Origin the middleware installed by the last boot sets. */
+  function allowOriginHeader(): unknown {
+    const corsMiddleware = mockUseFn.mock.calls[1][0];
+    const mockRes = makeMockRes();
+    corsMiddleware({ method: 'OPTIONS' }, mockRes, vi.fn());
+    const header = mockRes.setHeader.mock.calls.find(
+      (call) => call[0] === 'Access-Control-Allow-Origin'
+    );
+    return header?.[1];
+  }
+
+  it('OPS-16: the corsOrigin argument outranks the configured allowOrigin', async () => {
+    const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+    await startAgUiServer(
+      corsConfigFor('http://localhost:5555'),
+      3000,
+      undefined,
+      'http://localhost:5556'
+    );
+
+    expect(allowOriginHeader()).toBe('http://localhost:5556');
+  });
+
+  it('OPS-16: with no corsOrigin argument the configured allowOrigin still serves', async () => {
+    // The control. This is the behaviour every existing deployment has, and a change that only
+    // works when the new lever is pulled would be a different defect from the one OPS-16 fixes.
+    const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+    await startAgUiServer(corsConfigFor('http://localhost:5555'), 3000);
+
+    expect(allowOriginHeader()).toBe('http://localhost:5555');
+  });
+
+  it('OPS-16: a blank corsOrigin falls through to the config rather than being sent', async () => {
+    // An empty Access-Control-Allow-Origin matches no origin at all, so sending one would block
+    // every browser client — the opposite of what passing the flag can have meant. Unlike the empty
+    // host, which `listen` reads as the wildcard and which is therefore rewritten to the loopback
+    // default, an empty origin has no live meaning to preserve.
+    const { startAgUiServer } = await import('#src/modules/apiAgUiModule.js');
+    await startAgUiServer(corsConfigFor('http://localhost:5555'), 3000, undefined, '   ');
+
+    expect(allowOriginHeader()).toBe('http://localhost:5555');
+  });
+
   it('should respond with 204 for OPTIONS requests', async () => {
     const config = {
       commands: {

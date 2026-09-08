@@ -12,7 +12,9 @@
  *
  * And the port cell **connects to the port**. A banner is a claim about a socket, and only the
  * socket can settle it: `GET /health` answering on the flag's port is the one thing that separates
- * a bound flag from a dropped one.
+ * a bound flag from a dropped one. The same holds for `--cors-origin`, whose cells send a real
+ * preflight and read the header off the response: an allowed origin is a fact about what crossed
+ * the wire, and the browser that refuses a chat request has no other source for it.
  *
  * ## Why a cell holds a port of its own
  *
@@ -164,7 +166,11 @@ function childEnv(home: string): NodeJS.ProcessEnv {
 }
 
 /** A config the fake provider can serve with no key and no network. */
-function writeFixtureConfig(path: string, port?: number): void {
+function writeFixtureConfig(path: string, port?: number, allowOrigin?: string): void {
+  const api = {
+    ...(port === undefined ? {} : { port }),
+    ...(allowOrigin === undefined ? {} : { cors: { allowOrigin } }),
+  };
   writeFileSync(
     path,
     JSON.stringify({
@@ -172,9 +178,41 @@ function writeFixtureConfig(path: string, port?: number): void {
       // An empty allow-list disables tool resolution outright, so no MCP/A2A server is contacted
       // just to have the result discarded — see GthLangChainAgent.init.
       allowedTools: [],
-      ...(port === undefined ? {} : { commands: { api: { port } } }),
+      ...(Object.keys(api).length === 0 ? {} : { commands: { api } }),
     })
   );
+}
+
+/**
+ * OPS-16 — the origin the demo's config pins, and the origin a relocated web client actually has.
+ *
+ * Both are literals here, and they are literals on purpose. A cell that read either one from the
+ * fixture config, from a `.env`, or from the port allocator would assert that two derivations of
+ * the same value agree, which they do whether or not the flag is honoured. `5556` is the port vite
+ * takes when 5555 is held — the port from this node's original repro — and it is only a
+ * discriminating expectation while it differs from the pinned one.
+ */
+const PINNED_ORIGIN = 'http://localhost:5555';
+const RELOCATED_ORIGIN = 'http://localhost:5556';
+
+/**
+ * Send a CORS preflight from `origin` and return what the server allows.
+ *
+ * A real `OPTIONS` over the socket, because that is the request a browser actually refuses on: the
+ * header this reads is the whole subject, and any assertion made inside the process would pass on a
+ * server whose middleware never reached the wire.
+ */
+async function preflightAllowOrigin(port: number, origin: string): Promise<string | null> {
+  const response = await fetch(`http://127.0.0.1:${port}/agents/default/run`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: origin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type',
+    },
+    signal: AbortSignal.timeout(4000),
+  });
+  return response.headers.get('access-control-allow-origin');
 }
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
@@ -552,6 +590,60 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
     CELL_TIMEOUT_MS
   );
 
+  it(
+    'OPS-16: a preflight from the origin named by --cors-origin is allowed that same origin',
+    async () => {
+      // The acceptance measurement, made the way the defect was found: an OPTIONS preflight sent
+      // from the origin a relocated web client has, against a config still pinning the origin it
+      // used to have. Before this flag existed the answer was the pinned origin whatever the
+      // client's real origin was, and the browser refused every chat request that followed.
+      //
+      // The two origins must DIFFER for this to measure anything. A cell run where the client had
+      // not moved would be allowed the pinned origin and pass on a server that ignores the flag
+      // entirely, which is why neither value is derived from a port allocation.
+      expect(RELOCATED_ORIGIN).not.toBe(PINNED_ORIGIN);
+
+      const port = await freePort();
+      const { dir, home } = makeDirs('cors-flag');
+      writeFixtureConfig(join(dir, '.gsloth.config.json'), undefined, PINNED_ORIGIN);
+
+      const { child, transcript } = startServer(
+        ['ag-ui', '--port', String(port), '--cors-origin', RELOCATED_ORIGIN],
+        dir,
+        home
+      );
+      expect(await waitForHealth(port, child, transcript)).toBe(200);
+
+      expect(
+        await preflightAllowOrigin(port, RELOCATED_ORIGIN),
+        `the server said:\n${transcript()}`
+      ).toBe(RELOCATED_ORIGIN);
+    },
+    CELL_TIMEOUT_MS
+  );
+
+  it(
+    'OPS-16: with no --cors-origin the configured origin is still what a preflight is allowed',
+    async () => {
+      // The control, and it must survive every mutation the cell above reds under. The flag is an
+      // override; a change that served the new lever by dropping the configured origin would break
+      // every deployment that has one — including this demo's own default, which is the case the
+      // flag exists to move rather than to replace.
+      const port = await freePort();
+      const { dir, home } = makeDirs('cors-config');
+      writeFixtureConfig(join(dir, '.gsloth.config.json'), undefined, PINNED_ORIGIN);
+
+      const { child, transcript } = startServer(['ag-ui', '--port', String(port)], dir, home);
+      expect(await waitForHealth(port, child, transcript)).toBe(200);
+
+      expect(
+        await preflightAllowOrigin(port, RELOCATED_ORIGIN),
+        `the server said:\n${transcript()}`
+      ).toBe(PINNED_ORIGIN);
+    },
+    CELL_TIMEOUT_MS
+  );
+
   it('exits non-zero and names the path when --config points at a file that is not there', () => {
     const { dir, home } = makeDirs('missing');
     // A config that IS discoverable from the working directory, so a fallback to discovery would
@@ -604,10 +696,14 @@ describe('the gaunt-sloth-api bin reads the flags it accepts', () => {
     expect(result.status).toBe(0);
     expect(output).toContain('--port');
     expect(output).toContain('--host');
+    expect(output).toContain('--cors-origin');
     expect(output).toContain('--config');
     // The precedence the docs state, stated at the door too, so the two cannot drift apart.
     expect(output).toContain('Port precedence: --port, then commands.api.port');
     expect(output).toContain('Host precedence: --host, then commands.api.host');
+    expect(output).toContain(
+      'CORS origin precedence: --cors-origin, then commands.api.cors.allowOrigin'
+    );
   });
 
   it('refuses an unrecognised flag instead of ignoring it', () => {
