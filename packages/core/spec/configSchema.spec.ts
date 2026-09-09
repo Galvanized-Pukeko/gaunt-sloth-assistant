@@ -11,6 +11,7 @@ import {
   generateConfigJsonSchema,
   OUTPUT_HEADER_RUNGS,
   rawGthConfigSchema,
+  undeliverableBinaryFormatMessage,
   unresolvedRaterProfileMessage,
   validateRawGthConfig,
 } from '#src/config/schema.js';
@@ -382,6 +383,78 @@ describe('config schema (GS2-1 B1)', () => {
       }
       expect(validateRawGthConfig({ llm: { type: 'anthropic' }, binaryFormats: false }).ok).toBe(
         true
+      );
+    });
+  });
+
+  /**
+   * CFG-74 — an entry whose `type` is MISSING or not a string was the one `binaryFormats` case
+   * CFG-68 left unreadable. Its pre-parse scan skipped a non-string `type` on purpose (its job was
+   * the vocabulary), so those entries fell through to the schema, whose `false | array` union
+   * collapses every per-entry issue into `binaryFormats: Invalid input` — no index, no field name,
+   * no hint that `type` is the key. Measured on `{ binaryFormats: [{ extensions: ['png'] }] }`.
+   *
+   * Same route as the CFG-68 cells (`validateRawGthConfig`) and the same reason: the PATH is the
+   * assertion, because `ok === false` was already true before the fix.
+   */
+  describe('binaryFormats entry with a missing or non-string type (CFG-74)', () => {
+    it('names binaryFormats.<n>.type when an entry has no type', () => {
+      const result = validateRawGthConfig({
+        llm: { type: 'anthropic' },
+        binaryFormats: [{ type: 'image', extensions: ['png'] }, { extensions: ['png'] }],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.errorMessage).toContain('binaryFormats.1.type');
+      expect(result.errorMessage).toContain('image, file, audio');
+      expect(result.errorMessage).not.toContain('binaryFormats: Invalid input');
+    });
+
+    it.each([
+      { type: 42 },
+      { type: null },
+      { type: true },
+      { type: { name: 'image' } },
+      { type: ['image'] },
+    ])('names binaryFormats.<n>.type when the type is $type rather than a string', ({ type }) => {
+      const result = validateRawGthConfig({
+        llm: { type: 'anthropic' },
+        binaryFormats: [{ type, extensions: ['png'] }],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.errorMessage).toContain('binaryFormats.0.type');
+      expect(result.errorMessage).toContain(JSON.stringify(type));
+      expect(result.errorMessage).toContain('image, file, audio');
+    });
+
+    it('names the per-command path when the entry is under commands.<cmd>', () => {
+      const result = validateRawGthConfig({
+        llm: { type: 'anthropic' },
+        commands: { review: { binaryFormats: [{ extensions: ['png'] }] } },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.errorMessage).toContain('commands.review.binaryFormats.0.type');
+    });
+
+    it('reports a missing type and an undeliverable one side by side, each at its own index', () => {
+      const result = validateRawGthConfig({
+        llm: { type: 'anthropic' },
+        binaryFormats: [{ extensions: ['png'] }, { type: 'video', extensions: ['mp4'] }],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.errorMessage).toContain('binaryFormats.0.type');
+      expect(result.errorMessage).toContain(
+        'binaryFormats.1.type: "video" is not a binary format type'
+      );
+    });
+
+    // CONTROL — the CFG-68 sentence is byte-for-byte what it was. Widening the scan to shape must
+    // not reword the vocabulary message it already sends; a rewording reds here.
+    it('CONTROL — the undeliverable-value message is unchanged', () => {
+      expect(undeliverableBinaryFormatMessage('imgae')).toBe(
+        '"imgae" is not a binary format type any model provider can receive. Attachments reach a ' +
+          'model as image, file, audio; a block of any other type is rejected when the request is ' +
+          'built — on every provider, after the file has already been read. Use one of image, ' +
+          'file, audio, or remove the entry.'
       );
     });
   });

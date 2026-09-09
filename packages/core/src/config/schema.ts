@@ -130,6 +130,33 @@ export function undeliverableBinaryFormatMessage(type: unknown): string {
   );
 }
 
+/**
+ * CFG-74 — why a `binaryFormats` entry whose `type` is missing, or is not a string at all, is
+ * refused. The sentence above assumes a string was written and argues about its value; these are
+ * the two shapes where there is no value to argue about, so they get a sentence that names the
+ * shape instead. Reaches the user through {@link findUndeliverableBinaryFormatIssues}, for the
+ * same reason that one does: the union around the field would otherwise report the key alone.
+ */
+export function malformedBinaryFormatTypeMessage(type: unknown): string {
+  const vocabulary = DELIVERABLE_BINARY_FORMAT_TYPES.join(', ');
+  if (type === undefined) {
+    return `missing — every binaryFormats entry names its type as one of ${vocabulary}.`;
+  }
+  return (
+    `${describeRawValue(type)} is not a string — a binaryFormats type is one of ${vocabulary}, ` +
+    `written as a string.`
+  );
+}
+
+/** The value as the user wrote it, for a message; falls back to its typeof when JSON cannot. */
+function describeRawValue(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? typeof value;
+  } catch {
+    return typeof value;
+  }
+}
+
 const binaryFormatConfigSchema = z.object({
   type: z.enum(DELIVERABLE_BINARY_FORMAT_TYPES, {
     error: (issue) => undeliverableBinaryFormatMessage(issue.input),
@@ -1801,16 +1828,21 @@ export function findApprovalsGrammarIssues(raw: Record<string, unknown>): Deprec
 
 /**
  * CFG-68 — every `binaryFormats` entry naming a format type no provider can receive, found on the
- * RAW input, with the path that names the offending entry.
+ * RAW input, with the path that names the offending entry. CFG-74 — and every entry whose `type`
+ * is missing or not a string, at the same path, for the same reason.
  *
  * **This exists because the schema's own rejection is unreadable, not because a second opinion is
  * wanted.** `binaryFormats` is a `z.union([false, array])`, and a union whose branches all fail
  * collapses to a single `Invalid input` issue at the union's own path: the narrowed `type` enum
  * does refuse the value, but its message and the INDEX of the entry carrying it are both lost, so
  * the user is told `binaryFormats: Invalid input` about an array. Measured on
- * `{ binaryFormats: [{ type: 'image', ... }, { type: 'video', ... }] }`. Checked here — before the
- * parse, exactly as {@link findApprovalsGrammarIssues} arranges for its own — the message that
- * explains the fix is the only one they read.
+ * `{ binaryFormats: [{ type: 'image', ... }, { type: 'video', ... }] }`, and again on
+ * `{ binaryFormats: [{ extensions: ['png'] }] }`. Checked here — before the parse, exactly as
+ * {@link findApprovalsGrammarIssues} arranges for its own — the message that explains the fix is
+ * the only one they read.
+ *
+ * Only `type` is scanned. An entry's other fields, and an entry that is not an object, still fall
+ * through to the union and read as the key alone.
  *
  * PURE: it only reads the object.
  */
@@ -1825,12 +1857,13 @@ export function findUndeliverableBinaryFormatIssues(
     binaryFormats.forEach((entry, index) => {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
       const type = (entry as Record<string, unknown>).type;
-      if (typeof type !== 'string') return;
+      const path = `${prefix}.${index}.type`;
+      if (typeof type !== 'string') {
+        issues.push({ path, message: malformedBinaryFormatTypeMessage(type) });
+        return;
+      }
       if ((DELIVERABLE_BINARY_FORMAT_TYPES as readonly string[]).includes(type)) return;
-      issues.push({
-        path: `${prefix}.${index}.type`,
-        message: undeliverableBinaryFormatMessage(type),
-      });
+      issues.push({ path, message: undeliverableBinaryFormatMessage(type) });
     });
   };
 
@@ -1992,9 +2025,10 @@ export function validateRawGthConfig(
       };
     }
 
-    // CFG-68 — a `binaryFormats` entry whose type no provider can receive. Before the parse for a
-    // mechanical reason: the union around this field collapses the schema's own message and the
-    // entry's index. See findUndeliverableBinaryFormatIssues.
+    // CFG-68 / CFG-74 — a `binaryFormats` entry whose type no provider can receive, or that has no
+    // string type at all. Before the parse for a mechanical reason: the union around this field
+    // collapses the schema's own message and the entry's index. See
+    // findUndeliverableBinaryFormatIssues.
     const binaryFormatIssues = findUndeliverableBinaryFormatIssues(raw);
     if (binaryFormatIssues.length > 0) {
       return {
