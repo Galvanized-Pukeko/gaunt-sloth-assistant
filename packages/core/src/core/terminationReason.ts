@@ -372,6 +372,11 @@ const CONTEXT_OVERFLOW_PATTERNS: readonly string[] = [
   'input tokens exceed the configured limit',
   'prompt is too long',
   'too many tokens',
+  // [[EXT-163]] Load-bearing for groq alone. Groq's overflow 400 is this sentence and nothing else
+  // (`"Please reduce the length of the messages or completion."`, `type: invalid_request_error`,
+  // `param: messages`, and no `code` to key on), while OpenAI's message — where the sentence comes
+  // from — also matches 'maximum context length' above. Dropping this arm as redundant with that
+  // one turns a groq overflow into an `invalid_request`, which is never compacted.
   'reduce the length of the messages',
   'request too large',
 ];
