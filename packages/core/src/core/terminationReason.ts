@@ -372,11 +372,15 @@ const CONTEXT_OVERFLOW_PATTERNS: readonly string[] = [
   'input tokens exceed the configured limit',
   'prompt is too long',
   'too many tokens',
-  // [[EXT-163]] Load-bearing for groq alone. Groq's overflow 400 is this sentence and nothing else
-  // (`"Please reduce the length of the messages or completion."`, `type: invalid_request_error`,
-  // `param: messages`, and no `code` to key on), while OpenAI's message — where the sentence comes
-  // from — also matches 'maximum context length' above. Dropping this arm as redundant with that
-  // one turns a groq overflow into an `invalid_request`, which is never compacted.
+  // [[EXT-163]] Load-bearing for groq. Measured 2026-09-10, live groq, `allam-2-7b`: the overflow
+  // 400 body was `{"error":{"message":"Please reduce the length of the messages or completion.",
+  // "type":"invalid_request_error","param":"messages"}}`, with no `code` on that response. Groq is
+  // not uniform, though: public records of the same endpoint show this sentence together with
+  // `code: context_length_exceeded`, so the absent code is a property of the response measured,
+  // not of groq. Both shapes classify — a coded one also matches 'context_length_exceeded' above,
+  // since `errorText` collects the nested `code`; an uncoded one matches only this arm. Dropping
+  // this arm as redundant with 'maximum context length' — which OpenAI's message, the sentence's
+  // source, also hits — turns an uncoded groq overflow into an `invalid_request`, never compacted.
   'reduce the length of the messages',
   'request too large',
 ];

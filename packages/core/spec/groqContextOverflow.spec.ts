@@ -9,15 +9,23 @@
  *     {"error":{"message":"Please reduce the length of the messages or completion.",
  *               "type":"invalid_request_error","param":"messages"}}
  *
- * **There is no structural signal in it.** The body carries no `code` — so `context_length_exceeded`,
+ * **No structural signal on that response.** It carries no `code` — so `context_length_exceeded`,
  * the arm an OpenAI-compatible API was expected to hit, never sees it — `type` is the
  * `invalid_request_error` every groq 400 carries, and `param: 'messages'` was not measured to be
  * specific to overflow. The ONLY thing that classifies it is the prose arm
  * `'reduce the length of the messages'` in `CONTEXT_OVERFLOW_PATTERNS`: OpenAI's trailing sentence,
  * which groq reuses as its whole message. OpenAI's own message also matches
  * `'maximum context length'`, so that arm is load-bearing for groq alone — dedupe it as redundant
- * and a groq overflow silently becomes `invalid_request`, which the runner never compacts. The cells
- * here are what turns that removal red.
+ * and an uncoded groq overflow silently becomes `invalid_request`, which the runner never compacts.
+ * The cells here are what turns that removal red.
+ *
+ * **Groq is not uniform, and the absent `code` is a property of the response measured, not of
+ * groq.** Public records of the same endpoint — not measured here — show the identical sentence
+ * carrying `code: context_length_exceeded` (mainstream llama/gemma models, 2024). That shape
+ * classifies too, through `context_length_exceeded` rather than the sentence, because `errorText`
+ * collects the nested `code`; one cell below pins it, labelled as public record. Which shape a given
+ * model sends today is unmeasured, so both must classify, and the prose arm stays load-bearing for
+ * the uncoded one.
  *
  * The fixtures are built with the SDK's real error classes, reached through the client `ChatGroq`
  * constructs (a dependency this package already carries) rather than a phantom `groq-sdk` import, so
@@ -60,7 +68,10 @@ function headers(): Headers {
   return new Headers({ 'x-request-id': 'req_redacted', 'x-groq-region': 'redacted' });
 }
 
-/** Recorded 2026-09-10 — the overflow. */
+/**
+ * Recorded 2026-09-10 — the overflow. No `code` on this response: the bytes below are the whole
+ * body. The coded shape groq has also sent is {@link PUBLIC_RECORD_CODED_OVERFLOW}.
+ */
 const RECORDED_OVERFLOW: GroqErrorBody = {
   error: {
     message: 'Please reduce the length of the messages or completion.',
@@ -81,12 +92,26 @@ const RECORDED_DECOMMISSIONED: GroqErrorBody = {
   },
 };
 
+/**
+ * Public record, NOT measured here — the same sentence carrying a `code`, as groq's own API returned
+ * it on mainstream llama/gemma models in 2024. Groq is not uniform, and which shape a given model
+ * sends today is unmeasured, so both are pinned.
+ */
+const PUBLIC_RECORD_CODED_OVERFLOW: GroqErrorBody = {
+  error: {
+    message: 'Please reduce the length of the messages or completion.',
+    type: 'invalid_request_error',
+    param: 'messages',
+    code: 'context_length_exceeded',
+  },
+};
+
 describe('[[EXT-163]] groq context overflow — the recorded 400', () => {
   const { BadRequestError } = groqErrorClasses();
   const recorded = (): GroqApiError =>
     new BadRequestError(400, RECORDED_OVERFLOW, undefined, headers());
 
-  it('arrives as the SDK error, untyped: no class, no name, no code, no lc_error_code', () => {
+  it('arrives as the SDK error, untyped: no class, no name, no lc_error_code', () => {
     const error = recorded();
     // The SDK constructor reproduces the live throw byte for byte, message included.
     expect(error.message).toBe(
@@ -97,7 +122,6 @@ describe('[[EXT-163]] groq context overflow — the recorded 400', () => {
     expect(error.name).toBe('Error');
     expect(ContextOverflowError.isInstance(error)).toBe(false);
     expect((error as { lc_error_code?: string }).lc_error_code).toBeUndefined();
-    expect(RECORDED_OVERFLOW.error.code).toBeUndefined();
   });
 
   it('is classified as a context overflow', () => {
@@ -140,13 +164,26 @@ describe('[[EXT-163]] groq context overflow — the recorded 400', () => {
   });
 });
 
+describe('[[EXT-163]] the coded shape — public record, not measured here', () => {
+  const { BadRequestError } = groqErrorClasses();
+
+  it('the same sentence carrying a code is classified as a context overflow', () => {
+    // `errorText` collects the nested `code`, so this body matches `context_length_exceeded` before
+    // the sentence is consulted: strip 'reduce the length of the messages' from the patterns and
+    // this cell stays green while the recorded, uncoded cells above go red.
+    const error = new BadRequestError(400, PUBLIC_RECORD_CODED_OVERFLOW, undefined, headers());
+    expect(isContextOverflow(error)).toBe(true);
+    expect(classifyThrownTermination(error).category).toBe('context_overflow');
+  });
+});
+
 describe('[[EXT-163]] the arm is load-bearing for groq alone', () => {
   it("OpenAI's wording, which the sentence was lifted from, still classifies without it", () => {
     // OpenAI's message says "maximum context length" before it says "reduce the length of the
     // messages", so a reader who sees both arms match it may call the trailing one redundant. With
-    // the sentence stripped OpenAI still classifies — through the other arm — and groq, whose whole
-    // message IS the sentence, has no other arm to fall to. That is the surviving control for the
-    // removal the cells above go red on.
+    // the sentence stripped OpenAI still classifies — through the other arm — and the uncoded groq
+    // shape, whose whole message IS the sentence, has no other arm to fall to. That is the
+    // surviving control for the removal the cells above go red on.
     const openaiWithoutTheSentence = Object.assign(
       new Error("This model's maximum context length is 8192 tokens. However, you requested 9001."),
       { status: 400 }
