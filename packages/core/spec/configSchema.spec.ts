@@ -405,26 +405,51 @@ describe('config schema (GS2-1 B1)', () => {
       });
       expect(result.ok).toBe(false);
       expect(result.errorMessage).toContain('binaryFormats.1.type');
+      // The dedicated missing sentence, byte-for-byte after its path. Without this pin a disabled
+      // `undefined` branch falls through to the non-string sentence and every cell stays green.
+      expect(result.errorMessage).toContain(
+        'binaryFormats.1.type: missing — every binaryFormats entry names its type as one of ' +
+          'image, file, audio.'
+      );
       expect(result.errorMessage).toContain('image, file, audio');
       expect(result.errorMessage).not.toContain('binaryFormats: Invalid input');
     });
 
     it.each([
-      { type: 42 },
-      { type: null },
-      { type: true },
-      { type: { name: 'image' } },
-      { type: ['image'] },
-    ])('names binaryFormats.<n>.type when the type is $type rather than a string', ({ type }) => {
-      const result = validateRawGthConfig({
-        llm: { type: 'anthropic' },
-        binaryFormats: [{ type, extensions: ['png'] }],
-      });
-      expect(result.ok).toBe(false);
-      expect(result.errorMessage).toContain('binaryFormats.0.type');
-      expect(result.errorMessage).toContain(JSON.stringify(type));
-      expect(result.errorMessage).toContain('image, file, audio');
-    });
+      { type: 42, rendered: '42' },
+      { type: null, rendered: 'null' },
+      { type: true, rendered: 'true' },
+      { type: ['image'], rendered: '["image"]' },
+      // An object renders by shape, never by JSON: its JSON is not what the user wrote, can run to
+      // pages, and a string-returning `toJSON` (a `Date`, a `URL`, a `String` wrapper) would put a
+      // quoted string inside a sentence that says there is none.
+      { type: { name: 'image' }, rendered: 'an object' },
+      { type: { toJSON: () => 'image' }, rendered: 'an object' },
+      { type: new Date(0), rendered: 'an object (Date)' },
+      { type: new URL('https://example.invalid/'), rendered: 'an object (URL)' },
+      { type: new String('image'), rendered: 'an object (String)' },
+      // A non-finite number renders as written, not as JSON's `null`.
+      { type: NaN, rendered: 'NaN' },
+      { type: Infinity, rendered: 'Infinity' },
+      // JSON cannot render these at all — a bigint throws, a function and a symbol stringify to
+      // `undefined` — so each reads as its typeof, and the validator does not throw. These rows
+      // are what pins the try/catch and the fallback: delete either and a row here reds.
+      { type: 10n, rendered: 'bigint' },
+      { type: () => 'image', rendered: 'function' },
+      { type: Symbol('image'), rendered: 'symbol' },
+    ])(
+      'names binaryFormats.<n>.type when the type is $type rather than a string',
+      ({ type, rendered }) => {
+        const result = validateRawGthConfig({
+          llm: { type: 'anthropic' },
+          binaryFormats: [{ type, extensions: ['png'] }],
+        });
+        expect(result.ok).toBe(false);
+        expect(result.errorMessage).toContain('binaryFormats.0.type');
+        expect(result.errorMessage).toContain(`${rendered} is not a string — `);
+        expect(result.errorMessage).toContain('image, file, audio');
+      }
+    );
 
     it('names the per-command path when the entry is under commands.<cmd>', () => {
       const result = validateRawGthConfig({
@@ -433,6 +458,9 @@ describe('config schema (GS2-1 B1)', () => {
       });
       expect(result.ok).toBe(false);
       expect(result.errorMessage).toContain('commands.review.binaryFormats.0.type');
+      expect(result.errorMessage).toContain(
+        'commands.review.binaryFormats.0.type: missing — every binaryFormats entry'
+      );
     });
 
     it('reports a missing type and an undeliverable one side by side, each at its own index', () => {

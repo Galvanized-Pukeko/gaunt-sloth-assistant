@@ -148,8 +148,23 @@ export function malformedBinaryFormatTypeMessage(type: unknown): string {
   );
 }
 
-/** The value as the user wrote it, for a message; falls back to its typeof when JSON cannot. */
+/**
+ * The value as the user wrote it, for the sentence saying it is not a string. Primitives and arrays
+ * render as their JSON, which is what a config file holds. Two shapes deliberately do not: a
+ * non-finite number renders as `NaN` / `Infinity` rather than JSON's `null`, which names a value the
+ * user never wrote; and an object renders by shape, because its JSON is never what was written, can
+ * run to pages, and — for a `Date`, a `URL`, a `String` wrapper, anything with a string-returning
+ * `toJSON` — would put a quoted string inside a sentence that says there is none. Where JSON cannot
+ * render at all (a bigint throws; a function or symbol stringifies to `undefined`) the typeof is
+ * the description. Only a `.js`/`.mjs`/`.ts` config can carry any of these; JSON cannot.
+ */
 function describeRawValue(value: unknown): string {
+  if (typeof value === 'number') return String(value);
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const ctor = (value as { constructor?: { name?: unknown } }).constructor;
+    const name = ctor !== undefined && typeof ctor.name === 'string' ? ctor.name : '';
+    return name !== '' && name !== 'Object' ? `an object (${name})` : 'an object';
+  }
   try {
     return JSON.stringify(value) ?? typeof value;
   } catch {
@@ -1668,11 +1683,12 @@ const UNNAMEABLE_MCP_SERVER_NAME = '';
  * `approvalsSchema` already carries {@link approvalEntrySchema}: the `approvals` value is a union
  * (the §9.1 scalar-or-object sugar), and zod reports a failing union as ONE issue at the union's
  * own path — `approvals: Invalid input` — with every arm's real diagnosis nested out of reach of
- * the formatter. That is exactly the wrong message for this grammar, where the whole requirement is
- * that a rejection names the offending field, key or pattern. Parsing each entry on its own gets
- * the precise issue back, and because this runs BEFORE the parse the precise message is the only
- * one the user sees. The schema keeps the entries too, so it stays the authority and the emitted
- * JSON Schema still describes them.
+ * the formatter, unless exactly one arm failed only on continuable checks (the exact rule is in
+ * {@link findUndeliverableBinaryFormatIssues}'s docblock). That is exactly the wrong message for
+ * this grammar, where the whole requirement is that a rejection names the offending field, key or
+ * pattern. Parsing each entry on its own gets the precise issue back, and because this runs BEFORE
+ * the parse the precise message is the only one the user sees. The schema keeps the entries too,
+ * so it stays the authority and the emitted JSON Schema still describes them.
  *
  * A bare string is handled separately from the rest, because its message is the migration
  * affordance: it renders the entry for the string that was actually found rather than a generic
@@ -1832,10 +1848,18 @@ export function findApprovalsGrammarIssues(raw: Record<string, unknown>): Deprec
  * is missing or not a string, at the same path, for the same reason.
  *
  * **This exists because the schema's own rejection is unreadable, not because a second opinion is
- * wanted.** `binaryFormats` is a `z.union([false, array])`, and a union whose branches all fail
- * collapses to a single `Invalid input` issue at the union's own path: the narrowed `type` enum
- * does refuse the value, but its message and the INDEX of the entry carrying it are both lost, so
- * the user is told `binaryFormats: Invalid input` about an array. Measured on
+ * wanted.** `binaryFormats` is a `z.union([false, array])`, and zod surfaces one arm's own issues,
+ * paths intact, only when that arm is the ONLY non-aborted arm — an arm being non-aborted when
+ * every one of its issues is a continuable check: `too_small`, `too_big`, or a `custom` issue from
+ * `refine`/`superRefine` without `abort: true`. With zero such arms, or two or more, zod pushes a
+ * single `invalid_union` issue at the union's own path instead. Type and enum failures
+ * (`invalid_type`, `invalid_value`) are never continuable, so a union whose arms all fail on type
+ * always collapses — and this one always does: `false` never matches an array, and the entry
+ * schema has no check constraints, so the narrowed `type` enum's refusal is an `invalid_value`.
+ * The collapsed issue still carries every arm's issues under its `errors` field, paths relative to
+ * the union; what drops them is our own `formatConfigValidationError`, which maps only `path` and
+ * `message` and never descends. So the enum's message and the INDEX of the entry carrying it both
+ * go unreported, and the user is told `binaryFormats: Invalid input` about an array. Measured on
  * `{ binaryFormats: [{ type: 'image', ... }, { type: 'video', ... }] }`, and again on
  * `{ binaryFormats: [{ extensions: ['png'] }] }`. Checked here — before the parse, exactly as
  * {@link findApprovalsGrammarIssues} arranges for its own — the message that explains the fix is
