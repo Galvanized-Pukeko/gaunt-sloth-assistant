@@ -217,6 +217,11 @@ one-line summary, which still names the file that was read:
 }
 ```
 
+One quirk is specific to this tool. Its output opens with a line naming the repository, path and ref
+it read, followed by a blank line, so a depth of `1` or `2` is spent entirely on that header and
+shows none of the file. The useful settings here are `0` for the one-line summary, or `5` and up for
+a few lines of content; a small non-zero depth is not broken, it is the header.
+
 **`maxBytes` caps what the tool returns to the model; `previewLines` caps what is drawn for you.**
 Setting `maxBytes` to quieten your terminal truncates the file the review is reasoning about, and
 setting `previewLines` to save tokens saves none. See
