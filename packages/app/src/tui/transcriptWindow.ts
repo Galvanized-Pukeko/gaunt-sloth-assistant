@@ -34,6 +34,7 @@ import { approvalStopRows } from '@gaunt-sloth/core/core/shell/approvalStop.js';
 import { terminationNotice } from '@gaunt-sloth/core/core/terminationNotice.js';
 import { approvalRequestRows } from '@gaunt-sloth/core/core/approvals/approvalRequest.js';
 import { displayWidth } from '@gaunt-sloth/core/utils/displayWidth.js';
+import { overflowCompactionNotice } from '@gaunt-sloth/agent/modules/slashCommands.js';
 import { renderMarkdown } from '#src/tui/markdown.js';
 import {
   approvalOutcomeLine,
@@ -171,6 +172,14 @@ function turnRows(turn: TurnViewModel, toolsExpanded: boolean, columns: number):
       // are several panels at several depths, not one block above everything, and counting them as
       // one would put the same number of rows in the wrong place.
       rows += reasoningPanelRows(segment.text, toolsExpanded, columns);
+      continue;
+    }
+    if (segment.kind === 'compaction') {
+      // [[EXT-167]] — a <CommandNotice> inside the turn: a bracketing rule, the title, then one
+      // sibling <Text> per body line, counted from the SAME builder the panel paints from.
+      const notice = overflowCompactionNotice(segment.compaction);
+      rows += 1 + siblingRows(notice.title, columns);
+      for (const line of notice.lines) rows += siblingRows(line, columns);
       continue;
     }
     rows += toolCallRows(segment.tool, toolsExpanded, columns);

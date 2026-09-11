@@ -175,9 +175,11 @@ with an error:
 The context overflowed, so 9 earlier messages were folded into a summary (13→5 messages). Retrying.
 ```
 
-*On the plain readline surface (`--no-tui`). The TUI and the editor integrations report the overflow
-and end the turn instead of retrying; bringing them up to this is in progress. The preventive check
-above is not affected — it runs on every surface.*
+That is the plain readline surface (`--no-tui`). The TUI says the same thing as a notice inside the
+turn, at the point where the fold happened: the tool calls above it ran and still count, and the
+answer below it was made with the summary standing in for the older messages. The editor
+integrations put the same lines in the conversation. Every surface retries, and the preventive check
+above runs on every surface too.
 
 A turn is retried once. If the conversation still does not fit after being compacted, the turn ends
 and says why — folding it again would only eat the recent messages it just kept, so the next move is

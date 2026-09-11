@@ -1425,22 +1425,68 @@ export function compactionNotice(
       ],
     };
   }
-  const kept =
-    outcome.keptCount > outcome.keepRecent
-      ? `kept the last ${outcome.keptCount} word for word (${outcome.keepRecent} were asked for; ` +
-        'a tool call and its result stay together)'
-      : `kept the last ${outcome.keptCount} word for word`;
   return {
     title: 'Conversation compacted',
     lines: [
-      `Folded ${plural(outcome.removedCount, 'older message')} into a summary and ${kept}.`,
-      `Model context: ${plural(outcome.before.messages, 'message')} (~${formatCount(outcome.before.characters)} characters) → ` +
-        `${plural(outcome.after.messages, 'message')} (~${formatCount(outcome.after.characters)} characters).`,
+      `Folded ${plural(outcome.removedCount, 'older message')} into a summary and ${keptPhrase(outcome)}.`,
+      contextSizeLine(outcome),
       ...(focus && focus.trim().length > 0 ? [`Summary focus: ${focus.trim()}`] : []),
       'The transcript on screen is unchanged. This is what the model sees from the next turn on, ' +
         'and a resumed session stays compacted.',
     ],
   };
+}
+
+/** GS2-23 — how many messages a compaction kept verbatim, and why that can exceed the ask. */
+function keptPhrase(outcome: ConversationCompaction): string {
+  return outcome.keptCount > outcome.keepRecent
+    ? `kept the last ${outcome.keptCount} word for word (${outcome.keepRecent} were asked for; ` +
+        'a tool call and its result stay together)'
+    : `kept the last ${outcome.keptCount} word for word`;
+}
+
+/** GS2-23 — the model's context before and after a compaction, as a message and character count. */
+function contextSizeLine(outcome: ConversationCompaction): string {
+  return (
+    `Model context: ${plural(outcome.before.messages, 'message')} (~${formatCount(outcome.before.characters)} characters) → ` +
+    `${plural(outcome.after.messages, 'message')} (~${formatCount(outcome.after.characters)} characters).`
+  );
+}
+
+/**
+ * [[EXT-167]] — the notice for a compaction the session applied ON ITS OWN, mid-turn, because the
+ * provider rejected the turn for size (the `context_compacted` event on the typed-event stream).
+ *
+ * The same three facts as {@link compactionNotice}, from the same numbers, so the deliberate and the
+ * involuntary fold cannot describe one outcome two ways — plus the one thing this case must say and
+ * `/compact` need not: **nothing the person is looking at was undone.** The turn is picked up from
+ * where it was, with the summary standing in for the older messages; the tool calls above the
+ * notice ran and are what the model continues from. Warn-toned, because the person did not ask for
+ * this and it changes what the model remembers — a later answer that has "forgotten" something is
+ * explained by this line, and only if it was noticed.
+ */
+export function overflowCompactionNotice(outcome: ConversationCompaction): SlashCommandNotice {
+  return {
+    title: 'Context overflowed — conversation compacted',
+    lines: [
+      `The provider rejected this turn for size, so ${plural(outcome.removedCount, 'older message')} ` +
+        `were folded into a summary and the session ${keptPhrase(outcome)}.`,
+      contextSizeLine(outcome),
+      'Nothing already on screen was undone: the model is picking this turn up again with the ' +
+        'summary standing in for the older messages. The transcript is unchanged, and a resumed ' +
+        'session stays compacted.',
+    ],
+    tone: 'warn',
+  };
+}
+
+/**
+ * [[EXT-167]] — the same notice as one block of text, for a surface that has a conversation to put
+ * a line in but no notice component (the ACP editor integrations).
+ */
+export function overflowCompactionMessage(outcome: ConversationCompaction): string {
+  const notice = overflowCompactionNotice(outcome);
+  return [notice.title, ...notice.lines].join('\n');
 }
 
 /** GS2-23 — `/compact` on a surface with no conversation state behind it (the fixture agent). */

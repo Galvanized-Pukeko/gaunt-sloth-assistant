@@ -3264,6 +3264,13 @@ export class GthAgentRunner {
    * path's empty-stream retry/`invoke` fallback is intentionally NOT duplicated here — the
    * TUI renders the live event stream directly; revisit if empty-stream retries are needed.
    *
+   * [[EXT-167]] — the string path's compact-and-retry-once seam IS here, in
+   * `attemptEventTurn`, because this is the driver the default surfaces use and a context
+   * overflow on it ended the turn where the readline surface recovered. The retry is announced
+   * in-band as a `context_compacted` event rather than only through the status callback, because
+   * the consumer has already painted the rows that preceded the fold and is owed a line at that
+   * point in the turn, not a banner over it.
+   *
    * Tool-approval round-trip (EXT-11): after the stream ends, a gated `run_shell_command`
    * leaves the graph suspended on a `humanInTheLoopMiddleware` interrupt rather than
    * completing. This is the event-stream counterpart to the readline path's
@@ -3347,8 +3354,10 @@ export class GthAgentRunner {
           yield event;
         }
       };
-      yield* tracking(this.agent.streamWithEvents(messages, this.runConfig, signal));
-      yield* tracking(this.resolveToolInterruptsWithEvents(signal));
+      // [[EXT-167]] — the stream and the interrupt drain, with the overflow seam around them. The
+      // tracker is handed in so a retry's events are counted in the SAME sets as the attempt that
+      // failed: a call announced before the fold and closed after it is one call, not two.
+      yield* this.attemptEventTurn(messages, 0, signal, tracking);
       // The abort is the one case that IS distinguishable here, and it buys the wording rather than
       // a different outcome: a turn stopped part-way may have had a call in flight, so this says
       // what is certain — no result arrived — without claiming the command never started.
@@ -3416,6 +3425,56 @@ export class GthAgentRunner {
       // must mean "a site we missed".
       this.noteTermination(terminationReason('runner.events-abandoned', 'control', 'abandoned'));
       this.turnsInFlight--;
+    }
+  }
+
+  /**
+   * [[EXT-167]] — one attempt at the typed-event turn: the agent's stream, then the interrupt
+   * drain, and around both the reactive seam {@link runTurn} has on the string path — catch,
+   * classify, compact, retry once.
+   *
+   * Shaped as `runTurn` is, and for the same reasons. `attempt` is 0 for the turn the user asked
+   * for and 1 for the single retry; the retry passes an EMPTY message list because the user's
+   * message is already in the graph's state (the input step commits before the model step throws),
+   * so re-sending it would append a second copy of the same turn. And the decision is not made
+   * here: {@link handleContextOverflow} is the one seam both drivers call, so the two cannot come
+   * to disagree about what an overflow means or how many retries it is worth — the string path's
+   * behaviour is untouched by this method existing.
+   *
+   * **The retry is a continuation, not a replay.** Resuming from state means the tool calls the
+   * failed attempt already announced — and whose results are already in the graph — are what the
+   * model picks up from; nothing the consumer painted is redone. That is what makes the
+   * `context_compacted` event yielded between the two attempts honest: it marks the point in the
+   * turn where the history behind the model got shorter, and everything either side of it stands.
+   *
+   * The seam sits at THIS level rather than in the driver's outer `catch` because that catch is
+   * outside the `yield*`s: by the time it runs the generator has no way to yield the notice and
+   * then carry on with the same tracker, and a notice committed after the turn would read as though
+   * the fold happened after the answer. A second overflow declines at the seam (`attempt > 0`),
+   * as it does on the string path, and is then re-thrown UNCHANGED — this driver wraps nothing,
+   * where the string path wraps as `Agent processing failed: …` — and the driver's own catch
+   * classifies it: the seam has already stamped the exhausted site on the error, so that
+   * classification inherits it rather than overwriting it.
+   */
+  private async *attemptEventTurn(
+    messages: Message[],
+    attempt: number,
+    signal: AbortSignal | undefined,
+    track: (source: AsyncGenerator<AgentStreamEvent>) => AsyncGenerator<AgentStreamEvent>
+  ): AsyncGenerator<AgentStreamEvent> {
+    const agent = this.agent;
+    const runConfig = this.runConfig;
+    if (!agent || !runConfig) {
+      throw new Error('AgentRunner not initialized. Call init() first.');
+    }
+    try {
+      yield* track(agent.streamWithEvents(messages, runConfig, signal));
+      yield* track(this.resolveToolInterruptsWithEvents(signal));
+    } catch (error) {
+      const compaction = await this.handleContextOverflow(error, attempt);
+      if (!compaction) throw error;
+      yield { type: 'context_compacted', cause: 'context_overflow', compaction };
+      yield* this.attemptEventTurn([], attempt + 1, signal, track);
     }
   }
 
@@ -3846,9 +3905,10 @@ export class GthAgentRunner {
   /**
    * [[EXT-160]] — **decide what a thrown turn's context overflow means, and act on it once.**
    *
-   * Returns `true` when the conversation was made smaller and the turn is worth attempting again;
-   * `false` for everything else, including every failure that is not an overflow at all, in which
-   * case the caller's existing error path runs untouched.
+   * Returns the compaction when the conversation was made smaller and the turn is worth attempting
+   * again; `null` for everything else, including every failure that is not an overflow at all, in
+   * which case the caller's existing error path runs untouched. The string driver reads it as a
+   * boolean; the typed-event driver ([[EXT-167]]) also hands the numbers to its consumer.
    *
    * **The predicate is the taxonomy's, never a private one.** The category comes from the reason an
    * inner site already attached, or failing that from `classifyThrownTermination`, and the decision
@@ -3873,10 +3933,13 @@ export class GthAgentRunner {
    * whole node exists to preserve with a summariser's stack trace buries the one useful thing the
    * turn produced.
    */
-  private async handleContextOverflow(error: unknown, attempt: number): Promise<boolean> {
+  private async handleContextOverflow(
+    error: unknown,
+    attempt: number
+  ): Promise<ConversationCompaction | null> {
     const category =
       terminationReasonOf(error)?.category ?? classifyThrownTermination(error).category;
-    if (terminationPosture(category).remedy !== 'reduce-context') return false;
+    if (terminationPosture(category).remedy !== 'reduce-context') return null;
 
     if (attempt > 0) {
       this.overrideTerminationReason(
@@ -3891,7 +3954,7 @@ export class GthAgentRunner {
         'The context overflowed again after compacting, so this turn was ended. Start a new ' +
           'conversation, or narrow what this turn is asking for.'
       );
-      return false;
+      return null;
     }
 
     // An agent that exposes no conversation state cannot be compacted at ALL, which is a different
@@ -3903,7 +3966,7 @@ export class GthAgentRunner {
       debugLog(
         'Context overflow: this agent exposes no conversation state, so it cannot be compacted.'
       );
-      return false;
+      return null;
     }
 
     let compaction: ConversationCompaction;
@@ -3926,7 +3989,7 @@ export class GthAgentRunner {
         'The context overflowed and there was nothing left to compact, so this turn was ended. ' +
           'Start a new conversation, or narrow what this turn is asking for.'
       );
-      return false;
+      return null;
     }
 
     this.statusUpdate(
@@ -3937,7 +4000,7 @@ export class GthAgentRunner {
     // The retry is a fresh attempt and owes its own reason: the FULL reset, so the failed attempt's
     // provider finish reasons go with it rather than being read later as the retry's.
     this.resetTerminationReason();
-    return true;
+    return compaction;
   }
 
   /**

@@ -1,4 +1,5 @@
 import type { AgentStreamEvent, PendingToolInterrupt } from '@gaunt-sloth/core/core/types.js';
+import type { ConversationCompaction } from '@gaunt-sloth/core/core/compaction.js';
 import { neutralizeUntrustedText } from '@gaunt-sloth/core/core/shell/framing.js';
 import type { TranscriptItem } from '#src/tui/types.js';
 
@@ -166,6 +167,25 @@ export interface ToolSegment {
 }
 
 /**
+ * [[EXT-167]] — the point in a turn where the session compacted the conversation on its own,
+ * because the provider rejected the turn for size (the stream's `context_compacted` event).
+ *
+ * A SEGMENT, held where the event arrived, and not a field on the turn or an item pushed after it:
+ * the rows above it ran and the answer below it was produced with the summary in place of the
+ * older messages, and that boundary is the one fact the notice exists to state. Drawn anywhere else
+ * it would claim the fold happened before the whole turn or after it, and either is false. The
+ * event's data is kept rather than a rendered line, so the renderer and the row oracle derive the
+ * same words from one builder — the discipline every other notice on this surface follows.
+ *
+ * It never reaches the model: {@link turnText} reads `text` segments alone.
+ */
+export interface CompactionSegment {
+  kind: 'compaction';
+  cause: 'context_overflow';
+  compaction: ConversationCompaction;
+}
+
+/**
  * One renderable piece of a turn, in arrival order.
  *
  * The tool call is nested rather than referenced by id on purpose: order and content then have a
@@ -174,7 +194,7 @@ export interface ToolSegment {
  * {@link turnReasoning} derive the flat views the rest of the app used to read off separate
  * fields.
  */
-export type TurnSegment = TextSegment | ReasoningSegment | ToolSegment;
+export type TurnSegment = TextSegment | ReasoningSegment | ToolSegment | CompactionSegment;
 
 /** The two segment kinds that are a run of accumulating characters rather than an event. */
 type RunKind = TextSegment['kind'] | ReasoningSegment['kind'];
@@ -182,6 +202,14 @@ type RunKind = TextSegment['kind'] | ReasoningSegment['kind'];
 /** Build a run segment with its discriminant narrowed, so no cast is needed at the call sites. */
 const run = (kind: RunKind, text: string): TextSegment | ReasoningSegment =>
   kind === 'text' ? { kind, text } : { kind, text };
+
+/**
+ * Whether a segment is a run of accumulating characters — the only kind a later delta of the same
+ * kind extends, and the only kind `displaySegments` re-joins across something invisible. A tool
+ * call and a compaction notice are events: each one is its own block, and two of them never merge.
+ */
+const isRun = (segment: TurnSegment): segment is TextSegment | ReasoningSegment =>
+  segment.kind === 'text' || segment.kind === 'reasoning';
 
 /**
  * The renderable state of a single in-progress assistant turn.
@@ -262,8 +290,8 @@ export function turnReasoning(turn: TurnViewModel): string {
 function appendRun(segments: TurnSegment[], kind: RunKind, delta: string): TurnSegment[] {
   if (delta === '') return segments;
   const last = segments[segments.length - 1];
-  // The `!== 'tool'` test is what narrows `last` to a run, so `last.text` needs no cast.
-  if (last && last.kind !== 'tool' && last.kind === kind) {
+  // `isRun` is what narrows `last` to a run, so `last.text` needs no cast.
+  if (last && isRun(last) && last.kind === kind) {
     const next = segments.slice();
     next[next.length - 1] = run(kind, last.text + delta);
     return next;
@@ -379,6 +407,18 @@ export function foldEvents(state: TurnViewModel, event: AgentStreamEvent): TurnV
         })),
       };
     }
+    case 'context_compacted':
+      // [[EXT-167]] — appended where it arrived, so the boundary it marks is where the reader sees
+      // it: the rows above ran before the fold, the answer below was made after it. Appended, never
+      // merged — a second one in a turn cannot happen (the runtime retries once), and if a stream
+      // ever carried two they would be two facts.
+      return {
+        ...state,
+        segments: [
+          ...state.segments,
+          { kind: 'compaction', cause: event.cause, compaction: event.compaction },
+        ],
+      };
     default: {
       // Exhaustiveness guard: a new AgentStreamEvent variant fails the build here.
       const _never: never = event;
@@ -560,7 +600,8 @@ export const CHECKLIST_TOOL_NAME = 'gth_checklist';
  * panel under a placeholder label until its name arrives.
  */
 function drawsNothing(segment: TurnSegment): boolean {
-  if (segment.kind !== 'tool') return segment.text === '';
+  if (isRun(segment)) return segment.text === '';
+  if (segment.kind === 'compaction') return false;
   return segment.tool.name === CHECKLIST_TOOL_NAME;
 }
 
@@ -589,8 +630,9 @@ export function displaySegments(turn: TurnViewModel): TurnSegment[] {
     if (drawsNothing(segment)) continue;
     const last = drawn[drawn.length - 1];
     // Two runs of the SAME kind with only invisible segments between them re-join; a text run and
-    // a reasoning run never do, because they are different layers of the turn.
-    if (segment.kind !== 'tool' && last && last.kind !== 'tool' && last.kind === segment.kind) {
+    // a reasoning run never do, because they are different layers of the turn — and nothing
+    // re-joins across a tool call or a compaction notice, which is what makes each a boundary.
+    if (isRun(segment) && last && isRun(last) && last.kind === segment.kind) {
       drawn[drawn.length - 1] = run(segment.kind, last.text + segment.text);
       continue;
     }

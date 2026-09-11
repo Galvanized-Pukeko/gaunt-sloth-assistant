@@ -31,6 +31,7 @@ import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import type { GthConfig } from '#src/config.js';
 import type { GthAbstractAgent } from '#src/core/GthAbstractAgent.js';
+import type { AgentStreamEvent } from '#src/core/types.js';
 import { conversationSize, isCompactionSummary } from '#src/core/compaction.js';
 import { terminationReasonOf } from '#src/core/terminationReason.js';
 
@@ -362,5 +363,220 @@ describe('EXT-160 — compact and retry once on a context overflow', () => {
     runnerInternals.turnsInFlight = 1;
     await expect(runner.compactConversation()).rejects.toThrow(/turn is still running/i);
     runnerInternals.turnsInFlight = 0;
+  });
+
+  /**
+   * [[EXT-167]] — **the typed-event driver, which is the one the default surfaces use.** The
+   * string cells above proved the seam's place on `processMessages`; these prove it on
+   * `processMessagesWithEvents`, through the same real graph and the same overflowing model, and
+   * they add the one fact the string path has no way to state: what the CONSUMER is told. A
+   * renderer has painted rows by the time an overflow arrives, so the events have to describe the
+   * fold at the point it happened rather than presenting two attempts as one uninterrupted turn.
+   */
+  describe('[[EXT-167]] the typed-event driver compacts, announces the fold in-band, and retries once', () => {
+    type Compacted = Extract<AgentStreamEvent, { type: 'context_compacted' }>;
+
+    /** Every event the turn yielded, and the error it ended on if it did not end cleanly. */
+    const drain = async (
+      stream: AsyncGenerator<AgentStreamEvent>
+    ): Promise<{ events: AgentStreamEvent[]; thrown: unknown }> => {
+      const events: AgentStreamEvent[] = [];
+      try {
+        for await (const event of stream) events.push(event);
+        return { events, thrown: undefined };
+      } catch (thrown) {
+        return { events, thrown };
+      }
+    };
+    const answerText = (events: AgentStreamEvent[]): string =>
+      events
+        .filter((e): e is Extract<AgentStreamEvent, { type: 'text' }> => e.type === 'text')
+        .map((e) => e.delta)
+        .join('');
+    const folds = (events: AgentStreamEvent[]): Compacted[] =>
+      events.filter((e): e is Compacted => e.type === 'context_compacted');
+    const indexOfType = (events: AgentStreamEvent[], type: AgentStreamEvent['type']): number =>
+      events.findIndex((e) => e.type === type);
+    const withoutSystem = (request: BaseMessage[]): BaseMessage[] =>
+      request.filter((m) => !SystemMessage.isInstance(m));
+
+    it('retries with a measurably smaller prompt, tells the consumer where the fold happened, and answers', async () => {
+      const model = new OverflowingModel();
+      const runner = await makeRunner(model, { streamOutput: true });
+      await buildHistory(runner);
+      const turnsBefore = model.requests.length;
+
+      model.overflowsRemaining = 1;
+      const { events, thrown } = await drain(
+        runner.processMessagesWithEvents([new HumanMessage('SIX' + PADDING)])
+      );
+
+      // The turn recovered: no error, and the answer arrived as ordinary text events.
+      expect(thrown).toBeUndefined();
+      expect(answerText(events)).toContain('answer: SIX');
+
+      // Exactly two turn attempts and exactly one compaction between them — the same budget the
+      // string path spends, measured on the same counters.
+      expect(model.requests.length).toBe(turnsBefore + 2);
+      expect(model.summaryCalls).toBe(1);
+      const failed = conversationSize(model.requests[turnsBefore]);
+      const retried = conversationSize(model.requests[turnsBefore + 1]);
+      expect(retried.messages).toBeLessThan(failed.messages);
+      expect(retried.characters).toBeLessThan(failed.characters);
+
+      // **The events describe the restart.** One fold, announced BEFORE the answer — a consumer
+      // that paints in arrival order therefore draws it above the text the retry produced.
+      const announced = folds(events);
+      expect(announced).toHaveLength(1);
+      expect(events.indexOf(announced[0])).toBeLessThan(indexOfType(events, 'text'));
+      expect(announced[0].cause).toBe('context_overflow');
+      expect(announced[0].compaction.changed).toBe(true);
+      expect(announced[0].compaction.removedCount).toBeGreaterThan(0);
+      // The numbers on the event are the numbers the model was actually sent, not a description of
+      // what was asked for: `before` is the prompt that overflowed and `after` is the prompt that
+      // answered, each measured off the model's own record of the request. The runner's request
+      // carries the static system prompt in front, which the graph state the event was read from
+      // does not, so that one message is dropped on both sides of the comparison — and nothing else.
+      expect(announced[0].compaction.before).toEqual(
+        conversationSize(withoutSystem(model.requests[turnsBefore]))
+      );
+      expect(announced[0].compaction.after).toEqual(
+        conversationSize(withoutSystem(model.requests[turnsBefore + 1]))
+      );
+
+      // The retry's prompt is the compacted one, with the user's pending turn last and present once.
+      const retryRequest = model.requests[turnsBefore + 1];
+      expect(retryRequest.some((m) => isCompactionSummary(m))).toBe(true);
+      expect(
+        retryRequest.filter(
+          (m) => HumanMessage.isInstance(m) && String(m.content).startsWith('SIX')
+        )
+      ).toHaveLength(1);
+      expect(String(retryRequest[retryRequest.length - 1].content)).toContain('SIX');
+
+      // A recovered turn ends as a success, and it is over: the in-flight count is back to zero,
+      // so the next `/compact` is not refused for a turn that has already returned.
+      expect(runner.getTerminationReason()?.category).toBe('completed');
+      expect((runner as unknown as { turnsInFlight: number }).turnsInFlight).toBe(0);
+      // The status channel still carries the string path's one line, for a surface that reads it.
+      expect(noticesFrom().some((n) => /context overflowed.*folded into a summary/i.test(n))).toBe(
+        true
+      );
+    });
+
+    it('a fold after a tool ran keeps the rows already painted and continues the SAME turn — nothing is replayed', async () => {
+      const model = new OverflowingModel();
+      const runner = await makeRunner(model, { streamOutput: true });
+      await buildHistory(runner);
+      const turnsBefore = model.requests.length;
+
+      model.midIterationOverflows = 1;
+      const { events, thrown } = await drain(
+        runner.processMessagesWithEvents([new HumanMessage('SEVEN' + PADDING)])
+      );
+
+      expect(thrown).toBeUndefined();
+      expect(answerText(events)).toContain('answer:');
+      expect(model.summaryCalls).toBe(1);
+      expect(runner.getTerminationReason()?.category).toBe('completed');
+
+      // The tool call the failed attempt made is on the stream ONCE, with its result, and the fold
+      // sits after that result and before the answer: the consumer's rows for it stand, and the
+      // notice lands between the work and the continuation rather than above the whole turn.
+      const starts = events.filter((e) => e.type === 'tool_start');
+      expect(starts).toHaveLength(1);
+      expect(starts[0]).toMatchObject({ id: 'mid-iteration-1', name: 'lookup' });
+      const resultAt = indexOfType(events, 'tool_result');
+      const foldAt = indexOfType(events, 'context_compacted');
+      const answerAt = indexOfType(events, 'text');
+      expect(resultAt).toBeGreaterThanOrEqual(0);
+      expect(foldAt).toBeGreaterThan(resultAt);
+      expect(answerAt).toBeGreaterThan(foldAt);
+
+      // And the retry CONTINUED from that result rather than re-running the turn: the tool's own
+      // output is in the prompt the model answered from, and the tool was not called again.
+      const retryRequest = model.requests[model.requests.length - 1];
+      expect(
+        retryRequest.some((m) => ToolMessage.isInstance(m) && String(m.content) === 'LOOKED-UP')
+      ).toBe(true);
+      expect(model.requests.length).toBe(turnsBefore + 3); // ask → tool round → (overflow) → retry
+    });
+
+    it('ends the turn on a SECOND overflow — one fold, one retry, no loop, and the error is re-thrown unchanged', async () => {
+      const model = new OverflowingModel();
+      const runner = await makeRunner(model, { streamOutput: true });
+      await buildHistory(runner);
+      const turnsBefore = model.requests.length;
+
+      model.overflowsRemaining = 2;
+      const { events, thrown } = await drain(
+        runner.processMessagesWithEvents([new HumanMessage('SIX' + PADDING)])
+      );
+
+      // Two attempts and no third; one compaction, not two.
+      expect(thrown).toBeDefined();
+      expect(model.requests.length).toBe(turnsBefore + 2);
+      expect(model.summaryCalls).toBe(1);
+
+      // The consumer was told about the one fold that happened and was never handed an answer.
+      expect(folds(events)).toHaveLength(1);
+      expect(indexOfType(events, 'text')).toBe(-1);
+
+      // The stated reason, on BOTH carriers — and the error is re-thrown unchanged by THIS driver.
+      // The string path wraps its failure as `Agent processing failed: …`; this one adds no wrapper,
+      // so what the consumer catches is what the agent's stream threw: the framework's own error,
+      // named for the overflow, with the provider's `ContextOverflowError` either being it or one
+      // `cause` link away (the same link `terminationReasonOf` follows).
+      expect((thrown as Error).name).toBe('ContextOverflowError');
+      expect((thrown as Error).message).not.toMatch(/processing failed/i);
+      expect(
+        ContextOverflowError.isInstance(thrown) ||
+          ContextOverflowError.isInstance((thrown as { cause?: unknown }).cause)
+      ).toBe(true);
+      const reason = runner.getTerminationReason();
+      expect(reason?.category).toBe('context_overflow');
+      expect(reason?.site).toBe('runner.overflow-compact-exhausted');
+      expect(terminationReasonOf(thrown)?.site).toBe('runner.overflow-compact-exhausted');
+      expect((runner as unknown as { turnsInFlight: number }).turnsInFlight).toBe(0);
+    });
+
+    it('does not compact when there is nothing left to fold, announces nothing, and says so at its own site', async () => {
+      const model = new OverflowingModel();
+      const runner = await makeRunner(model, { streamOutput: true });
+      model.overflowsRemaining = 1;
+
+      const { events, thrown } = await drain(
+        runner.processMessagesWithEvents([new HumanMessage('ONLY' + PADDING)])
+      );
+
+      expect(thrown).toBeDefined();
+      expect(model.requests.length).toBe(1);
+      expect(model.summaryCalls).toBe(0);
+      // No fold happened, so no fold is announced: a notice for a compaction that did not change
+      // anything would be the surface being told a remedy was applied when it was not.
+      expect(folds(events)).toHaveLength(0);
+      expect(runner.getTerminationReason()?.site).toBe('runner.overflow-compact');
+      expect(noticesFrom().some((n) => /nothing left to compact/i.test(n))).toBe(true);
+    });
+
+    it('leaves a failure that is NOT an overflow entirely alone — the control that must survive', async () => {
+      // Without this, a seam that compacted on every thrown error would pass every cell above.
+      const model = new OverflowingModel();
+      const runner = await makeRunner(model, { streamOutput: true });
+      await buildHistory(runner);
+      const turnsBefore = model.requests.length;
+      vi.spyOn(model, '_generate').mockRejectedValueOnce(new Error('the provider is on fire'));
+
+      const { events, thrown } = await drain(
+        runner.processMessagesWithEvents([new HumanMessage('SIX' + PADDING)])
+      );
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect((thrown as Error).message).toMatch(/on fire/);
+      expect(model.summaryCalls).toBe(0);
+      expect(model.requests.length).toBe(turnsBefore);
+      expect(folds(events)).toHaveLength(0);
+      expect(runner.getTerminationReason()?.category).not.toBe('context_overflow');
+    });
   });
 });

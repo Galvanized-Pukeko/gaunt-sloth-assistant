@@ -567,6 +567,68 @@ describe('the ACP agent — the handshake Zed sends', () => {
 });
 
 describe('the ACP v1 agent — session lifecycle', () => {
+  /**
+   * [[EXT-167]] — the v1 twin of the v2 cell: a compaction the session applied mid-turn reaches
+   * the client as a line in the conversation, after the tool call that ran before the fold and
+   * before the answer made after it, and that answer is a message of its own.
+   */
+  it('reports a mid-turn compaction as a line between the work before it and the answer after it', async () => {
+    const { view, response } = await withClient(
+      {
+        script: {
+          events: [
+            { type: 'tool_start', id: 'call-1', name: 'read_file' },
+            { type: 'tool_args', id: 'call-1', delta: '{"path":"alpha.txt"}' },
+            { type: 'tool_end', id: 'call-1' },
+            { type: 'tool_result', id: 'call-1', content: 'alpha' },
+            {
+              type: 'context_compacted',
+              cause: 'context_overflow',
+              compaction: {
+                changed: true,
+                removedCount: 9,
+                keptCount: 6,
+                keepRecent: 6,
+                summaryText: 'SUMMARY',
+                before: { messages: 15, characters: 40210 },
+                after: { messages: 7, characters: 3120 },
+              },
+            },
+            ...textEvents('the answer'),
+          ],
+        },
+      },
+      async (ctx, h) => {
+        const sessionId = await newSession(ctx);
+        const response = await ctx.request(acp.AGENT_METHODS.session_prompt, {
+          sessionId,
+          prompt: [{ type: 'text', text: 'go' }],
+        });
+        return { view: h.view, response };
+      }
+    );
+
+    expect(response).toMatchObject({ stopReason: 'end_turn' });
+    const kinds = view.updates.map((u) => u.sessionUpdate);
+    const lastToolUpdate = kinds.lastIndexOf('tool_call_update');
+    const textOf = (u: acp.SessionUpdate): string =>
+      String(((u as unknown as { content?: { text?: string } }).content ?? {}).text ?? '');
+    const notice = view.updates.findIndex(
+      (u) => u.sessionUpdate === 'agent_message_chunk' && textOf(u).includes('Context overflowed')
+    );
+    const answer = view.updates.findIndex(
+      (u) => u.sessionUpdate === 'agent_message_chunk' && textOf(u).includes('the answer')
+    );
+    expect(lastToolUpdate).toBeGreaterThanOrEqual(0);
+    expect(notice).toBeGreaterThan(lastToolUpdate);
+    expect(answer).toBeGreaterThan(notice);
+    // v1 has only chunks, so the split is carried by identity: two messages, not one.
+    expect(view.agentMessages.size).toBe(2);
+    expect(view.textOf(view.agentMessages)).toContain(
+      '9 older messages were folded into a summary'
+    );
+  });
+
   it('runs a session end to end and answers the prompt request with the stop reason', async () => {
     const { view, response, sessionId, updateSessionIds } = await withClient(
       { script: { events: textEvents('Hello', ' world') } },

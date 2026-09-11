@@ -18,6 +18,8 @@ import { approvalOutcomeLine, displaySegments } from '#src/tui/viewModel.js';
 import { renderMarkdown } from '#src/tui/markdown.js';
 import { BlankRow } from '#src/tui/components/BlankRow.js';
 import { ApprovalRequestPanel } from '#src/tui/components/ApprovalRequestPanel.js';
+import { CommandNotice } from '#src/tui/components/CommandNotice.js';
+import { overflowCompactionNotice } from '@gaunt-sloth/agent/modules/slashCommands.js';
 
 /**
  * Status glyph + word + colour for a tool call's compact summary line.
@@ -394,6 +396,11 @@ export function LiveTurn({
         const body =
           segment.kind === 'text' ? (
             <Text>{streaming ? segment.text : renderMarkdown(segment.text)}</Text>
+          ) : segment.kind === 'compaction' ? (
+            // [[EXT-167]] — the involuntary fold, drawn as the same block `/compact` commits and at
+            // the point in the turn where it happened. The words come from `overflowCompactionNotice`,
+            // which `transcriptWindow`'s row oracle counts through as well.
+            <CommandNotice {...overflowCompactionNotice(segment.compaction)} />
           ) : segment.kind === 'reasoning' ? (
             // Only the thought at the BOTTOM of a still-streaming turn is the one being written,
             // so it is the only one that previews its newest rows. Once text or a tool call

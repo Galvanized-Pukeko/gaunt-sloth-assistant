@@ -55,6 +55,15 @@ Rules:
   state the surface can actually read — here a threshold surviving in the status under a disabled
   config can only have come from the config, since a session override cannot be recorded while the
   feature is off.
+- **A notice the session raises in the middle of a turn is drawn where it happened, as a segment
+  of that turn (DL-1, DL-4).** The involuntary compaction is the case: the provider rejected the
+  turn for size, the session folded the older messages and retried, and the stream says so with a
+  `context_compacted` event. The tool calls above that point ran and the answer below it was made
+  with the summary in place of the older messages, so the notice is a `compaction` segment of the
+  turn view model, painted with `CommandNotice` from `overflowCompactionNotice(...)` and counted by
+  the row oracle from the same builder. Committed as a transcript item it would land above the whole
+  turn — the viewport draws committed items before the live one — and claim the fold preceded the
+  work. Warn-toned, because the person did not ask for it and it changes what the model remembers.
 
 ### On the plain surface a notice is written to ONE stream (DL-4 transparency, DL-7 graceful degradation)
 

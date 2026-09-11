@@ -435,6 +435,67 @@ afterAll(() => rmSync(projectDir, { recursive: true, force: true }));
 // ---------------------------------------------------------------------------
 
 describe('the ACP v2 agent — session lifecycle', () => {
+  /**
+   * [[EXT-167]] — a compaction the session applied mid-turn reaches the client as a line in the
+   * conversation, IN ORDER: after the tool call that ran before the fold, before the answer made
+   * after it. The event is scripted on the fixture agent's stream because the runner's own emission
+   * of it is pinned in core; what this cell owns is the bridge and the transport — that the line
+   * arrives, where it arrives, and that the answer after it is a message of its own.
+   */
+  it('reports a mid-turn compaction as a message between the work before it and the answer after it', async () => {
+    const view = await withClient(
+      {
+        script: {
+          events: [
+            { type: 'tool_start', id: 'call-1', name: 'read_file' },
+            { type: 'tool_args', id: 'call-1', delta: '{"path":"alpha.txt"}' },
+            { type: 'tool_end', id: 'call-1' },
+            { type: 'tool_result', id: 'call-1', content: 'alpha' },
+            {
+              type: 'context_compacted',
+              cause: 'context_overflow',
+              compaction: {
+                changed: true,
+                removedCount: 9,
+                keptCount: 6,
+                keepRecent: 6,
+                summaryText: 'SUMMARY',
+                before: { messages: 15, characters: 40210 },
+                after: { messages: 7, characters: 3120 },
+              },
+            },
+            ...textEvents('the answer'),
+          ],
+        },
+      },
+      async (ctx, h) => {
+        const sessionId = await newSession(ctx);
+        await ctx.request(acp.AGENT_METHODS.session_prompt, {
+          sessionId,
+          prompt: [{ type: 'text', text: 'go' }],
+        });
+        await waitForStop(h.view);
+        return h.view;
+      }
+    );
+
+    const kinds = view.updates.map((u) => u.sessionUpdate);
+    const lastToolUpdate = kinds.lastIndexOf('tool_call_update');
+    const notice = kinds.indexOf('agent_message');
+    const answer = kinds.indexOf('agent_message_chunk');
+    expect(lastToolUpdate).toBeGreaterThanOrEqual(0);
+    expect(notice).toBeGreaterThan(lastToolUpdate);
+    expect(answer).toBeGreaterThan(notice);
+    // Two messages, not one: the notice, and the answer as its own message after it.
+    expect(view.agentMessages.size).toBe(2);
+    const text = view.textOf(view.agentMessages);
+    expect(text).toContain('Context overflowed — conversation compacted');
+    expect(text).toContain('9 older messages were folded into a summary');
+    expect(text).toContain('the answer');
+    // The tool call the client was shown before the fold settled as what it was: completed.
+    expect(view.toolCalls.get('call-1')).toMatchObject({ status: 'completed' });
+  });
+
   it('runs a session end to end and reports completion on an idle state update', async () => {
     const { view, sessionId, updateSessionIds } = await withClient(
       { script: { events: textEvents('Hello', ' world') } },

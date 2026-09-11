@@ -10,11 +10,13 @@ import { TranscriptViewport } from '#src/tui/components/TranscriptViewport.js';
 import { estimateItemRows, transcriptWindowStart } from '#src/tui/transcriptWindow.js';
 import {
   CHECKLIST_TOOL_NAME,
+  displaySegments,
   extractActiveChecklist,
   foldEvents,
   foldEventSequence,
   initialTurnViewModel,
   turnReasoning,
+  turnText,
   type TurnViewModel,
 } from '#src/tui/viewModel.js';
 import type { TranscriptItem } from '#src/tui/types.js';
@@ -188,6 +190,105 @@ describe('TUI-C52 — foldEvents records arrival order as an ordered segment lis
   it('turnToolCalls derives the tool calls in first-seen order', async () => {
     const { turnToolCalls } = await import('#src/tui/viewModel.js');
     expect(turnToolCalls(foldEventSequence(INTERLEAVED)).map((tc) => tc.id)).toEqual(['t1', 't2']);
+  });
+});
+
+/** [[EXT-167]] — the stream's account of a mid-turn fold, with numbers a reader can check on screen. */
+const COMPACTED: AgentStreamEvent = {
+  type: 'context_compacted',
+  cause: 'context_overflow',
+  compaction: {
+    changed: true,
+    removedCount: 9,
+    keptCount: 6,
+    keepRecent: 6,
+    summaryText: 'SUMMARY',
+    before: { messages: 15, characters: 40210 },
+    after: { messages: 7, characters: 3120 },
+  },
+};
+
+/** A turn that acted, was folded under, and then answered — the shape the runner produces. */
+const FOLDED_MID_TURN: AgentStreamEvent[] = [
+  text('before-fold-run '),
+  ...toolCall('t1', 'alpha_tool'),
+  COMPACTED,
+  text('after-fold-run'),
+];
+
+describe('[[EXT-167]] a compaction the session applied mid-turn is a segment where it happened', () => {
+  beforeEach(() => {
+    chalk.level = 0;
+  });
+
+  it('folds the event into a compaction segment at its arrival position, and the text after it is a NEW run', () => {
+    const vm = foldEventSequence(FOLDED_MID_TURN);
+    expect(vm.segments.map((seg) => seg.kind)).toEqual(['text', 'tool', 'compaction', 'text']);
+    const fold = vm.segments[2];
+    expect(fold.kind === 'compaction' && fold.compaction.removedCount).toBe(9);
+    expect(fold.kind === 'compaction' && fold.cause).toBe('context_overflow');
+  });
+
+  it('is a boundary text does not re-join across, even with nothing else between the two runs', () => {
+    // Two text runs either side of a tool call stay two; the same must hold either side of the
+    // fold, or the answer made after the compaction would be drawn as one paragraph with the text
+    // made before it — precisely the two-attempts-as-one-turn presentation the event exists to stop.
+    const vm = foldEventSequence([text('before '), COMPACTED, text('after')]);
+    expect(vm.segments.map((seg) => seg.kind)).toEqual(['text', 'compaction', 'text']);
+    expect(displaySegments(vm).map((seg) => seg.kind)).toEqual(['text', 'compaction', 'text']);
+  });
+
+  it('never reaches the model: the turn text is the deltas alone', () => {
+    expect(turnText(foldEventSequence(FOLDED_MID_TURN))).toBe('before-fold-run after-fold-run');
+  });
+
+  it('<LiveTurn> paints the notice BETWEEN the tool panel and the answer, streaming and committed', () => {
+    const vm = foldEventSequence(FOLDED_MID_TURN);
+    for (const streaming of [true, false]) {
+      const rows = frameRows(<LiveTurn turn={vm} streaming={streaming} columns={100} />);
+      const before = rowOf(rows, 'before-fold-run');
+      const tool = rowOf(rows, 'alpha_tool');
+      const title = rowOf(rows, 'Context overflowed — conversation compacted');
+      const after = rowOf(rows, 'after-fold-run');
+      expect(
+        [before, tool, title, after].every((i) => i >= 0),
+        `streaming=${streaming}`
+      ).toBe(true);
+      expect(before, `streaming=${streaming}`).toBeLessThan(tool);
+      expect(tool, `streaming=${streaming}`).toBeLessThan(title);
+      expect(title, `streaming=${streaming}`).toBeLessThan(after);
+      // The body says what the numbers were and what was NOT undone — the same builder the
+      // committed `/compact` notice uses, so the two cannot describe one fold two ways.
+      const frame = rows.join('\n');
+      expect(frame).toContain('9 older messages were folded into a summary');
+      expect(frame).toContain(
+        'Model context: 15 messages (~40,210 characters) → 7 messages (~3,120 characters).'
+      );
+      expect(frame).toContain('Nothing already on screen was undone');
+    }
+  });
+
+  it('the row oracle charges the notice: a turn with the fold is estimated taller than the same turn without it', () => {
+    const withFold = foldEventSequence(FOLDED_MID_TURN);
+    const withoutFold = foldEventSequence(FOLDED_MID_TURN.filter((e) => e !== COMPACTED));
+    for (const columns of [40, 100]) {
+      const estimateWith = estimateItemRows(item(withFold), {
+        columns,
+        toolsExpanded: false,
+        separator: false,
+      });
+      const estimateWithout = estimateItemRows(item(withoutFold), {
+        columns,
+        toolsExpanded: false,
+        separator: false,
+      });
+      // A rule, a title and three body lines is at least five rows more, whatever the width.
+      expect(estimateWith - estimateWithout, `at ${columns} columns`).toBeGreaterThanOrEqual(5);
+      // And still a LOWER bound on what Ink really draws — the invariant the viewport rests on.
+      expect(estimateWith, `at ${columns} columns`).toBeLessThanOrEqual(
+        actualRows(item(withFold), columns, false)
+      );
+    }
   });
 });
 

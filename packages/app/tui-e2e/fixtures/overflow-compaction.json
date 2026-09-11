@@ -1,0 +1,28 @@
+{
+  "defaultDelayMs": 15,
+  "turns": [
+    {
+      "events": [
+        { "type": "text", "delta": "before-fold-run " },
+        { "type": "tool_start", "id": "t1", "name": "read_file" },
+        { "type": "tool_args", "id": "t1", "delta": "{\"path\":\"alpha.txt\"}" },
+        { "type": "tool_end", "id": "t1" },
+        { "type": "tool_result", "id": "t1", "content": "alpha-tool-result" },
+        {
+          "type": "context_compacted",
+          "cause": "context_overflow",
+          "compaction": {
+            "changed": true,
+            "removedCount": 9,
+            "keptCount": 6,
+            "keepRecent": 6,
+            "summaryText": "SUMMARY",
+            "before": { "messages": 15, "characters": 40210 },
+            "after": { "messages": 7, "characters": 3120 }
+          }
+        },
+        { "type": "text", "delta": "after-fold-run" }
+      ]
+    }
+  ]
+}

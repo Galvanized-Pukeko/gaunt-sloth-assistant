@@ -25,6 +25,7 @@ import { randomUUID } from 'node:crypto';
 import type { SessionUpdate } from '@agentclientprotocol/sdk/experimental/v2';
 import type { AgentStreamEvent } from '@gaunt-sloth/core/core/types.js';
 import { AcpToolCallTracker, toolKindFor } from '#src/modules/acp/acpToolCalls.js';
+import { overflowCompactionMessage } from '#src/modules/slashCommands.js';
 
 /** One text content block, the shape both message chunks and tool content wrap. */
 function textBlock(text: string): { type: 'text'; text: string } {
@@ -144,6 +145,22 @@ export class AcpUpdateMapper extends AcpToolCallTracker {
             toolCallId: event.id,
             status: event.isError ? 'failed' : 'completed',
             content: [{ type: 'content', content: textBlock(event.content) }],
+          },
+        ];
+      }
+      case 'context_compacted': {
+        // [[EXT-167]] — the session folded the conversation mid-turn and is retrying. It goes as an
+        // `agent_message` of its own — this dialect's way for the agent to put a line in the
+        // conversation about the session rather than about the model's answer, the same channel a
+        // failed turn and a remembered approval report through — and it closes the open text run:
+        // the answer that follows was produced with the summary in place of the older messages, so
+        // it is a NEW message rather than an append to the one the client already considers whole.
+        this.assistantMessageId = null;
+        return [
+          {
+            sessionUpdate: 'agent_message',
+            messageId: randomUUID(),
+            content: [textBlock(overflowCompactionMessage(event.compaction))],
           },
         ];
       }

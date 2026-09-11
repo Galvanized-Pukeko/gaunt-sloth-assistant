@@ -207,6 +207,63 @@ describe('tui <App> — /compact (GS2-23)', () => {
  * status renders as such; this is the seam between them — the surface refreshing the snapshot
  * after the command — which neither of those can see.
  */
+/**
+ * [[EXT-167]] — a compaction the SESSION applied, mid-turn, because the provider rejected the turn
+ * for size. The App is handed the `context_compacted` event in the stream and has to show it where
+ * it happened: below the rows the turn had already painted, above the answer the retry produced,
+ * and never as a line in the model's history.
+ */
+describe('tui <App> — a compaction applied mid-turn (EXT-167)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const foldedTurn: AgentStreamEvent[] = [
+    { type: 'tool_start', id: 't1', name: 'read_file' },
+    { type: 'tool_args', id: 't1', delta: '{"path":"alpha.txt"}' },
+    { type: 'tool_end', id: 't1' },
+    { type: 'tool_result', id: 't1', content: 'alpha-tool-result' },
+    { type: 'context_compacted', cause: 'context_overflow', compaction: outcome() },
+    { type: 'text', delta: 'the answer' },
+  ];
+
+  it('draws the notice between the tool row and the answer, and keeps it out of the history', async () => {
+    const onTurnComplete = vi.fn();
+    const { agent } = compactingAgent(undefined, foldedTurn);
+    const { lastFrame, unmount } = render(
+      <App {...baseProps} agent={agent} initialMessage="Hi sloth" onTurnComplete={onTurnComplete} />
+    );
+    await vi.waitFor(() => expect(lastFrame()).toContain('the answer'));
+    await vi.waitFor(() => expect(lastFrame()).toContain('turns: 1'));
+
+    const rows = (lastFrame() ?? '').split('\n');
+    const rowOf = (needle: string): number => rows.findIndex((row) => row.includes(needle));
+    const user = rowOf('Hi sloth');
+    const tool = rowOf('read_file');
+    const title = rowOf('Context overflowed — conversation compacted');
+    const answer = rowOf('the answer');
+    expect(
+      [user, tool, title, answer].every((i) => i >= 0),
+      rows.join('\n')
+    ).toBe(true);
+    // Below the turn's own work and above its answer — not a banner over the whole turn, which is
+    // where a transcript item pushed on the event would have landed.
+    expect(user).toBeLessThan(tool);
+    expect(tool).toBeLessThan(title);
+    expect(title).toBeLessThan(answer);
+    // The numbers are the event's, rendered by the same builder `/compact` uses.
+    const frame = rows.join('\n');
+    expect(frame).toContain('4 older messages were folded into a summary');
+    expect(frame).toContain(
+      'Model context: 10 messages (~12,345 characters) → 7 messages (~2,100 characters).'
+    );
+    // The history gets the model's words alone.
+    expect(onTurnComplete).toHaveBeenCalledWith('Hi sloth', 'the answer');
+
+    unmount();
+  });
+});
+
 describe('tui <App> — /autocompact (EXT-161)', () => {
   beforeEach(() => {
     vi.resetAllMocks();

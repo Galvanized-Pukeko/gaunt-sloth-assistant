@@ -1,6 +1,7 @@
 import type { GthConfig } from '#src/config.js';
 import type { DeclaredToolAnnotations } from '#src/core/approvals/annotations.js';
 import type { ApprovalSubject } from '#src/core/approvals/matcher.js';
+import type { ConversationCompaction } from '#src/core/compaction.js';
 import type { AutocompactController } from '#src/core/compactionThreshold.js';
 import type { RaterNegotiationRound, ShellSafetyVerdict } from '#src/core/shell/rater.js';
 import type {
@@ -197,6 +198,40 @@ export type AgentStreamEvent =
        * because legitimate output may begin with "Error handling…".
        */
       raterClarification?: boolean;
+    }
+  | {
+      /**
+       * [[EXT-167]] — **the provider rejected this turn's request for size, the runtime folded the
+       * older conversation into a summary, and it is asking the model again with the smaller
+       * context.** Yielded by `GthAgentRunner.processMessagesWithEvents` at the point in the stream
+       * where the overflow was caught, and at most once per turn: a second overflow ends the turn,
+       * and the thrown error carries that reason.
+       *
+       * **Everything the consumer has already rendered for this turn happened and stands.** The
+       * retry resumes the graph from its state rather than re-sending the turn, so the tool calls
+       * announced before this event ran, their results are what the model continues from, and no
+       * row is replayed. What follows is the SAME turn continued with less history behind it —
+       * which is why a renderer that keeps arrival order (the Ink TUI) draws this between the work
+       * that preceded the fold and the answer that follows it, rather than as a banner over the
+       * turn.
+       *
+       * Informational, and additive. A consumer that does not know the variant renders a correct
+       * turn with the fold unannounced, which is the degradation this event exists to prevent — so
+       * the runner ALSO reports the fold through its status callback, exactly as the string driver
+       * does, for a surface that reads that channel. The AG-UI server never receives it: that
+       * surface drives the agent's own stream directly, and this event is the runner's.
+       */
+      type: 'context_compacted';
+      /**
+       * Why the fold happened. Only the overflow today; named on the event so a preventive fold
+       * surfaced through this channel later cannot be mistaken for a rejected request.
+       */
+      cause: 'context_overflow';
+      /**
+       * What the fold did, in the shape `/compact` reports — the same numbers, so one notice
+       * renderer serves the deliberate and the involuntary compaction alike.
+       */
+      compaction: ConversationCompaction;
     };
 
 /**
