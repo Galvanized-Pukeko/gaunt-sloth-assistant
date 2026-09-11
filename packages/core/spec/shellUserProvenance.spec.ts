@@ -18,6 +18,7 @@ import {
 import { carvedOpenWorldHosts, isOpenWorldCarved } from '#src/core/shell/provenance.js';
 import { findOpenWorldHostLiterals } from '#src/core/shell/openWorld.js';
 import { checkHardline } from '#src/core/shell/hardline.js';
+import { NonInteractiveEscalationError } from '#src/core/shell/approvalStop.js';
 import type { ApprovalDecisionCapture } from '#src/core/shell/approvalCapture.js';
 import { peekProjectDir, setProjectDir } from '#src/utils/systemUtils.js';
 import { SHELL_ALLOWLIST_FILE } from '#src/constants.js';
@@ -134,6 +135,21 @@ type RoundResult = 'reject' | 'approve' | 'escalate' | 'halt';
 
 interface DriveResult {
   results: RoundResult[];
+  /**
+   * [[EXT-132]] — **the error the run ENDED on, or `undefined` when it completed.**
+   *
+   * On a surface with no approval callback an escalation is not a prompt, it is
+   * `NonInteractiveEscalationError` out of `processMessages` — the run dies on the first gated
+   * call. That outcome reaches `results` as nothing at all: the throw happens before any decision
+   * is resumed, so `streamResume` is never called and an ended run is indistinguishable here from
+   * one that never had a gated call. A driver that swallowed the rejection therefore could not
+   * observe the one consequence this surface has, which is why it is surfaced rather than caught
+   * and dropped.
+   *
+   * **Captured, never re-thrown.** Cell 3b's `attack` halt also throws out of the run by design, so
+   * a driver that propagated would turn every such cell into a failure.
+   */
+  thrown: unknown;
   /** WARNING-level status lines the gate emitted. */
   warnings: string[];
   /** The `[system, user]` pair of each rating call the gate actually made. */
@@ -260,10 +276,13 @@ describe('[[EXT-106]] §4.6 — the user-provenance carve-out', () => {
     }
 
     const input = (options.userMessages ?? ['go']).map((text) => new HumanMessage(text));
+    let thrown: unknown;
     await runner
       .processMessages(input)
       .then(() => undefined)
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        thrown = error;
+      });
 
     const decisions = streamResume.mock.calls.map(
       (call) => call[0].decisions[0] as { type: string; message?: string }
@@ -277,6 +296,7 @@ describe('[[EXT-106]] §4.6 — the user-provenance carve-out', () => {
 
     return {
       results,
+      thrown,
       prompts,
       ratings,
       warnings: statusUpdate.mock.calls
@@ -917,5 +937,85 @@ describe('[[EXT-106]] §4.6 — the user-provenance carve-out', () => {
 
     expect(results).toEqual(['approve']);
     expect(warnings.join('\n')).toContain(CARVED_HOST);
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  // Cell 12 — carved AND UNATTENDED, where the consequence of the floor is a dead run.
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * [[EXT-132]] — **the carve on the surface with no one to ask.**
+   *
+   * Every other runner cell in this file wires an approval callback, so what the floor costs there
+   * is a prompt. On `gth exec -m`, in CI, or behind a server there is no callback: an escalation
+   * leaves the gate as `NonInteractiveEscalationError` and the run ends non-zero on the first gated
+   * call, with no second attempt and nothing to answer it. That makes the carve the difference
+   * between a run that completes and a run that dies — and it was pinned by nothing.
+   *
+   * **The pair is the test.** The positive alone would pass on an implementation that had stopped
+   * flooring open-world commands altogether, which is the same vacuity this suite's own sanity
+   * check caught once when the shell tool was left ungated and every cell "passed" with no decision
+   * made at all. {@link `cell 12b`} drives the BYTE-IDENTICAL command with different user words, so
+   * the only thing that can explain the difference is the carve.
+   *
+   * **Asserted on the capture, not only on the throw.** *Something threw* is also what a broken
+   * harness, an unparseable config or a missing mock produces; `floorApplied`, `carvedHosts` and
+   * the recorded action say WHICH decision was made and why.
+   *
+   * **The alignment checker takes no part in either cell, and that is asserted rather than
+   * assumed.** [[EXT-127]]'s checker can rewrite a floored `escalate` into an `approve` with no
+   * human involved, so a cell that let it answer would be measuring a model's judgement instead of
+   * the carve, and would flap. This harness gives `config.llm` no `bindTools`, which is what makes
+   * the check unreachable — a fact cell 12b pins by name (`no-model`) so that wiring a checker into
+   * this harness reds these cells loudly instead of quietly changing what they measure.
+   */
+  it('cell 12: a carved command with no one to ask RUNS instead of ending the run', async () => {
+    const { results, thrown, records, warnings } = await drive({
+      calls: [{ command: CARVED_COMMAND }],
+      script: ['safe'],
+      human: null,
+      userMessages: [USER_ASKED],
+      initAs: { command: 'exec' },
+    });
+
+    expect(thrown, 'a carved command must not end an unattended run').toBeUndefined();
+    expect(results).toEqual(['approve']);
+    expect(records[0].action).toBe('approve');
+    // The preflight FOUND the host and the readers declined to act on it — the carve, not a floor
+    // that failed to fire.
+    expect(records[0].preflight?.kind).toBe('open-world');
+    expect(records[0].preflight?.floorApplied).toBe(false);
+    expect(records[0].preflight?.carvedHosts).toEqual([CARVED_HOST]);
+    // It ran with nobody asked, so the user is told.
+    expect(warnings.join('\n')).toContain(CARVED_HOST);
+    // No alignment check was even reachable here: the classifier approved on its own.
+    expect(records[0].alignment).toBeUndefined();
+  });
+
+  it('cell 12b: control — the same command, words that do not name the host, ends the run', async () => {
+    const { results, thrown, records, warnings } = await drive({
+      calls: [{ command: CARVED_COMMAND }],
+      script: ['safe'],
+      human: null,
+      userMessages: ['please set up the toolchain for me'],
+      initAs: { command: 'exec' },
+    });
+
+    expect(thrown, 'an uncarved open-world command must end an unattended run').toBeInstanceOf(
+      NonInteractiveEscalationError
+    );
+    // The run died on the first gated call: nothing was ever resumed.
+    expect(results).toEqual([]);
+    expect(records[0].action).toBe('escalate');
+    expect(records[0].preflight?.kind).toBe('open-world');
+    expect(records[0].preflight?.floorApplied).toBe(true);
+    expect(records[0].preflight?.carvedHosts).toBeUndefined();
+    // Nothing ran, so nothing may claim it did.
+    expect(warnings.join('\n')).not.toContain(CARVED_HOST);
+    // [[EXT-127]] — the checker IS consulted on a floored open-world escalation, and in this
+    // harness it has no tool-capable model to reach, so it cannot answer and the classifier's
+    // action stands. Pinned by name: a checker that starts answering here would otherwise turn
+    // this cell into a measurement of a model.
+    expect(records[0].alignment?.failClosed).toBe('no-model');
   });
 });
