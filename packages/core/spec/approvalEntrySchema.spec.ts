@@ -182,8 +182,9 @@ describe('approvals rule entry grammar (EXT-71 §3.1)', () => {
         const message = expectRejected(validate({ mode: 'assisted', [list]: 'npm test' }));
         expect(message).toContain(`approvals.${list}`);
         expect(message).toContain('must be a LIST of rule entries');
-        // Not the union's bland fallback, which is what this whole surface exists to replace.
-        expect(message).not.toContain('approvals: Invalid input');
+        // Not the schema's bare type mismatch, which names the shape without the migration — the
+        // thing this whole surface exists to replace.
+        expect(message).not.toContain('expected array, received string');
 
         expectAccepted(
           validate({

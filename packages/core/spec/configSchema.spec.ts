@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -125,6 +126,245 @@ describe('config schema (GS2-1 B1)', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(formatConfigValidationError(result.error)).toContain('streamOutput');
+      }
+    });
+  });
+
+  /**
+   * CFG-76 — a union reports as ONE `invalid_union` issue at its own path unless exactly one arm
+   * failed only on continuable checks. Zod carries every arm's diagnosis under that issue's
+   * `errors`, paths relative to the union, and a renderer that reads only the top-level `path` and
+   * `message` throws all of it away — telling the user `binaryFormats: Invalid input` about an
+   * array whose failing entry and field zod had already named.
+   *
+   * These cells assert the CONTENT of the rejection rather than `success === false`: the point is
+   * the entry INDEX and the FIELD, and a rejection naming neither leaves the user counting array
+   * entries. The CONTROL cells are the other half — the risk in descending into one union is
+   * regressing every message that was already legible.
+   */
+  describe('a failing union renders its arms (CFG-76)', () => {
+    /**
+     * Through `validateRawGthConfig`, which is the route the loader and `gth config validate` both
+     * take — and the reason `type` is VALID in every entry here: a bad `type` never reaches the
+     * formatter, because `findUndeliverableBinaryFormatIssues` throws pre-parse with its own
+     * message. These entries fail on another field, so the message under test is the formatter's.
+     */
+    it('names the entry index and the field for a bad binaryFormats entry', () => {
+      const result = validateRawGthConfig({
+        llm: { type: 'anthropic' },
+        binaryFormats: [{ type: 'image', extensions: 'png' }],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.errorMessage).toContain(
+        'binaryFormats.0.extensions: Invalid input: expected array, received string'
+      );
+      expect(result.errorMessage).not.toContain('binaryFormats: Invalid input');
+    });
+
+    it('names the SECOND entry when the first is fine', () => {
+      const result = validateRawGthConfig({
+        llm: { type: 'anthropic' },
+        binaryFormats: [{ type: 'image', extensions: ['png'] }, { type: 'audio' }],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.errorMessage).toContain(
+        'binaryFormats.1.extensions: Invalid input: expected array, received undefined'
+      );
+    });
+
+    it('rejoins the per-command path onto the arm issue', () => {
+      const result = validateRawGthConfig({
+        llm: { type: 'anthropic' },
+        commands: { review: { binaryFormats: [{ type: 'file', extensions: 3 }] } },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.errorMessage).toContain(
+        'commands.review.binaryFormats.0.extensions: Invalid input: expected array, received number'
+      );
+    });
+
+    // `builtInTools` is a union whose record arm holds a union, so this is two levels of descent
+    // on a real config key rather than a schema written for the test.
+    it('descends through a union nested inside a union arm', () => {
+      const result = rawGthConfigSchema.safeParse({
+        llm: { type: 'anthropic' },
+        builtInTools: { gth_read_binary: 'yes' },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const message = formatConfigValidationError(result.error);
+        expect(message).toContain(
+          'builtInTools.gth_read_binary: Invalid input: expected boolean, received string'
+        );
+        expect(message).not.toContain('builtInTools: Invalid input');
+      }
+    });
+
+    /**
+     * The two collapse shapes the coarse rule ("checks surface, types collapse") gets wrong. No
+     * config union hits either today, which is exactly why they are pinned on schemas written
+     * here: a `.min()` or an `abort: true` added to `schema.ts` tomorrow would otherwise silently
+     * land back on `Invalid input`.
+     *
+     * `util.aborted` is true when ANY issue is non-continuable, and zod returns an arm's own
+     * issues only when that arm is the ONLY non-aborted one — so two arms failing on nothing but
+     * continuable checks still collapse.
+     */
+    it('renders both arms when TWO check-only-failing arms collapse the union', () => {
+      const schema = z.object({ k: z.union([z.string().min(5), z.string().max(1)]) });
+      const result = schema.safeParse({ k: 'abc' });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].code).toBe('invalid_union');
+        expect(formatConfigValidationError(result.error)).toBe(
+          '  - k: Too small: expected string to have >=5 characters\n' +
+            '  - k: Too big: expected string to have <=1 characters'
+        );
+      }
+    });
+
+    // `abort: true` makes a `refine` issue non-continuable, so a single failing refine aborts its
+    // arm and the union collapses on its own.
+    it('renders the refine message when abort: true collapses the union', () => {
+      const schema = z.object({
+        k: z.union([
+          z.string().refine(() => false, { error: 'a rule name must be lower case', abort: true }),
+          z.number(),
+        ]),
+      });
+      const result = schema.safeParse({ k: 'Abc' });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].code).toBe('invalid_union');
+        expect(formatConfigValidationError(result.error)).toContain(
+          'k: a rule name must be lower case'
+        );
+      }
+    });
+
+    /**
+     * CONTROL — the arm that zod surfaces DIRECTLY (exactly one non-aborted arm) must not be
+     * routed through the new code by accident. The `code` assertion is what makes that a control
+     * rather than a coincidence: there is no `invalid_union` issue here at all, so the line below
+     * is zod's own issue rendered by the untouched path.
+     */
+    it('CONTROL — a single surviving arm still surfaces its own issue, undescended', () => {
+      const schema = z.object({ k: z.union([z.string().min(5), z.number()]) });
+      const result = schema.safeParse({ k: 'ab' });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].code).toBe('too_small');
+        expect(formatConfigValidationError(result.error)).toBe(
+          '  - k: Too small: expected string to have >=5 characters'
+        );
+      }
+    });
+
+    /**
+     * CONTROL — a message that was already legible is byte-for-byte what it was before the
+     * descent existed. Both strings were measured on the pre-change formatter. `toBe` on the whole
+     * rendering, not `toContain`: the risk this change carries is regressing every other config
+     * error while fixing one, and a containment check cannot see an extra line.
+     */
+    it.each([
+      [
+        { llm: { type: 'openai' }, commands: { api: { port: '3000' } } },
+        '  - commands.api.port: Invalid input: expected number, received string',
+      ],
+      [
+        { llm: { type: 'anthropic' }, output: { header: false } },
+        '  - output.header: no longer a boolean: it is one of none, compact, debug. ' +
+          'Use "none" instead of false.',
+      ],
+    ])('CONTROL — an already-legible message is unchanged', (raw, expected) => {
+      const result = rawGthConfigSchema.safeParse(raw);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatConfigValidationError(result.error)).toBe(expected);
+      }
+    });
+
+    /**
+     * An `invalid_union` carrying nothing to descend into still prints a line. Zod emits exactly
+     * this shape for an exclusive union where SEVERAL arms matched (`errors: []`, plus `matches`),
+     * and a hand-built error can omit `errors` entirely. Dropping the issue would be worse than
+     * the bland message it replaces, so the union's own line is the floor.
+     */
+    it.each([
+      ['empty errors (several arms matched)', { errors: [], inclusive: false, matches: [0, 1] }],
+      ['no errors field at all', {}],
+      ['every arm empty', { errors: [[], []] }],
+    ])('falls back to the union line when it carries no arm issues — %s', (_label, extra) => {
+      const error = new z.ZodError([
+        {
+          code: 'invalid_union',
+          path: ['approvals'],
+          message: 'Invalid input',
+          ...extra,
+        } as unknown as z.core.$ZodIssue,
+      ]);
+      expect(formatConfigValidationError(error)).toBe('  - approvals: Invalid input');
+    });
+
+    // Overlapping arms fail at the same path with the same sentence; one problem reads as one
+    // line. The dedupe is scoped to a single union's expansion, so the second cell pins that the
+    // issue LIST is still not deduped — two separate keys that happen to fail alike both print.
+    it('prints one line when two arms of a union fail identically', () => {
+      const schema = z.object({
+        k: z.union([
+          z.object({ a: z.string() }),
+          z.object({ a: z.string(), b: z.number().optional() }),
+        ]),
+      });
+      const result = schema.safeParse({ k: { a: 1 } });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatConfigValidationError(result.error)).toBe(
+          '  - k.a: Invalid input: expected string, received number'
+        );
+      }
+    });
+
+    it('does not dedupe across separate issues', () => {
+      const result = rawGthConfigSchema.safeParse({
+        llm: { type: 'anthropic' },
+        streamOutput: 'yes',
+        injectModelContext: 'yes',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatConfigValidationError(result.error).split('\n')).toHaveLength(2);
+      }
+    });
+
+    /**
+     * The descent is capped, and the cap renders the union's own line rather than dropping the
+     * issue. Four nested unions is one past the cap; three is inside it, and the pair is what
+     * pins the bound — a cell at only one depth passes whatever the cap is set to.
+     */
+    it('stops descending past the cap, and says so with the union line', () => {
+      const innermost = z.union([z.object({ deep: z.string() }), z.object({ other: z.number() })]);
+      const inside = z.object({
+        k: z.union([z.literal(false), z.union([z.literal(1), innermost])]),
+      });
+      const past = z.object({
+        k: z.union([z.literal(false), z.union([z.literal(1), z.union([z.literal(2), innermost])])]),
+      });
+
+      const insideResult = inside.safeParse({ k: { deep: 3 } });
+      expect(insideResult.success).toBe(false);
+      if (!insideResult.success) {
+        expect(formatConfigValidationError(insideResult.error)).toContain(
+          'k.deep: Invalid input: expected string, received number'
+        );
+      }
+
+      const pastResult = past.safeParse({ k: { deep: 3 } });
+      expect(pastResult.success).toBe(false);
+      if (!pastResult.success) {
+        const message = formatConfigValidationError(pastResult.error);
+        expect(message).not.toContain('k.deep');
+        expect(message).toContain('  - k: Invalid input');
       }
     });
   });
@@ -317,11 +557,9 @@ describe('config schema (GS2-1 B1)', () => {
    * the run died at the provider boundary naming a LangChain block type.
    *
    * Asserted through `validateRawGthConfig`, which is what the loader and `gth config validate`
-   * both run — and, here, the difference between a fix and the appearance of one. The narrowed
-   * enum alone rejects the value but says `binaryFormats: Invalid input`, because the surrounding
-   * `false | array` union swallows the branch's message and the entry's index. So these cells
-   * assert the PATH and the offending VALUE rather than `ok === false`: a rejection naming neither
-   * leaves the user counting array entries to find the one that is wrong.
+   * both run. These cells assert the PATH and the offending VALUE rather than `ok === false`,
+   * because a rejection naming neither leaves the user counting array entries to find the one that
+   * is wrong — and `ok === false` was true of the un-narrowed schema too.
    */
   describe('undeliverable binaryFormats types (CFG-68)', () => {
     it.each(['video', 'binary'])(
@@ -388,14 +626,14 @@ describe('config schema (GS2-1 B1)', () => {
   });
 
   /**
-   * CFG-74 — an entry whose `type` is MISSING or not a string was the one `binaryFormats` case
-   * CFG-68 left unreadable. Its pre-parse scan skipped a non-string `type` on purpose (its job was
-   * the vocabulary), so those entries fell through to the schema, whose `false | array` union
-   * collapses every per-entry issue into `binaryFormats: Invalid input` — no index, no field name,
-   * no hint that `type` is the key. Measured on `{ binaryFormats: [{ extensions: ['png'] }] }`.
+   * CFG-74 — an entry whose `type` is MISSING or not a string needs a sentence the enum cannot
+   * write. The enum's error hook renders `issue.input`, so left to the schema an entry with no
+   * `type` is refused as `undefined is not a binary format type` — a sentence about a value, for
+   * an entry that has none. The pre-parse scan names the shape instead, and runs first, so that is
+   * what the user reads.
    *
-   * Same route as the CFG-68 cells (`validateRawGthConfig`) and the same reason: the PATH is the
-   * assertion, because `ok === false` was already true before the fix.
+   * Same route as the CFG-68 cells (`validateRawGthConfig`) and the same reason: the MESSAGE is
+   * the assertion, because `ok === false` holds either way.
    */
   describe('binaryFormats entry with a missing or non-string type (CFG-74)', () => {
     it('names binaryFormats.<n>.type when an entry has no type', () => {

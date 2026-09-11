@@ -1230,16 +1230,116 @@ function formatIssueLines(issues: ReadonlyArray<{ path: string; message: string 
 }
 
 /**
+ * CFG-76 — how many nested `invalid_union` levels a rendering descends through before it prints
+ * the union's own line instead.
+ *
+ * **This is not hang prevention.** Zod builds the issue tree before the formatter ever sees it, so
+ * the tree is finite and a plain recursion terminates. The cap bounds the SIZE of what is printed
+ * (each level multiplies arms) and guards the two shapes that are not zod's own output: an issue
+ * object built by hand, and a `z.lazy` self-referential union. Two is the deepest this schema can
+ * produce ({@link builtInToolsSchema} is a union whose record arm holds a union), so three leaves
+ * headroom for one more nesting level without a second edit.
+ */
+const MAX_UNION_DESCENT = 3;
+
+/** One Zod issue path, rendered the way {@link formatConfigValidationError} renders one. */
+function renderIssuePath(path: ReadonlyArray<PropertyKey>): string {
+  return path.length > 0 ? path.join('.') : '';
+}
+
+/**
+ * How far into the value one arm of a failed union got before giving up: the longest path any of
+ * its issues carries, relative to the union. An arm that only ever failed at the union's own path
+ * (`0`) rejected the value wholesale — "not this shape" — while an arm reporting at `0.type` read
+ * the array, found the entry and named the field.
+ */
+function armSpecificity(issues: ReadonlyArray<z.core.$ZodIssue>): number {
+  return issues.reduce((deepest, issue) => Math.max(deepest, issue.path.length), 0);
+}
+
+/**
+ * CFG-76 — the lines one collapsed `invalid_union` contributes, or none if it carries nothing to
+ * descend into (the exclusive-union "several arms matched" issue has `errors: []`, and a hand-built
+ * issue may have no `errors` at all); the caller then falls back to the union's own line.
+ *
+ * **The heuristic: only the arms that got deepest are rendered.** A union's `errors` holds every
+ * arm's diagnosis, and for `false | Array<entry>` that means the `false` arm's "expected false"
+ * sits beside the entry's real problem — printing both buries the actionable line under one that
+ * only restates the other half of the type. So the arms are ranked by {@link armSpecificity} and
+ * the shallower ones are dropped. Ties keep every tied arm, which is what makes a genuinely
+ * ambiguous union (`string | number` given a boolean) still name both options rather than pick one
+ * arbitrarily.
+ */
+function flattenUnionIssue(
+  issue: z.core.$ZodIssueInvalidUnion,
+  path: ReadonlyArray<PropertyKey>,
+  depth: number
+): Array<{ path: string; message: string }> {
+  const arms = (issue.errors ?? []).filter((arm) => arm.length > 0);
+  if (arms.length === 0) return [];
+
+  const deepest = arms.reduce((best, arm) => Math.max(best, armSpecificity(arm)), 0);
+  const lines = arms
+    .filter((arm) => armSpecificity(arm) === deepest)
+    .flatMap((arm) => flattenConfigIssues(arm, path, depth + 1));
+
+  // Arms that overlap — two object arms differing in a field the value does not have, say — fail
+  // at the same path with the same sentence, and printing it twice reads as two problems. Deduped
+  // only WITHIN this union's expansion: the issue list as a whole is not deduped, and quietly
+  // starting to would change output this change is not about.
+  const seen = new Set<string>();
+  return lines.filter((line) => {
+    const key = JSON.stringify([line.path, line.message]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * CFG-76 — flatten Zod issues into the `{ path, message }` pairs {@link formatIssueLines} renders,
+ * descending into a collapsed union instead of printing its bland `Invalid input`.
+ *
+ * A union reports as ONE `invalid_union` issue at its own path whenever it does not have exactly
+ * one non-aborted arm — which is always, when the arms fail on type or enum, since those issues
+ * are never continuable. Every arm's real diagnosis is still there, under `errors`, with paths
+ * RELATIVE to the union; `basePath` is what rejoins them, so an entry's issue at `0.type` under a
+ * union at `binaryFormats` renders as `binaryFormats.0.type` — the same dotted join every other
+ * path here uses.
+ *
+ * A top-level issue that is not a union is passed through untouched (`basePath` is empty and its
+ * path is already absolute), so every message that was already legible is byte-for-byte unchanged.
+ */
+function flattenConfigIssues(
+  issues: ReadonlyArray<z.core.$ZodIssue>,
+  basePath: ReadonlyArray<PropertyKey>,
+  depth: number
+): Array<{ path: string; message: string }> {
+  const lines: Array<{ path: string; message: string }> = [];
+  for (const issue of issues) {
+    const path = [...basePath, ...issue.path];
+    const nested =
+      issue.code === 'invalid_union' && depth < MAX_UNION_DESCENT
+        ? flattenUnionIssue(issue, path, depth)
+        : [];
+    if (nested.length > 0) {
+      lines.push(...nested);
+    } else {
+      lines.push({ path: renderIssuePath(path), message: issue.message });
+    }
+  }
+  return lines;
+}
+
+/**
  * Render a friendly, path-scoped validation message from a Zod error. Each issue
  * becomes a line `  - <path>: <message>`, with `(root)` for top-level issues.
+ *
+ * A failing union is expanded into its arms' own issues rather than printed as itself, so the user
+ * reads the failing entry and field instead of `Invalid input` at the key.
  */
 export function formatConfigValidationError(error: z.ZodError): string {
-  return formatIssueLines(
-    error.issues.map((issue) => ({
-      path: issue.path.length > 0 ? issue.path.join('.') : '',
-      message: issue.message,
-    }))
-  );
+  return formatIssueLines(flattenConfigIssues(error.issues, [], 0));
 }
 
 /** Deprecated → canonical key pairs at the config root (SSOT for the rejecter). */
@@ -1680,14 +1780,11 @@ const UNNAMEABLE_MCP_SERVER_NAME = '';
  * command), pushing one issue per problem with a path that points at the exact entry and field.
  *
  * **Why the entries are checked HERE rather than left to the schema parse**, given that
- * `approvalsSchema` already carries {@link approvalEntrySchema}: the `approvals` value is a union
- * (the §9.1 scalar-or-object sugar), and zod reports a failing union as ONE issue at the union's
- * own path — `approvals: Invalid input` — with every arm's real diagnosis nested out of reach of
- * the formatter, unless exactly one arm failed only on continuable checks (the exact rule is in
- * {@link findUndeliverableBinaryFormatIssues}'s docblock). That is exactly the wrong message for
- * this grammar, where the whole requirement is that a rejection names the offending field, key or
- * pattern. Parsing each entry on its own gets the precise issue back, and because this runs BEFORE
- * the parse the precise message is the only one the user sees. The schema keeps the entries too,
+ * `approvalsSchema` already carries {@link approvalEntrySchema}: the parse names the path but not
+ * the fix. A bare string in a rule list is refused by the schema as `expected object, received
+ * string`, which is true and useless — the requirement for this grammar is the entry the user can
+ * paste back over the line they wrote. Checking each entry here produces that sentence, and
+ * because it runs BEFORE the parse it is the only one they read. The schema keeps the entries too,
  * so it stays the authority and the emitted JSON Schema still describes them.
  *
  * A bare string is handled separately from the rest, because its message is the migration
@@ -1706,10 +1803,10 @@ function collectApprovalEntryIssues(
     const list = block[listKey];
     if (list === undefined) continue;
 
-    // A list written as something other than an array would otherwise fall back to the union's
-    // bland "approvals: Invalid input" — the same message this whole function exists to replace.
-    // `escalate` is exempt: its non-array shape is the retired severity threshold and gets its own
-    // migration message from `collectRetiredApprovalsIssues`.
+    // A list written as something other than an array would otherwise read as the schema's
+    // `expected array, received object` — the shape without the migration, which is the whole
+    // point of this function. `escalate` is exempt: its non-array shape is the retired severity
+    // threshold and gets its own migration message from `collectRetiredApprovalsIssues`.
     if (!Array.isArray(list)) {
       if (listKey !== 'escalate') {
         issues.push({
@@ -1752,10 +1849,9 @@ function collectApprovalEntryIssues(
 /**
  * EXT-70 §4.7/§9 — validate one `approvals.mcp` block, with a path that names the offending field.
  *
- * It runs PRE-PARSE for the same reason the rule entries do: `approvalsSchema` is a `z.union`, so a
- * bad `mcp` block otherwise collapses into the union's bland "approvals: Invalid input" — the
- * message this whole family of checks exists to replace. Here the user gets the server key, the
- * field and (for a hint name) the value they mistyped.
+ * It runs PRE-PARSE for the same reason the rule entries do: the parse reports the shape, this
+ * reports the fix. Here the user gets the server key, the field and (for a hint name) the value
+ * they mistyped, rather than a type mismatch at the field it landed on.
  */
 function collectMcpApprovalsIssues(
   approvals: unknown,
@@ -1847,26 +1943,22 @@ export function findApprovalsGrammarIssues(raw: Record<string, unknown>): Deprec
  * RAW input, with the path that names the offending entry. CFG-74 — and every entry whose `type`
  * is missing or not a string, at the same path, for the same reason.
  *
- * **This exists because the schema's own rejection is unreadable, not because a second opinion is
- * wanted.** `binaryFormats` is a `z.union([false, array])`, and zod surfaces one arm's own issues,
- * paths intact, only when that arm is the ONLY non-aborted arm — an arm being non-aborted when
- * every one of its issues is a continuable check: `too_small`, `too_big`, or a `custom` issue from
- * `refine`/`superRefine` without `abort: true`. With zero such arms, or two or more, zod pushes a
- * single `invalid_union` issue at the union's own path instead. Type and enum failures
- * (`invalid_type`, `invalid_value`) are never continuable, so a union whose arms all fail on type
- * always collapses — and this one always does: `false` never matches an array, and the entry
- * schema has no check constraints, so the narrowed `type` enum's refusal is an `invalid_value`.
- * The collapsed issue still carries every arm's issues under its `errors` field, paths relative to
- * the union; what drops them is our own `formatConfigValidationError`, which maps only `path` and
- * `message` and never descends. So the enum's message and the INDEX of the entry carrying it both
- * go unreported, and the user is told `binaryFormats: Invalid input` about an array. Measured on
- * `{ binaryFormats: [{ type: 'image', ... }, { type: 'video', ... }] }`, and again on
- * `{ binaryFormats: [{ extensions: ['png'] }] }`. Checked here — before the parse, exactly as
- * {@link findApprovalsGrammarIssues} arranges for its own — the message that explains the fix is
- * the only one they read.
+ * **The half that is load-bearing is the missing/non-string one**, and it is load-bearing because
+ * the enum's own sentence argues about a value the user never wrote. The enum's error hook renders
+ * `issue.input`, so an entry with no `type` at all is refused as `undefined is not a binary format
+ * type` — a sentence about a value, for an entry that has none. These two shapes get a sentence
+ * naming the SHAPE instead ({@link malformedBinaryFormatTypeMessage}), and because the scan runs
+ * BEFORE the parse — exactly as {@link findApprovalsGrammarIssues} arranges for its own — that is
+ * the only sentence the user reads.
  *
- * Only `type` is scanned. An entry's other fields, and an entry that is not an object, still fall
- * through to the union and read as the key alone.
+ * The undeliverable-VALUE half says what the parse now says on its own, in the same words — both
+ * routes render {@link undeliverableBinaryFormatMessage}, which is why one function owns that
+ * sentence — and is kept so the vocabulary is refused on the RAW input, before any arm of the
+ * union is tried.
+ *
+ * Only `type` is scanned. An entry's other fields, and an entry that is not an object, fall
+ * through to the union, whose arms {@link formatConfigValidationError} descends into — so those
+ * report at their own path too, in zod's words rather than in ours.
  *
  * PURE: it only reads the object.
  */

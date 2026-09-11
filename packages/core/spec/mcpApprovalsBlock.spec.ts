@@ -19,8 +19,8 @@ import { TOOL_ANNOTATION_HINTS } from '#src/config/shell-policy.js';
  *
  * Assertions run through {@link validateRawGthConfig}, the function both real entry points share
  * (the loader's layer validation and `gth config validate`). That matters here specifically:
- * `approvals` is a `z.union`, so without the pre-parse check in `findApprovalsGrammarIssues` every
- * error below would arrive as the union's bland "Invalid input" with no path into the block.
+ * without the pre-parse check in `findApprovalsGrammarIssues` every error below would arrive as
+ * the schema's own type mismatch, naming the field it landed on but not the fix.
  */
 
 const BASE = { llm: { type: 'openai' } } as const;

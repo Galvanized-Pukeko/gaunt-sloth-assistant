@@ -157,9 +157,9 @@ function validateRawConfigLayer<T extends Record<string, unknown>>(
     }
 
     // CFG-68 / CFG-74 — a `binaryFormats` entry naming a format type no provider can receive, or
-    // one with no string type at all. Also before the parse, and for a mechanical reason: the
-    // `false | array` union around that field collapses the schema's own message and the index of
-    // the offending entry into one `Invalid input`.
+    // one with no string type at all. Also before the parse, so an entry with no `type` is
+    // described by its shape rather than by the enum's sentence about a value it does not have
+    // (see `findUndeliverableBinaryFormatIssues`).
     // Checked here and in `gth config validate` alike, so the validator cannot green-light a
     // config a real run refuses.
     const binaryFormatIssues = findUndeliverableBinaryFormatIssues(raw);
