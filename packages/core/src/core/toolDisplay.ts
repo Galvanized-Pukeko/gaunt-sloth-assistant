@@ -34,7 +34,10 @@
  *    (added = `added` style/green, removed = `removed` style/red); monochrome keeps the `+`/`-`
  *    prefixes so the diff still reads without colour (DL-7 graceful degradation).
  */
+import { GH_READ_FILE_TOOL_NAME, getToolPreviewLines } from '#src/config/shell-policy.js';
+import type { GthConfig } from '#src/config/types.js';
 import { neutralizeToOneLine, neutralizeUntrustedText } from '#src/core/shell/framing.js';
+import type { GthCommand } from '#src/core/types.js';
 import { displayWidth, sliceToWidth } from '#src/utils/displayWidth.js';
 import { collectSecretValues, redactText } from '#src/utils/redactSecrets.js';
 import { env } from '#src/utils/systemUtils.js';
@@ -219,12 +222,21 @@ export function parseToolArgsSafe(argsText: string | undefined): Record<string, 
 let displayConfig: unknown = undefined;
 
 /**
- * Register the live config for inline-secret collection (TUI-C32 residual a). Resets the secret
- * cache so the next {@link getDefaultSecrets} recomputes with the config's inline literals folded
- * in. Idempotent; a later call with a fresh config supersedes the previous one.
+ * TUI-C105 — the run's command, registered beside the config so the per-tool preview depth honours
+ * `commands.<command>.builtInTools` exactly as every other `builtInTools` knob does. `undefined`
+ * (no command, or a caller that does not know one) reads the ROOT registry only.
  */
-export function setToolDisplayConfig(config: unknown): void {
+let displayCommand: GthCommand | undefined = undefined;
+
+/**
+ * Register the live config for inline-secret collection (TUI-C32 residual a) and, since TUI-C105,
+ * for the configurable preview depth ({@link buildToolPreviewLines}). Resets the secret cache so
+ * the next {@link getDefaultSecrets} recomputes with the config's inline literals folded in.
+ * Idempotent; a later call with a fresh config supersedes the previous one.
+ */
+export function setToolDisplayConfig(config: unknown, command?: GthCommand): void {
   displayConfig = config;
+  displayCommand = command;
   cachedSecrets = null;
 }
 
@@ -252,6 +264,29 @@ function getDefaultSecrets(): string[] {
 export function resetToolDisplaySecretsCacheForTests(): void {
   cachedSecrets = null;
   displayConfig = undefined;
+  // TUI-C105 — the command is registered by the same call and must be dropped by the same reset,
+  // or a spec that sets a per-command depth leaks it into whatever runs next in the same worker.
+  displayCommand = undefined;
+}
+
+/**
+ * TUI-C105 — the configured preview depth for one tool, or {@link TOOL_OUTPUT_PREVIEW_LINES} when
+ * nothing is configured. Reads the config registered by {@link setToolDisplayConfig}, which is the
+ * seam TUI-C32 already put here; no new plumbing.
+ *
+ * Wrapped fail-safe for the same reason {@link getDefaultSecrets} is: `displayConfig` is typed
+ * `unknown` because a JS/MJS config is arbitrary user code, this runs on EVERY rendered tool call,
+ * and a render path is never allowed to throw into the run. Anything unexpected falls back to the
+ * canonical cap, which is what an unconfigured session renders anyway.
+ */
+function resolveToolPreviewLines(toolName: string): number {
+  try {
+    const config = displayConfig as
+      Pick<GthConfig, 'commands' | 'builtInTools' | 'toolOutputPreviewLines'> | undefined;
+    return getToolPreviewLines(config, toolName, displayCommand, TOOL_OUTPUT_PREVIEW_LINES);
+  } catch {
+    return TOOL_OUTPUT_PREVIEW_LINES;
+  }
 }
 
 /**
@@ -474,6 +509,19 @@ function formatEditFileBody(
  */
 const TOOL_DISPLAY_REGISTRY: Record<string, ToolDisplayEntry> = {
   read_file: { glyph: FILE_GLYPH, summariseArgs: ['path', 'offset', 'limit', 'head', 'tail'] },
+  // TUI-C105 — the review/pr GitHub file-read tool. Registered for the FILE glyph and so the
+  // summary keeps naming the file if the tool ever grows a second argument: the generic fallback
+  // summarises every parsed arg, which is why an unregistered entry here already rendered
+  // `gth_gh_read_file(path=…)` whenever the call's args were tracked. `path` is its only argument —
+  // owner/repo/ref are bound from the PR context and deliberately NOT model-supplied
+  // (`packages/review/src/tools/ghReadFileTool.ts`).
+  //
+  // DECISION — the display KEEPS the tool's `Full contents of <owner/repo/path@ref>:` preamble
+  // rather than stripping it for rendering: when a provider streams no tool-call id, the display
+  // layer never learns the args, and that preamble is then the only place the filename appears at
+  // any depth. Stripping it would make exactly the run this node came from strictly worse. No
+  // `formatBody` is registered, so the generic body rendering is unchanged.
+  [GH_READ_FILE_TOOL_NAME]: { glyph: FILE_GLYPH, summariseArgs: ['path'] },
   read_multiple_files: { glyph: FILE_GLYPH, summariseArgs: ['paths'] },
   gth_read_binary: { glyph: FILE_GLYPH, summariseArgs: ['path'] },
   write_file: { glyph: FILE_GLYPH, summariseArgs: ['path'], formatBody: formatWriteFileBody },
@@ -722,14 +770,28 @@ export function capToolDisplayLines(
 }
 
 /**
- * The collapsed inline preview: {@link buildToolBodyLines} capped at the canonical
- * {@link TOOL_OUTPUT_PREVIEW_LINES}.
+ * The collapsed inline preview: {@link buildToolBodyLines} capped at the depth this tool resolves
+ * to — the per-tool `builtInTools.<tool>.previewLines`, else the root `toolOutputPreviewLines`,
+ * else the canonical {@link TOOL_OUTPUT_PREVIEW_LINES}. Both render surfaces call this, so the
+ * setting reaches the Ink TUI and the plain observer through one change rather than two.
+ *
+ * **Depth `0` returns NO lines at all — not even the overflow marker** — so the call renders as its
+ * summary line alone. That is a deliberate, local exception to the DL-4 transparency rule the
+ * marker exists to serve: everywhere else "how much was hidden" is worth a row, but a user who has
+ * asked for one line is not served by being given two, and the whole point of the setting is that
+ * a tool call stops occupying a block. The marker returns at any depth above 0.
+ *
+ * The cap stays step 3 of the [[TUI-C102]] order (redact → neutralise → cap): the depth decides
+ * only HOW MANY already-neutralised lines survive, and the short-circuit above drops all of them
+ * rather than reordering anything. Nothing here can put an escape back on a row.
  */
 export function buildToolPreviewLines(
   input: ToolCallDisplayInput,
   secrets: readonly string[] = getDefaultSecrets()
 ): ToolDisplayLine[] {
-  return capToolDisplayLines(buildToolBodyLines(input, secrets));
+  const maxLines = resolveToolPreviewLines(input.name);
+  if (maxLines <= 0) return [];
+  return capToolDisplayLines(buildToolBodyLines(input, secrets), maxLines);
 }
 
 /* ------------------------------------------------------------------------- *

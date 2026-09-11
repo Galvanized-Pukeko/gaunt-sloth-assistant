@@ -796,6 +796,11 @@ const builtInToolConfigSchema = z.object({
   // returns (default 600 KiB). A file read, not captured command output, hence `maxBytes` rather
   // than `maxOutputBytes`. See BuiltInToolConfig.
   maxBytes: z.number().optional(),
+  // TUI-C105 — ANY tool: how many lines of ITS output the collapsed preview shows (`0` = the
+  // summary line alone). Overrides the root `toolOutputPreviewLines`. A DISPLAY cap — what the
+  // human sees — where `maxBytes`/`maxOutputBytes` above cap what the tool returns TO THE MODEL.
+  // See BuiltInToolConfig, which spells the layer distinction out.
+  previewLines: z.number().optional(),
   // GS2-51 — `gth_grep`: which corpus to search. `gitignore` (default) respects .gitignore/.ignore
   // and skips hidden dot-files; `all` scans everything but the noise dirs. See BuiltInToolConfig.
   fileSet: z.enum(['gitignore', 'all']).optional(),
@@ -1067,6 +1072,13 @@ export const rawGthConfigSchema = z.looseObject({
   // reason as `useColour`: absence is what tells "the user chose true" from the `true` in
   // `defaults.ts`, and rung 2 collapses into rung 4 without it.
   useMouse: z.boolean().optional(),
+  // TUI-C105 — default depth of the COLLAPSED tool-output preview, in lines, on both surfaces;
+  // `0` leaves a tool call as its one-line summary. Per-tool override:
+  // `builtInTools.<tool>.previewLines`. MUST stay `.optional()` for the same reason as
+  // `useColour`/`useMouse`: absence is what tells "the user chose a depth" from the built-in cap
+  // (`TOOL_OUTPUT_PREVIEW_LINES`), and the fallback collapses without it. This caps what is DRAWN,
+  // never what the model receives. User docs: docs/configuration/output.md
+  toolOutputPreviewLines: z.number().optional(),
   // CFG-37 — persistent surface preference for the `chat`/`code` sessions: `true` asks for the Ink
   // TUI, `false` for the plain readline session. MUST stay `.optional()` for the same reason as
   // `useColour`/`useMouse`: absence is what distinguishes "the user chose readline" from "nobody

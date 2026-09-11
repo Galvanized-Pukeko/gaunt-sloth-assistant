@@ -2244,6 +2244,31 @@ describe('config', async () => {
       expect(getGhReadFileMaxBytes(config, 'pr')).toBe(222);
       expect(getGhReadFileMaxBytes(config, 'review')).toBe(111);
     });
+
+    // TUI-C105 — the DISPLAY depth, resolved through the same registry and the same per-command
+    // pick as maxBytes above. Driven through the loader rather than the resolver alone so the zod
+    // schema is proven to accept both new keys: a resolver test would pass just as well against a
+    // schema that silently rejected them.
+    it('carries previewLines through the loader, per command and per tool', async () => {
+      const config = await loadWith({
+        toolOutputPreviewLines: 4,
+        builtInTools: { gth_gh_read_file: { previewLines: 2 } },
+        commands: { pr: { builtInTools: { gth_gh_read_file: { previewLines: 0 } } } },
+      });
+      const { getToolPreviewLines } = await import('#src/config.js');
+
+      expect(getToolPreviewLines(config, 'gth_gh_read_file', 'pr', 10)).toBe(0);
+      expect(getToolPreviewLines(config, 'gth_gh_read_file', 'review', 10)).toBe(2);
+      // A tool with no entry of its own falls to the root default, not to the built-in fallback.
+      expect(getToolPreviewLines(config, 'read_file', 'review', 10)).toBe(4);
+    });
+
+    it('falls back to the caller-supplied default when nothing is configured', async () => {
+      const config = await loadWith({});
+      const { getToolPreviewLines } = await import('#src/config.js');
+      expect(getToolPreviewLines(config, 'read_file', 'review', 10)).toBe(10);
+      expect(getToolPreviewLines(config, 'read_file', undefined, 10)).toBe(10);
+    });
   });
 
   describe('custom config path', () => {

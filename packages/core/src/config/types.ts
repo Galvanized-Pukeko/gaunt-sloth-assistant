@@ -297,6 +297,22 @@ export interface GthConfig {
    */
   useMouse: boolean;
   /**
+   * TUI-C105 — the default number of output lines a COLLAPSED tool call previews, on both the Ink
+   * TUI and the plain surface, before the `… (+N more lines)` overflow marker. `0` reduces every
+   * tool call to its one-line summary. Absent, the built-in cap applies
+   * (`TOOL_OUTPUT_PREVIEW_LINES` in `core/toolDisplay`); override it for one tool with
+   * `builtInTools.<tool>.previewLines`, which ranks above this.
+   *
+   * **A display cap, not a content cap.** It changes only what is drawn for the human; the model
+   * receives every tool result in full regardless. The knobs that change what a tool returns to
+   * the model are separate and per-tool (`builtInTools.gth_gh_read_file.maxBytes`,
+   * `builtInTools.run_shell_command.maxOutputBytes`).
+   *
+   * MUST stay optional: absence is what distinguishes "the user chose a depth" from the built-in
+   * cap, and the fallback in `getToolPreviewLines` collapses without that distinction.
+   */
+  toolOutputPreviewLines?: number;
+  /**
    * Stream session log instead of writing it when inference streaming is complete.
    * (only works when {@link streamOutput} is true)
    */

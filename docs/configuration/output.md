@@ -155,6 +155,52 @@ and `info`; a warning notice from `debug` through `warning`. From `display` onwa
 command whose feedback is informational prints nothing at all. An enabled session log records every
 notice in full either way, whatever the level.
 
+## Tool output preview depth (toolOutputPreviewLines)
+
+Reviewing a large pull request, the agent reads a dozen files, and each read prints ten greyed lines
+of that file before the review text you actually came for. To leave every tool call as a single
+summary line instead:
+
+```json
+{ "toolOutputPreviewLines": 0 }
+```
+
+A finished tool call is drawn as one summary row — `✓ 📁 read_file(path=README.md)` — followed by a
+preview of what the tool returned. `toolOutputPreviewLines` sets how many lines of that preview you
+get, on both the TUI and the plain `--no-tui` surface. The default is `10`, and anything cut is
+accounted for by a `… (+N more lines)` marker. `0` drops the preview entirely, marker included:
+you asked for one line, so a second line reporting how much was hidden would defeat the setting.
+
+To quieten the noisiest tool while leaving the rest alone, set `previewLines` on that tool's entry in
+[`builtInTools`](tools.md#built-in-tools-builtintools) instead. It outranks the root key, so the two
+combine — a shallow default with one tool collapsed completely:
+
+```json
+{
+  "toolOutputPreviewLines": 3,
+  "builtInTools": {
+    "gth_gh_read_file": { "previewLines": 0 },
+    "gth_checklist": true,
+    "gth_grep": true
+  }
+}
+```
+
+Highest first, the depth for a given tool is: that tool's `previewLines`, then
+`toolOutputPreviewLines`, then the built-in `10`. A per-tool entry can be set per command as well,
+under `commands.<command>.builtInTools` — and there, as everywhere, a per-command `builtInTools`
+object replaces the inherited set rather than extending it.
+
+**This is a display setting, and it changes nothing the model sees.** The tool's full result goes to
+the model whatever depth you choose, so turning the preview down saves you screen space, never
+tokens. The settings that cap what a tool actually returns are separate and per-tool —
+[`gth_gh_read_file`'s `maxBytes`](tools.md#github-file-reads-during-a-pr-review-gth_gh_read_file)
+and [`run_shell_command`'s `maxOutputBytes`](tools.md#general-purpose-shell-tool-run_shell_command).
+Reaching for one expecting the other is the mistake to avoid: `maxBytes` set to quieten the terminal
+truncates the file the model is reasoning about, and `previewLines` set to save tokens saves none.
+
+A fractional depth is rounded down. A negative or non-numeric one falls back to the next level.
+
 ## Colour (useColour, NO_COLOR, FORCE_COLOR)
 
 Turn colour off for a single run, without touching your config:

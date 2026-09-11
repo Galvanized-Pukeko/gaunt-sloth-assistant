@@ -1120,7 +1120,9 @@ export class GthAgentRunner {
     // TUI-C32 residual a — register the live config with the shared tool-display redactor so its
     // secret-literal collection walks INLINE config secrets (a pasted `apiKey`/`token` value), not
     // only env-derived ones. Both surfaces (plain observer + Ink TUI) render through this module.
-    setToolDisplayConfig(configIn);
+    // TUI-C105 — the command rides along so the per-tool preview depth resolves through
+    // `commands.<command>.builtInTools` like every other registry knob, rather than the root only.
+    setToolDisplayConfig(configIn, command);
 
     // CFG-27 — seed the session posture from config, so a config that pre-selects `bypass` starts
     // there while the shell tool stays gated (see `resolveShellApprovalGate`) and therefore

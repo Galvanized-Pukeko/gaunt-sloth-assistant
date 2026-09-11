@@ -406,6 +406,10 @@
       "kind": "function"
     },
     {
+      "name": "getToolPreviewLines",
+      "kind": "function"
+    },
+    {
       "name": "gthLeanAgentFactory",
       "kind": "function"
     },

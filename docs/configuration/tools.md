@@ -202,6 +202,27 @@ incomplete file rather than reasoning about one it only half received:
 Set at the root like this it applies to both `review` and `pr`. An out-of-range or non-numeric
 `maxBytes` falls back to the default.
 
+This tool is also the usual reason to reach for `previewLines`, which is a different knob on a
+different layer. Reading a file prints a preview of it into your terminal, and across a large review
+that is most of what scrolls past. `previewLines` caps that preview; `0` leaves the call as its
+one-line summary, which still names the file that was read:
+
+```json
+{
+  "builtInTools": {
+    "gth_gh_read_file": { "maxBytes": 200000, "previewLines": 0 },
+    "gth_checklist": true,
+    "gth_grep": true
+  }
+}
+```
+
+**`maxBytes` caps what the tool returns to the model; `previewLines` caps what is drawn for you.**
+Setting `maxBytes` to quieten your terminal truncates the file the review is reasoning about, and
+setting `previewLines` to save tokens saves none. See
+[tool output preview depth](output.md#tool-output-preview-depth-tooloutputpreviewlines) for the root
+default that `previewLines` overrides.
+
 ## Development Tools Configuration
 
 The `code` / `exec` commands (and `ask --write`) can run development tools, configured under the

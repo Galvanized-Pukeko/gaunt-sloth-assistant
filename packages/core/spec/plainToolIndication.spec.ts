@@ -441,4 +441,86 @@ describe('plainToolIndication (TUI-C30 — the --no-tui / piped surface)', () =>
     observer.observe(new HumanMessage('hi'));
     expect(sink).not.toHaveBeenCalled();
   });
+
+  /**
+   * [[TUI-C105]] — the configurable preview depth on THIS surface, which is the one `review` runs
+   * on and therefore the one the originating issue is about. The depth is resolved in the shared
+   * `toolDisplay` module, so these assert the setting actually reaches the rendered block rather
+   * than only the helper; the Ink half lives in `packages/app/spec/tui/toolPreviewDepth.spec.tsx`.
+   */
+  describe('configurable preview depth (TUI-C105)', () => {
+    const TWELVE_LINES = Array.from({ length: 12 }, (_, i) => `body-${i + 1}`).join('\n');
+
+    /** One complete gth_gh_read_file round whose args ARE tracked. */
+    const ghRound = (): Array<AIMessage | ToolMessage> => [
+      new AIMessage({
+        content: '',
+        tool_calls: [
+          {
+            id: 'g1',
+            name: 'gth_gh_read_file',
+            args: { path: 'src/tenant/Community.ts' },
+          },
+        ],
+      }),
+      new ToolMessage({
+        content: `Full contents of acme/widgets/src/tenant/Community.ts@main:\n\n${TWELVE_LINES}`,
+        tool_call_id: 'g1',
+      }),
+    ];
+
+    const renderRound = async (config: unknown, command?: 'review' | 'pr'): Promise<string> => {
+      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
+      const { setToolDisplayConfig } = await import('#src/core/toolDisplay.js');
+      if (config !== undefined) setToolDisplayConfig(config, command);
+      const sink = vi.fn();
+      const observer = createPlainToolIndication(sink);
+      for (const m of ghRound()) observer.observe(m);
+      return sink.mock.calls[0][0] as string;
+    };
+
+    it('unconfigured, still prints the canonical 10-line preview and the overflow marker', async () => {
+      const text = await renderRound(undefined);
+      expect(text).toContain('Full contents of');
+      expect(text).toContain('body-8');
+      expect(text).toContain('… (+4 more lines)');
+    });
+
+    it('at depth 0 prints ONE line for the call, and that line names the file', async () => {
+      const text = await renderRound({ builtInTools: { gth_gh_read_file: { previewLines: 0 } } });
+
+      // The emitted block is a leading blank (the historical notice framing) + the summary row.
+      const rows = text.split('\n').filter((r) => r.trim().length > 0);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toContain('gth_gh_read_file(path=src/tenant/Community.ts)');
+      expect(rows[0]).toContain('📁'); // the registry entry's glyph, not the generic ⚙
+      expect(text).not.toContain('Full contents of');
+      expect(text).not.toContain('more lines');
+    });
+
+    it('at a small depth prints N body rows plus the overflow marker', async () => {
+      const text = await renderRound({ toolOutputPreviewLines: 3 });
+      const rows = text.split('\n').filter((r) => r.trim().length > 0);
+      // The 3 body rows are the tool's `Full contents of …` preamble, the blank line after it, and
+      // body-1. Counting NON-BLANK rows therefore gives 4: summary + preamble + body-1 + marker.
+      expect(rows).toHaveLength(4);
+      expect(text).toContain('body-1');
+      expect(text).not.toContain('body-2');
+      // 14 body lines in all (preamble + its blank line + 12), 3 shown, so 11 are accounted for.
+      expect(text).toContain('… (+11 more lines)');
+    });
+
+    it('honours a per-command override for the command that is running', async () => {
+      const config = {
+        toolOutputPreviewLines: 5,
+        commands: { review: { builtInTools: { gth_gh_read_file: { previewLines: 0 } } } },
+      };
+      const underReview = await renderRound(config, 'review');
+      expect(underReview.split('\n').filter((r) => r.trim().length > 0)).toHaveLength(1);
+
+      vi.resetModules();
+      const underPr = await renderRound(config, 'pr');
+      expect(underPr).toContain('body-1');
+    });
+  });
 });

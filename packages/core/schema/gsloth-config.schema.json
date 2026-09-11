@@ -383,6 +383,9 @@
                   "maxBytes": {
                     "type": "number"
                   },
+                  "previewLines": {
+                    "type": "number"
+                  },
                   "fileSet": {
                     "type": "string",
                     "enum": [
@@ -535,6 +538,9 @@
     },
     "useMouse": {
       "type": "boolean"
+    },
+    "toolOutputPreviewLines": {
+      "type": "number"
     },
     "tui": {
       "type": "boolean"
@@ -725,6 +731,9 @@
                             "type": "number"
                           },
                           "maxBytes": {
+                            "type": "number"
+                          },
+                          "previewLines": {
                             "type": "number"
                           },
                           "fileSet": {
@@ -1054,6 +1063,9 @@
                           "maxBytes": {
                             "type": "number"
                           },
+                          "previewLines": {
+                            "type": "number"
+                          },
                           "fileSet": {
                             "type": "string",
                             "enum": [
@@ -1372,6 +1384,9 @@
                           "maxBytes": {
                             "type": "number"
                           },
+                          "previewLines": {
+                            "type": "number"
+                          },
                           "fileSet": {
                             "type": "string",
                             "enum": [
@@ -1663,6 +1678,9 @@
                             "type": "number"
                           },
                           "maxBytes": {
+                            "type": "number"
+                          },
+                          "previewLines": {
                             "type": "number"
                           },
                           "fileSet": {
@@ -1958,6 +1976,9 @@
                           "maxBytes": {
                             "type": "number"
                           },
+                          "previewLines": {
+                            "type": "number"
+                          },
                           "fileSet": {
                             "type": "string",
                             "enum": [
@@ -2251,6 +2272,9 @@
                           "maxBytes": {
                             "type": "number"
                           },
+                          "previewLines": {
+                            "type": "number"
+                          },
                           "fileSet": {
                             "type": "string",
                             "enum": [
@@ -2542,6 +2566,9 @@
                             "type": "number"
                           },
                           "maxBytes": {
+                            "type": "number"
+                          },
+                          "previewLines": {
                             "type": "number"
                           },
                           "fileSet": {

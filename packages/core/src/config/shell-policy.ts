@@ -66,6 +66,23 @@ export interface BuiltInToolConfig {
    */
   maxBytes?: number;
   /**
+   * ANY tool (TUI-C105): how many lines of this tool's output the COLLAPSED preview shows, before
+   * the `… (+N more lines)` overflow marker. `0` collapses the call to its summary line alone (and
+   * then no overflow marker is drawn — at an explicitly requested depth of 0 a second line would
+   * defeat the setting). Overrides the root {@link GthConfig.toolOutputPreviewLines}; absent, that
+   * default applies, and absent too the built-in 10.
+   *
+   * **This is a DIFFERENT LAYER from {@link maxBytes}, and setting one never does the other's job.**
+   * `maxBytes` caps what a tool RETURNS TO THE MODEL — it changes the conversation. `previewLines`
+   * caps what is SHOWN TO THE HUMAN — the model receives the tool's full result either way. A user
+   * who sets `maxBytes` to quieten the terminal has instead truncated the file the model is
+   * reasoning about; a user who sets `previewLines` to save tokens has saved none.
+   *
+   * Example — keep the review tool's output to one line:
+   * `{ "builtInTools": { "gth_gh_read_file": { "previewLines": 0 } } }`.
+   */
+  previewLines?: number;
+  /**
    * `gth_grep` (GS2-51): which corpus the content-search tool scans, applied consistently to BOTH
    * execution engines (native ripgrep and the in-process JS fallback):
    * - `gitignore` (DEFAULT) — respect `.gitignore`/`.ignore` and skip hidden dot-files. This is the
@@ -167,10 +184,52 @@ export type GhReadFileCommand = 'pr' | 'review';
  */
 function effectiveBuiltInToolsRegistry(
   config: Pick<GthConfig, 'commands' | 'builtInTools'> | undefined,
-  command: GhReadFileCommand
+  command: GthCommand | undefined
 ): Record<string, boolean | BuiltInToolConfig> {
-  const cmdConfig = config?.commands?.[command];
+  const cmdConfig = command ? config?.commands?.[command] : undefined;
   return normalizeBuiltInTools(cmdConfig?.builtInTools ?? config?.builtInTools);
+}
+
+/**
+ * TUI-C105 — how many lines of `toolName`'s output the COLLAPSED preview shows, resolved
+ * **per-tool override → global default → `fallback`**.
+ *
+ * The per-tool override rides the {@link GthConfig.builtInTools} registry through the SAME
+ * per-command-then-root pick as every other entry here, so a tool's display depth is configured
+ * beside its other knobs rather than on a second per-tool surface (CFG-18's whole point). The
+ * global default is a root key, because the issue behind this asks for less tool-output noise
+ * generally and the review tool is only the worst offender.
+ *
+ * **`0` is a legitimate value** — it means "summary line only", which is the setting this exists
+ * to provide. So the guard is `>= 0`, deliberately NOT the `> 0` that
+ * {@link getGhReadFileMaxBytes} applies to a byte cap where zero would mean "return nothing".
+ * A negative, non-finite or non-numeric value is meaningless here and falls back, the same way
+ * every other resolver in this module treats an out-of-range value.
+ *
+ * `fallback` is passed in rather than read from a constant here because the canonical cap belongs
+ * to the render layer (`core/toolDisplay`'s `TOOL_OUTPUT_PREVIEW_LINES`), and importing it into
+ * config would close a cycle — the render layer is what calls this. Duplicating the number instead
+ * would give the project two sources of truth for one cap.
+ *
+ * `command` is the run's command when one is known; `undefined` reads the root registry only.
+ */
+export function getToolPreviewLines(
+  config: Pick<GthConfig, 'commands' | 'builtInTools' | 'toolOutputPreviewLines'> | undefined,
+  toolName: string,
+  command: GthCommand | undefined,
+  fallback: number
+): number {
+  const entry = effectiveBuiltInToolsRegistry(config, command)[toolName];
+  if (entry && typeof entry === 'object' && typeof entry.previewLines === 'number') {
+    if (Number.isFinite(entry.previewLines) && entry.previewLines >= 0) {
+      return Math.floor(entry.previewLines);
+    }
+  }
+  const globalDefault = config?.toolOutputPreviewLines;
+  if (typeof globalDefault === 'number' && Number.isFinite(globalDefault) && globalDefault >= 0) {
+    return Math.floor(globalDefault);
+  }
+  return fallback;
 }
 
 /**
