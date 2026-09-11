@@ -1,0 +1,903 @@
+{
+  "note": "FROZEN control baseline captured from the PRE-CHANGE build. See packages/core/scripts/capture-tool-display-baseline.mjs — do not regenerate to make a red control green.",
+  "node": "TUI-C105",
+  "entries": [
+    {
+      "id": "read_file",
+      "input": {
+        "name": "read_file",
+        "argsText": "{\"path\":\"notes/example.txt\",\"offset\":0,\"limit\":200}",
+        "result": "line-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12"
+      },
+      "glyph": "📁",
+      "summary": "read_file(path=notes/example.txt, offset=0, limit=200)",
+      "preview": [
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "line-09",
+          "style": "dim"
+        },
+        {
+          "text": "line-10",
+          "style": "dim"
+        },
+        {
+          "text": "… (+2 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "read_multiple_files",
+      "input": {
+        "name": "read_multiple_files",
+        "argsText": "{\"paths\":[\"a/one.ts\",\"a/two.ts\"]}",
+        "result": "a/one.ts:\nalpha\n\na/two.ts:\nbeta\n"
+      },
+      "glyph": "📁",
+      "summary": "read_multiple_files(paths=[\"a/one.ts\",\"a/two.ts\"])",
+      "preview": [
+        {
+          "text": "a/one.ts:",
+          "style": "dim"
+        },
+        {
+          "text": "alpha",
+          "style": "dim"
+        },
+        {
+          "text": "",
+          "style": "dim"
+        },
+        {
+          "text": "a/two.ts:",
+          "style": "dim"
+        },
+        {
+          "text": "beta",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "gth_read_binary",
+      "input": {
+        "name": "gth_read_binary",
+        "argsText": "{\"path\":\"assets/logo.png\"}",
+        "result": "Read 1 image (image/png)."
+      },
+      "glyph": "📁",
+      "summary": "gth_read_binary(path=assets/logo.png)",
+      "preview": [
+        {
+          "text": "Read 1 image (image/png).",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "write_file",
+      "input": {
+        "name": "write_file",
+        "argsText": "{\"path\":\"src/new.ts\",\"content\":\"export const a = 1;\\nexport const b = 2;\\n\"}",
+        "result": "Wrote 2 lines to src/new.ts"
+      },
+      "glyph": "📁",
+      "summary": "write_file(path=src/new.ts, …)",
+      "preview": [
+        {
+          "text": "+ export const a = 1;",
+          "style": "added"
+        },
+        {
+          "text": "+ export const b = 2;",
+          "style": "added"
+        },
+        {
+          "text": "Wrote 2 lines to src/new.ts",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "write_file-error",
+      "input": {
+        "name": "write_file",
+        "argsText": "{\"path\":\"/etc/passwd\",\"content\":\"nope\\n\"}",
+        "result": "EACCES: permission denied, open '/etc/passwd'",
+        "isError": true
+      },
+      "glyph": "📁",
+      "summary": "write_file(path=/etc/passwd, …)",
+      "preview": [
+        {
+          "text": "EACCES: permission denied, open '/etc/passwd'",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "edit_file",
+      "input": {
+        "name": "edit_file",
+        "argsText": "{\"path\":\"src/answer.ts\",\"dryRun\":false,\"edits\":[{\"oldText\":\"const answer = 41;\",\"newText\":\"const answer = 42;\"},{\"oldText\":\"// old\",\"newText\":\"// new\"}]}",
+        "result": "edit 2: replaced 2 occurrence(s)"
+      },
+      "glyph": "📁",
+      "summary": "edit_file(path=src/answer.ts, dryRun=false, …)",
+      "preview": [
+        {
+          "text": "- const answer = 41;",
+          "style": "removed"
+        },
+        {
+          "text": "+ const answer = 42;",
+          "style": "added"
+        },
+        {
+          "text": "…",
+          "style": "dim"
+        },
+        {
+          "text": "- // old",
+          "style": "removed"
+        },
+        {
+          "text": "+ // new",
+          "style": "added"
+        }
+      ]
+    },
+    {
+      "id": "create_directory",
+      "input": {
+        "name": "create_directory",
+        "argsText": "{\"path\":\"build/out\"}",
+        "result": "Created build/out"
+      },
+      "glyph": "📁",
+      "summary": "create_directory(path=build/out)",
+      "preview": [
+        {
+          "text": "Created build/out",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "list_directory",
+      "input": {
+        "name": "list_directory",
+        "argsText": "{\"path\":\"src\"}",
+        "result": "line-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12"
+      },
+      "glyph": "📁",
+      "summary": "list_directory(path=src)",
+      "preview": [
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "line-09",
+          "style": "dim"
+        },
+        {
+          "text": "line-10",
+          "style": "dim"
+        },
+        {
+          "text": "… (+2 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "list_directory_with_sizes",
+      "input": {
+        "name": "list_directory_with_sizes",
+        "argsText": "{\"path\":\"src\",\"sortBy\":\"size\"}",
+        "result": "[FILE] index.ts  1.2 KB\n[DIR]  core"
+      },
+      "glyph": "📁",
+      "summary": "list_directory_with_sizes(path=src, sortBy=size)",
+      "preview": [
+        {
+          "text": "[FILE] index.ts  1.2 KB",
+          "style": "dim"
+        },
+        {
+          "text": "[DIR]  core",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "directory_tree",
+      "input": {
+        "name": "directory_tree",
+        "argsText": "{\"path\":\"src\"}",
+        "result": "line-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12"
+      },
+      "glyph": "📁",
+      "summary": "directory_tree(path=src)",
+      "preview": [
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "line-09",
+          "style": "dim"
+        },
+        {
+          "text": "line-10",
+          "style": "dim"
+        },
+        {
+          "text": "… (+2 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "move_file",
+      "input": {
+        "name": "move_file",
+        "argsText": "{\"source\":\"a.ts\",\"destination\":\"b.ts\"}",
+        "result": "Moved a.ts to b.ts"
+      },
+      "glyph": "📁",
+      "summary": "move_file(source=a.ts, destination=b.ts)",
+      "preview": [
+        {
+          "text": "Moved a.ts to b.ts",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "search_files",
+      "input": {
+        "name": "search_files",
+        "argsText": "{\"path\":\"src\",\"pattern\":\"*.ts\"}",
+        "result": "src/index.ts\nsrc/core/toolDisplay.ts"
+      },
+      "glyph": "📁",
+      "summary": "search_files(path=src, pattern=*.ts)",
+      "preview": [
+        {
+          "text": "src/index.ts",
+          "style": "dim"
+        },
+        {
+          "text": "src/core/toolDisplay.ts",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "get_file_info",
+      "input": {
+        "name": "get_file_info",
+        "argsText": "{\"path\":\"src/index.ts\"}",
+        "result": "size: 1024\ntype: file"
+      },
+      "glyph": "📁",
+      "summary": "get_file_info(path=src/index.ts)",
+      "preview": [
+        {
+          "text": "size: 1024",
+          "style": "dim"
+        },
+        {
+          "text": "type: file",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "delete_file",
+      "input": {
+        "name": "delete_file",
+        "argsText": "{\"path\":\"tmp/stale.log\"}",
+        "result": "Deleted tmp/stale.log"
+      },
+      "glyph": "📁",
+      "summary": "delete_file(path=tmp/stale.log)",
+      "preview": [
+        {
+          "text": "Deleted tmp/stale.log",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "delete_directory",
+      "input": {
+        "name": "delete_directory",
+        "argsText": "{\"path\":\"tmp\",\"recursive\":true}",
+        "result": "Deleted tmp"
+      },
+      "glyph": "📁",
+      "summary": "delete_directory(path=tmp, recursive=true)",
+      "preview": [
+        {
+          "text": "Deleted tmp",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "list_allowed_directories",
+      "input": {
+        "name": "list_allowed_directories",
+        "argsText": "{}",
+        "result": "Allowed directories:\n/home/user/project"
+      },
+      "glyph": "📁",
+      "summary": "list_allowed_directories()",
+      "preview": [
+        {
+          "text": "Allowed directories:",
+          "style": "dim"
+        },
+        {
+          "text": "/home/user/project",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "run_shell_command",
+      "input": {
+        "name": "run_shell_command",
+        "argsText": "{\"command\":\"ls -la\"}",
+        "result": "Executing 'ls -la'\n\n<COMMAND_OUTPUT>\nline-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12\n</COMMAND_OUTPUT>\n\nExit code: 0"
+      },
+      "glyph": "🔧",
+      "summary": "run_shell_command(command=ls -la)",
+      "preview": [
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "line-09",
+          "style": "dim"
+        },
+        {
+          "text": "line-10",
+          "style": "dim"
+        },
+        {
+          "text": "… (+3 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "run_shell_command-live-already-shown",
+      "input": {
+        "name": "run_shell_command",
+        "argsText": "{\"command\":\"ls -la\"}",
+        "output": "line-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12",
+        "result": "Executing 'ls -la'\n\n<COMMAND_OUTPUT>\nline-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12\n</COMMAND_OUTPUT>\n\nExit code: 0",
+        "liveOutputAlreadyShown": true
+      },
+      "glyph": "🔧",
+      "summary": "run_shell_command(command=ls -la)",
+      "preview": [
+        {
+          "text": "Exit code: 0",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "run_tests",
+      "input": {
+        "name": "run_tests",
+        "argsText": "{}",
+        "result": "Executing 'npm test'\n\n<COMMAND_OUTPUT>\nline-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12\n</COMMAND_OUTPUT>\n\nExit code: 0"
+      },
+      "glyph": "🔧",
+      "summary": "run_tests()",
+      "preview": [
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "line-09",
+          "style": "dim"
+        },
+        {
+          "text": "line-10",
+          "style": "dim"
+        },
+        {
+          "text": "… (+3 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "run_single_test",
+      "input": {
+        "name": "run_single_test",
+        "argsText": "{\"testPath\":\"spec/toolDisplay.spec.ts\"}",
+        "result": "Executing 'npm test spec/toolDisplay.spec.ts'\n\n<COMMAND_OUTPUT>\nok\n</COMMAND_OUTPUT>\n\nExit code: 0"
+      },
+      "glyph": "🔧",
+      "summary": "run_single_test(testPath=spec/toolDisplay.spec.ts)",
+      "preview": [
+        {
+          "text": "ok",
+          "style": "dim"
+        },
+        {
+          "text": "Exit code: 0",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "run_lint",
+      "input": {
+        "name": "run_lint",
+        "argsText": "{}",
+        "result": "Executing 'npm run lint'\n\n<COMMAND_OUTPUT>\nclean\n</COMMAND_OUTPUT>\n\nExit code: 0"
+      },
+      "glyph": "🔧",
+      "summary": "run_lint()",
+      "preview": [
+        {
+          "text": "clean",
+          "style": "dim"
+        },
+        {
+          "text": "Exit code: 0",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "run_build",
+      "input": {
+        "name": "run_build",
+        "argsText": "{}",
+        "result": "Executing 'npm run build'\n\n<COMMAND_OUTPUT>\nline-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12\n</COMMAND_OUTPUT>\n\nExit code: 0"
+      },
+      "glyph": "🔧",
+      "summary": "run_build()",
+      "preview": [
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "line-09",
+          "style": "dim"
+        },
+        {
+          "text": "line-10",
+          "style": "dim"
+        },
+        {
+          "text": "… (+3 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "task",
+      "input": {
+        "name": "task",
+        "argsText": "{\"subagent_type\":\"general-purpose\",\"description\":\"find the caller\"}",
+        "result": "Subagent finished."
+      },
+      "glyph": "🤖",
+      "summary": "task(subagent_type=general-purpose, description=find the caller)",
+      "preview": [
+        {
+          "text": "Subagent finished.",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "unregistered-generic",
+      "input": {
+        "name": "some_mcp_tool",
+        "argsText": "{\"query\":\"weather\",\"units\":\"metric\"}",
+        "output": "partial output line",
+        "result": "line-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12"
+      },
+      "glyph": "⚙",
+      "summary": "some_mcp_tool(query=weather, units=metric)",
+      "preview": [
+        {
+          "text": "partial output line",
+          "style": "dim"
+        },
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "line-09",
+          "style": "dim"
+        },
+        {
+          "text": "… (+3 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "unregistered-shell-shaped",
+      "input": {
+        "name": "my_custom_toolkit_tool",
+        "argsText": "{\"arg\":\"value\"}",
+        "result": "Executing 'custom-runner --go'\n\n<COMMAND_OUTPUT>\nline-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12\n</COMMAND_OUTPUT>\n\nExit code: 1",
+        "isError": true
+      },
+      "glyph": "⚙",
+      "summary": "my_custom_toolkit_tool(arg=value)",
+      "preview": [
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "line-09",
+          "style": "dim"
+        },
+        {
+          "text": "line-10",
+          "style": "dim"
+        },
+        {
+          "text": "… (+3 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "unparsable-args",
+      "input": {
+        "name": "read_file",
+        "argsText": "{\"path\":\"half-strea",
+        "result": "still streaming"
+      },
+      "glyph": "📁",
+      "summary": "read_file(…)",
+      "preview": [
+        {
+          "text": "still streaming",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "no-args",
+      "input": {
+        "name": "list_directory",
+        "result": "empty"
+      },
+      "glyph": "📁",
+      "summary": "list_directory()",
+      "preview": [
+        {
+          "text": "empty",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "gth_gh_read_file",
+      "input": {
+        "name": "gth_gh_read_file",
+        "argsText": "{\"path\":\"packages/core/src/core/toolDisplay.ts\"}",
+        "result": "Full contents of acme/widgets/packages/core/src/core/toolDisplay.ts@main:\n\nline-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\nline-08\nline-09\nline-10\nline-11\nline-12"
+      },
+      "glyph": "⚙",
+      "summary": "gth_gh_read_file(path=packages/core/src/core/toolDisplay.ts)",
+      "preview": [
+        {
+          "text": "Full contents of acme/widgets/packages/core/src/core/toolDisplay.ts@main:",
+          "style": "dim"
+        },
+        {
+          "text": "",
+          "style": "dim"
+        },
+        {
+          "text": "line-01",
+          "style": "dim"
+        },
+        {
+          "text": "line-02",
+          "style": "dim"
+        },
+        {
+          "text": "line-03",
+          "style": "dim"
+        },
+        {
+          "text": "line-04",
+          "style": "dim"
+        },
+        {
+          "text": "line-05",
+          "style": "dim"
+        },
+        {
+          "text": "line-06",
+          "style": "dim"
+        },
+        {
+          "text": "line-07",
+          "style": "dim"
+        },
+        {
+          "text": "line-08",
+          "style": "dim"
+        },
+        {
+          "text": "… (+4 more lines)",
+          "style": "dim"
+        }
+      ]
+    },
+    {
+      "id": "gth_gh_read_file-error",
+      "input": {
+        "name": "gth_gh_read_file",
+        "argsText": "{\"path\":\"missing.ts\"}",
+        "result": "Could not read \"missing.ts\" via the GitHub API: not found\nThis tool needs an authenticated gh CLI.",
+        "isError": true
+      },
+      "glyph": "⚙",
+      "summary": "gth_gh_read_file(path=missing.ts)",
+      "preview": [
+        {
+          "text": "Could not read \"missing.ts\" via the GitHub API: not found",
+          "style": "dim"
+        },
+        {
+          "text": "This tool needs an authenticated gh CLI.",
+          "style": "dim"
+        }
+      ]
+    }
+  ]
+}
