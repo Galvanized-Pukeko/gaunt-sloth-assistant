@@ -383,6 +383,33 @@ const CONTEXT_OVERFLOW_PATTERNS: readonly string[] = [
   // source, also hits — turns an uncoded groq overflow into an `invalid_request`, never compacted.
   'reduce the length of the messages',
   'request too large',
+  // [[EXT-162]] Load-bearing for google, and for both provider ids. Measured 2026-09-12, live AI
+  // Studio through `@langchain/google` 0.2.3, on two models with different windows
+  // (`gemini-3.8-flash`, 1048576 tokens, and `gemini-2.5-flash-image`, 32768): an oversized input
+  // is an HTTP 400 thrown as that package's own `RequestError`, and the whole body is
+  // `{"error":{"code":400,"message":"The input token count exceeds the maximum number of tokens
+  // allowed (1048576).","status":"INVALID_ARGUMENT"}}`. The package maps no context overflow at
+  // all — it stamps `ContextOverflowError` on nothing — so without this arm the 400 fell to
+  // `invalid_request` and the compact-and-retry seam never saw an overflow it could act on.
+  //
+  // **Nothing structural can carry it.** `code: 400` and `status: 'INVALID_ARGUMENT'` are byte for
+  // byte what a rejected API key returns from the same endpoint, so the prose is the only carrier —
+  // the conclusion [[EXT-163]] reached for groq, reached again here from the opposite direction.
+  //
+  // **The arm is the tail of the sentence rather than its head, deliberately.** 'input token count
+  // exceeds' matches the measured bytes just as well and stops matching the moment the count is
+  // rendered inline — `The input token count (1246756) exceeds the maximum …` — a gap the head
+  // cannot span and this arm still covers.
+  //
+  // **VERTEX: the envelope is shared by construction; only the WORDING is unverified.** From the
+  // package's code, `BaseChatGoogle` reaches both platforms through one `apiClient.fetch(...)` and
+  // one `throw await RequestError.fromResponse(response)`, and the only platform branch is
+  // `buildUrl` (host, api version, auth) — so the class, the status, the `data` body and the
+  // `message = errorBody.error.message` derivation are identical on Vertex. What nobody has
+  // captured is the sentence the Vertex endpoint puts in `error.message`, because this machine has
+  // no Vertex credential (no ADC, no service account, no project) to make the call with. If Vertex
+  // words its limit differently, it needs its own arm beside this one.
+  'exceeds the maximum number of tokens allowed',
 ];
 
 /** Substrings that mean the provider refused for rate or quota reasons. */
