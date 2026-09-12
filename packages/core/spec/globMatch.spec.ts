@@ -38,6 +38,31 @@ describe('CFG-70 globMatch: the vocabulary', () => {
     expect(compileGlob('src/*.ts').test('src/nested/main.ts')).toBe(false);
   });
 
+  it('`*` matches ZERO characters, not only one or more', () => {
+    // The vocabulary table says "zero or more", and every other star in this file consumes at
+    // least one character — so a matcher that quietly required one would pass the whole suite.
+    // The shape that actually bites is a star FLANKED by literals, which is how a user writes
+    // "optionally qualified": `*vue*` is written to catch `vue-ui` and `my-vue`, and a star that
+    // could not match the empty string would drop plain `vue` — the one segment the author was
+    // most certainly thinking of — without any error to notice.
+    const flanked = compileGlob('packages/*vue*/**');
+    expect(flanked.test('packages/vue/Button.vue')).toBe(true);
+    expect(flanked.test('packages/vue-ui/Button.vue')).toBe(true);
+    expect(flanked.test('packages/my-vue/Button.vue')).toBe(true);
+    // The literals still have to be present, so an always-true matcher cannot satisfy this cell.
+    expect(flanked.test('packages/vu/Button.vue')).toBe(false);
+    expect(flanked.test('packages/core/Button.vue')).toBe(false);
+
+    // Both stars empty at once, and the same pattern with them non-empty.
+    expect(compileGlob('src/a*b.ts').test('src/ab.ts')).toBe(true);
+    expect(compileGlob('src/a*b.ts').test('src/axyzb.ts')).toBe(true);
+    expect(compileGlob('src/a*b.ts').test('src/ac.ts')).toBe(false);
+
+    // Derived from the same rule rather than a separate decision: there is no leading-dot
+    // exception in the vocabulary, so a leading star matches the empty prefix like any other.
+    expect(compileGlob('src/*.ts').test('src/.ts')).toBe(true);
+  });
+
   it('`?` matches exactly one character and never a separator', () => {
     expect(compileGlob('src/a?c.ts').test('src/abc.ts')).toBe(true);
     expect(compileGlob('src/a?c.ts').test('src/ac.ts')).toBe(false);
