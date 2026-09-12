@@ -167,7 +167,12 @@ describe('review() — the two warnings', () => {
     expect(warning).toContain('unified diff');
     // The paired half: this is a DIFFERENT diagnosis from "your globs matched nothing", because
     // the remedies are different — one is the config, the other is `--content-source`.
-    expect(warnings().some((line) => line.includes('matched any of the'))).toBe(false);
+    //
+    // The needle is the REMEDY sentence, which is unique to the other warning and says nothing
+    // about counts. Keyed on a fragment of its opening clause instead, a later edit to the count
+    // wording silently empties this assertion out — it then holds whether or not the other warning
+    // fires, which is exactly the defect M18 was.
+    expect(warnings().some((line) => line.includes('Check the match globs'))).toBe(false);
   });
 
   it('treats an absent changedPaths the same as an empty one', async () => {
