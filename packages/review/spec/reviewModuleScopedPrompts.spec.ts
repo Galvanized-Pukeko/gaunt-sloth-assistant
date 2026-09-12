@@ -170,16 +170,33 @@ describe('review() — the two warnings', () => {
 
 describe('review() — output.header: none', () => {
   /**
-   * GS2-93 promised a byte-clean stream to a caller who diffs captured stdout. The cells are a
-   * pair because either half alone passes against an implementation that suppressed everything,
-   * or nothing.
+   * GS2-93 promised a byte-clean stream to a caller who diffs captured stdout. The two cells are a
+   * pair because either half alone passes against an implementation that suppressed everything, or
+   * nothing.
+   *
+   * **The suppression cell must be run on a diff that DOES match.** Written with a diff that
+   * matches nothing there is no report line to suppress in the first place, so the assertion holds
+   * for a reason that has nothing to do with the guard — it passed against an implementation that
+   * displayed the line unconditionally. Mutation testing is how that was found; the paths here are
+   * the ones that make the assertion capable of failing.
    */
-  it('suppresses the report line but not the warnings', async () => {
+  it('suppresses the report line while still selecting the entries', async () => {
+    const config = await runReview(
+      configWith({ output: { header: 'none' } } as Partial<GthConfig>),
+      ['packages/vue-ui/src/Button.vue']
+    );
+
+    expect(scopedReportLine()).toBeUndefined();
+    // The paired half: silencing the header silences the LINE, never the feature. A caller who
+    // wanted a clean document still gets the module guidelines attached to the review.
+    expect(config.scopedPrompts?.map((entry) => entry.name)).toEqual(['vue-ui']);
+  });
+
+  it('still emits the warnings when the header is silenced', async () => {
     await runReview(configWith({ output: { header: 'none' } } as Partial<GthConfig>), [
       'src/nothing-matches.ts',
     ]);
 
-    expect(scopedReportLine()).toBeUndefined();
     expect(warnings().some((line) => line.includes('matched'))).toBe(true);
   });
 
