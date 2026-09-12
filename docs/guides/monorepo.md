@@ -62,6 +62,43 @@ must be complete on its own (at minimum a valid `llm` spec). The only layer that
 a discovered project config is the global `~/.gsloth` config, so genuinely cross-cutting settings
 belong there rather than being duplicated into each package.
 
+## Scope guidelines by path when you review
+
+Discovery answers the question above for a command you run *inside* a package. A review is not that
+shape: `gth review` and `gth pr` run once, from the repo root, over a diff that can span several
+packages at once. One run, one config, one guidelines file — and no single directory for the walk to
+start from, so nothing on this page so far can give the API package's rules to the API half of a
+diff.
+
+The usual workaround is to write the per-package rules into the review instructions as prose —
+"for files under `packages/api`, apply…" — and leave the model to apply the right ones. It works,
+and it is a judgement call on every run: nothing outside the answer shows which rules were used, and
+it decays quietly as packages are added.
+
+`prompts.paths` makes that selection deterministic instead, before the model is called. Each entry
+names the paths it covers and the file to attach for them:
+
+```json
+{
+  "prompts": {
+    "guidelines": "AGENTS.md",
+    "paths": [
+      { "name": "api", "match": ["packages/api/**"], "guidelines": ".gsloth/guidelines/api.md" },
+      { "name": "ml", "match": ["packages/ml/**"], "guidelines": ".gsloth/guidelines/ml.md" }
+    ]
+  }
+}
+```
+
+```bash
+gth review --content-source git
+```
+
+A diff confined to `packages/api` is reviewed against `AGENTS.md` plus the API guidelines, with the
+ML ones left out, and the run reports which entries it attached. The glob vocabulary, the other six
+segments, and what each outcome reports:
+[Path-scoped prompts](../configuration/prompts.md#path-scoped-prompts).
+
 ## Examples
 
 ```bash

@@ -105,3 +105,5 @@ git --no-pager diff | gth review -r requirements.md
 - Every `review` / `pr` flag: [Commands](../COMMANDS.md#pr).
 - Run the review under a cheaper model than your coding model:
   [Choose & switch models](choose-and-switch-models.md).
+- Attach a package's own guidelines only when the diff touches it, instead of one guidelines file for
+  the whole repository: [Path-scoped prompts](../configuration/prompts.md#path-scoped-prompts).
