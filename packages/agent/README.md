@@ -45,6 +45,17 @@ it can run the agent with the tools your configuration gives it. A fourth argume
 to call the server, for a client whose origin the config cannot know because the caller chose it.
 Port, host and CORS come from `commands.api.*` in the config — see
 [the configuration guide](https://github.com/pukeko-robotics/gaunt-sloth/blob/main/docs/configuration/index.md).
+`startAgUiServer` resolves with the bound `http.Server`, which is how an embedder learns the port a
+`port` of `0` was given, and how it stops the server.
+
+Beyond the protocol's own events, the stream carries one `CUSTOM` event, named `context_compacted`
+(exported as `AGUI_CONTEXT_COMPACTED_EVENT`). It is sent when the provider rejected the turn for
+size and the server folded the older conversation into a summary and asked the model again: its
+`value` is `{ cause, compaction, notice }` — the numbers `/compact` reports and the notice the other
+surfaces show, so a client can render either. Everything already streamed for the run stands; what
+follows is the same turn continued with less history behind it, as a new text message. A client
+that ignores the event shows a correct turn with the fold unannounced. A second overflow ends the
+run with `RUN_ERROR` carrying `code: context_overflow@runner.overflow-compact-exhausted`.
 
 ## Binaries
 

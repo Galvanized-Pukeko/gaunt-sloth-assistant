@@ -217,9 +217,11 @@ export type AgentStreamEvent =
        *
        * Informational, and additive. A consumer that does not know the variant renders a correct
        * turn with the fold unannounced, which is the degradation this event exists to prevent — so
-       * the runner ALSO reports the fold through its status callback, exactly as the string driver
-       * does, for a surface that reads that channel. The AG-UI server never receives it: that
-       * surface drives the agent's own stream directly, and this event is the runner's.
+       * the seam ALSO reports the fold through the status callback, exactly as the string driver
+       * does, for a surface that reads that channel. [[EXT-174]] — the AG-UI server, which drives
+       * the agent's own stream directly rather than through the runner, receives it too: it wraps
+       * that stream in the same `retryEventTurnOnContextOverflow` the runner uses, and puts the
+       * fold on the wire as an AG-UI `CUSTOM` event named `context_compacted`.
        */
       type: 'context_compacted';
       /**
