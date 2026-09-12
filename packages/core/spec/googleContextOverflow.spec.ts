@@ -24,22 +24,27 @@
  * node — `refusal.ts` reads camelCase `finishReason` off the same shelf — so the cells for it are
  * *pinning* what was measured, not covering something new.
  *
- * **VERTEX IS NOT COVERED HERE, and the gap is narrower than "the envelope".** From the package's
- * code, `BaseChatGoogle` reaches both platforms through one `apiClient.fetch(...)` and one
- * `throw await RequestError.fromResponse(response)`; the only platform branch is `buildUrl` (host,
- * api version, auth). So the class, the status, the `data` body and the
- * `message = errorBody.error.message` derivation are shared by construction, and the one thing
- * nobody here has seen is the **sentence the Vertex endpoint puts in `error.message`** — because
- * this machine has no Vertex credential (no ADC, no service account, no project) to make the call
- * with. No fixture is invented for it: a detector fitted to a guessed wording would read as covered
- * and would not be.
+ * **VERTEX IS COVERED TOO, from bytes measured live on 2026-09-12 through the same package.** The
+ * envelope is the one the package's code predicts — `BaseChatGoogle` reaches both platforms through
+ * one `apiClient.fetch(...)` and one `throw await RequestError.fromResponse(response)`, and the only
+ * platform branch is `buildUrl` — so the class, the status, the `data` body and the
+ * `message = errorBody.error.message` derivation are shared. **The wording differs in the
+ * parentheses and in nothing else:** AI Studio sends `... allowed (1048576).` where Vertex sends
+ * `... allowed 1048576.` Both curated Vertex defaults answer that way on both transports, and the
+ * one arm covers them because it matches the tail of the sentence.
+ *
+ * One Vertex case is *not* covered — `gemini-2.5-flash-image` while streaming, which answers with no
+ * token-count prose at all. It is pinned below as a negative control and carved out to [[EXT-176]].
  *
  * **How the fixtures are driven.** Each cell replaces `apiClient.fetch` on a real `ChatGoogle` with
  * one that answers from the recorded bytes, so the real `RequestError.fromResponse` builds the real
  * class and the real converters build the real message — the shape under test is the package's own,
  * not a hand-drawn imitation. No request is ever made: the api key is an explicit placeholder (so
- * the ambient `GOOGLE_API_KEY` is never read), and every cell asserts the stub was called, which
- * makes a stub that failed to install a red rather than a live network call on a CI cell.
+ * the ambient `GOOGLE_API_KEY` is never read), and every cell that drives a fixture through the
+ * model asserts the stub was called, which makes a stub that failed to install a red rather than a
+ * live network call on a CI cell. The Vertex
+ * cells use a second factory that is hermetic in two further respects, asserted rather than
+ * described — see `vertexModel` and the construction cell beside it.
  */
 import { describe, expect, it } from 'vitest';
 import { ContextOverflowError } from '@langchain/core/errors';
@@ -65,6 +70,54 @@ const RECORDED_OVERFLOW_SMALL_WINDOW = {
   error: {
     code: 400,
     message: 'The input token count exceeds the maximum number of tokens allowed (32768).',
+    status: 'INVALID_ARGUMENT',
+  },
+};
+
+/**
+ * Recorded 2026-09-12 — the **Vertex** wording of the same overflow, on both curated Vertex
+ * defaults (`gemini-3.8-flash` and `gemini-3.5-flash-lite`, window 1048576) and on both transports.
+ *
+ * **The parentheses are the entire difference from AI Studio**, which sends `... allowed (1048576).`
+ * where Vertex sends `... allowed 1048576.` That is why the arm in `CONTEXT_OVERFLOW_PATTERNS` ends
+ * at `'…tokens allowed'` — the **tail** of the sentence, stopping short of the count. An arm
+ * reaching one character further, into the open paren, or one anchored on the head up to the count,
+ * classifies AI Studio and misses Vertex outright. Any future narrowing of that kind goes red
+ * **here**, on the Vertex cells, while every AI Studio cell above stays green; that asymmetry is
+ * what these cells exist for.
+ */
+const RECORDED_VERTEX_OVERFLOW_FLASH = {
+  error: {
+    code: 400,
+    message: 'The input token count exceeds the maximum number of tokens allowed 1048576.',
+    status: 'INVALID_ARGUMENT',
+  },
+};
+
+/**
+ * Recorded 2026-09-12 — Vertex, `gemini-2.5-flash-image` (window 32768), **non-streaming**. The same
+ * paren-less wording on a second window, so the difference is the platform's and not the model's.
+ * Only the non-streaming transport is recorded for this model, deliberately: streaming it produces a
+ * different body entirely, which is the negative control below.
+ */
+const RECORDED_VERTEX_OVERFLOW_SMALL_WINDOW = {
+  error: {
+    code: 400,
+    message: 'The input token count exceeds the maximum number of tokens allowed 32768.',
+    status: 'INVALID_ARGUMENT',
+  },
+};
+
+/**
+ * Recorded 2026-09-12 — Vertex, `gemini-2.5-flash-image`, **streaming**, answering an input sized
+ * past its window. Reproduced 3 times out of 3. There is no token-count prose anywhere in the body:
+ * the same model non-streaming, and other models streaming, both give the detailed sentence, so this
+ * is an interaction of platform, model and transport rather than a property of any one of them.
+ */
+const RECORDED_VERTEX_STREAM_INVALID_ARGUMENT = {
+  error: {
+    code: 400,
+    message: 'Request contains an invalid argument.',
     status: 'INVALID_ARGUMENT',
   },
 };
@@ -217,22 +270,82 @@ function googleModel(): ChatGoogle {
   return new ChatGoogle({ model: 'gemini-3.8-flash', apiKey: 'stub-never-sent', maxRetries: 0 });
 }
 
+/**
+ * Placeholder service-account credentials for the Vertex factory. Nothing is ever signed with them:
+ * the private key is imported only inside `NodeApiClient.fetch`, which every cell replaces, and
+ * `normalizeGCPCredentials` merely freezes the object. The single field that is read is
+ * `project_id`, which `getProjectId()` hands to `buildUrl` so the Vertex URL can be built without
+ * asking the environment for anything.
+ */
+const STUB_VERTEX_CREDENTIALS = {
+  type: 'service_account',
+  project_id: 'stub-project-never-called',
+  private_key_id: 'stub-key-id',
+  private_key: 'stub-never-signed',
+  client_id: 'stub-client-id',
+  client_email: 'stub@example.invalid',
+  auth_uri: 'https://example.invalid/auth',
+  token_uri: 'https://example.invalid/token',
+  auth_provider_x509_cert_url: 'https://example.invalid/certs',
+  client_x509_cert_url: 'https://example.invalid/client-cert',
+};
+
+/**
+ * A real Vertex `ChatGoogle` that can reach neither the network nor a credential of any kind.
+ *
+ * **Both fields below are load-bearing, for different reasons, and neither is cosmetic.**
+ *
+ * `apiKey: ''` — the constructor resolves `params.apiKey ?? getEnvironmentVariable('GOOGLE_API_KEY')`,
+ * so `undefined` lets an ambient key straight back in, while `''` is not nullish and skips the
+ * lookup; the library's own `hasApiKey()` (`typeof k === 'string' && k !== ''`) then reports false.
+ * This is the same demotion `providers/vertexai.ts` performs for CFG-58, so the cells exercise
+ * production's construction rather than working around it. Omit it and an ambient `GOOGLE_API_KEY`
+ * flips `isVertexExpress` to true: the model then builds a Vertex **express** URL carrying no
+ * project and no location — a fixture labelled Vertex that came from a different endpoint, green on
+ * a developer machine and differently shaped on a CI cell that has no key.
+ *
+ * `credentials` — with neither an api key nor credentials the client builds a real `GoogleAuth`, and
+ * `buildUrl` then awaits `getProjectId()`, which consults ADC, shells out to gcloud and finally
+ * waits on the GCE metadata server before throwing `Unable to detect a Project Id in the current
+ * environment.` Supplying credentials returns `project_id` off the frozen object instead, and stops
+ * `GoogleAuth` from being constructed at all.
+ *
+ * Neither claim is left to this comment: the construction cell below asserts both states directly.
+ */
+function vertexModel(model = 'gemini-3.8-flash'): ChatGoogle {
+  return new ChatGoogle({
+    model,
+    vertexai: true,
+    apiKey: '',
+    credentials: STUB_VERTEX_CREDENTIALS,
+    maxRetries: 0,
+  });
+}
+
 interface TransportHolder {
   apiClient: { fetch: (request: Request) => Promise<Response> };
 }
 
+/** The two auth-state predicates the Vertex hermeticity cell reads off the constructed client. */
+interface AuthStateHolder {
+  apiClient: { hasApiKey: () => boolean; googleAuth?: unknown };
+}
+
 /**
  * Answer this model's next request from recorded bytes. Returns the call counter, so every cell can
- * assert the transport really was replaced instead of trusting that it was.
+ * assert the transport really was replaced instead of trusting that it was, and the URL the model
+ * built — which is the only thing that tells a Vertex request from a Vertex **express** one, since
+ * the response body is identical either way and classification never looks at the endpoint.
  */
 function stubTransport(
   llm: ChatGoogle,
   init: { status: number; statusText: string; body: unknown; contentType?: string }
-): { count: number } {
-  const calls = { count: 0 };
+): { count: number; url: string | undefined } {
+  const calls: { count: number; url: string | undefined } = { count: 0, url: undefined };
   const payload = typeof init.body === 'string' ? init.body : JSON.stringify(init.body);
-  (llm as unknown as TransportHolder).apiClient.fetch = async () => {
+  (llm as unknown as TransportHolder).apiClient.fetch = async (request: Request) => {
     calls.count += 1;
+    calls.url = request.url;
     return new Response(payload, {
       status: init.status,
       statusText: init.statusText,
@@ -242,14 +355,18 @@ function stubTransport(
   return calls;
 }
 
-/** Drive a recorded error response through the real model and return what it threw. */
+/**
+ * Drive a recorded error response through the real model and return what it threw. `makeModel`
+ * selects the platform: the AI Studio factory by default, `vertexModel` for the Vertex cells.
+ */
 async function thrownFor(
   body: unknown,
   status: number,
   statusText: string,
-  path: 'invoke' | 'stream' = 'invoke'
+  path: 'invoke' | 'stream' = 'invoke',
+  makeModel: () => ChatGoogle = googleModel
 ): Promise<unknown> {
-  const llm = googleModel();
+  const llm = makeModel();
   const calls = stubTransport(llm, { status, statusText, body });
   let caught: unknown = undefined;
   let threw = false;
@@ -364,6 +481,140 @@ describe('[[EXT-162]] the arm is the tail of the sentence, not its head', () => 
     expect(isContextOverflow(Object.assign(new Error(withInlineCount), { statusCode: 400 }))).toBe(
       true
     );
+  });
+});
+
+describe('[[EXT-162]] vertex words the same overflow without the parentheses', () => {
+  it('the vertex client reaches the location endpoint holding no credential of any kind', async () => {
+    // The hermeticity every cell in this block rests on, asserted instead of described. `hasApiKey()`
+    // false is what keeps `isVertexExpress` off; `googleAuth` undefined is what keeps ADC, gcloud and
+    // the GCE metadata server out of `buildUrl`. Drop either field in `vertexModel` and one of these
+    // goes red here rather than silently somewhere else.
+    //
+    // The URL is asserted for a reason a body-only cell cannot cover: an express-mode request
+    // returns the identical recorded bytes and classifies identically, so every other cell below
+    // would stay green while testing a different endpoint. `/projects/` and `/locations/` appear in
+    // the location URL and in no express one.
+    const llm = vertexModel();
+    const client = (llm as unknown as AuthStateHolder).apiClient;
+    expect(client.hasApiKey()).toBe(false);
+    expect(client.googleAuth).toBeUndefined();
+
+    const calls = stubTransport(llm, {
+      status: 400,
+      statusText: 'Bad Request',
+      body: RECORDED_VERTEX_OVERFLOW_FLASH,
+    });
+    await expect(llm.invoke('hi')).rejects.toThrow();
+    expect(calls.count).toBe(1);
+    expect(calls.url).toContain('aiplatform.googleapis.com');
+    expect(calls.url).toContain('/projects/stub-project-never-called/');
+    expect(calls.url).toContain('/locations/global/');
+  });
+
+  it('differs from the AI Studio sentence in the parentheses and in nothing else', () => {
+    // The relationship the arm's design depends on, pinned against a mis-transcription: strip the
+    // two parens from the AI Studio message and the Vertex one is left byte for byte. That is why
+    // ONE arm, anchored on the tail, spans both platforms.
+    //
+    // **What this can and cannot catch.** Both operands are recorded constants, so a rewording by
+    // Google cannot red it — that surfaces only on a fresh live measurement. It reds when someone
+    // EDITS either fixture, which is the realistic way these bytes go wrong. Read it as a
+    // transcription guard, not as a drift detector.
+    expect(RECORDED_OVERFLOW_FLASH.error.message.replace('(', '').replace(')', '')).toBe(
+      RECORDED_VERTEX_OVERFLOW_FLASH.error.message
+    );
+    expect(RECORDED_OVERFLOW_SMALL_WINDOW.error.message.replace('(', '').replace(')', '')).toBe(
+      RECORDED_VERTEX_OVERFLOW_SMALL_WINDOW.error.message
+    );
+  });
+
+  it('arrives as the same untyped RequestError the AI Studio path produces', async () => {
+    const error = (await thrownFor(
+      RECORDED_VERTEX_OVERFLOW_FLASH,
+      400,
+      'Bad Request',
+      'invoke',
+      vertexModel
+    )) as { name: string; statusCode: number; message: string; data: unknown };
+    expect(error.name).toBe('RequestError');
+    expect(error.statusCode).toBe(400);
+    expect(error.message).toBe(
+      'The input token count exceeds the maximum number of tokens allowed 1048576.'
+    );
+    expect(error.data).toEqual(RECORDED_VERTEX_OVERFLOW_FLASH);
+    expect(ContextOverflowError.isInstance(error)).toBe(false);
+  });
+
+  it('is classified as a context overflow', async () => {
+    const error = await thrownFor(
+      RECORDED_VERTEX_OVERFLOW_FLASH,
+      400,
+      'Bad Request',
+      'invoke',
+      vertexModel
+    );
+    expect(isContextOverflow(error)).toBe(true);
+    expect(classifyThrownTermination(error)).toEqual({
+      category: 'context_overflow',
+      detail: 'RequestError',
+    });
+  });
+
+  it('is classified on the streaming path too, which is the path the runner uses', async () => {
+    const error = await thrownFor(
+      RECORDED_VERTEX_OVERFLOW_FLASH,
+      400,
+      'Bad Request',
+      'stream',
+      vertexModel
+    );
+    expect(isContextOverflow(error)).toBe(true);
+    expect(classifyThrownTermination(error).category).toBe('context_overflow');
+  });
+
+  it('is classified on a model with a different window, from the same paren-less sentence', async () => {
+    // Non-streaming only, matching the transport this body was recorded on: streaming this model
+    // is the negative control below, not this sentence.
+    const error = await thrownFor(
+      RECORDED_VERTEX_OVERFLOW_SMALL_WINDOW,
+      400,
+      'Bad Request',
+      'invoke',
+      () => vertexModel('gemini-2.5-flash-image')
+    );
+    expect(isContextOverflow(error)).toBe(true);
+    expect(classifyThrownTermination(error).category).toBe('context_overflow');
+  });
+});
+
+describe('[[EXT-162]] the one vertex case the arm cannot reach', () => {
+  it('a streaming flash-image overflow is NOT an overflow — a known hole, pinned deliberately', async () => {
+    // `gemini-2.5-flash-image` on Vertex, streaming, answers an oversized input with no token-count
+    // prose at all, so nothing in the body can carry the classification: `code: 400` and
+    // `status: 'INVALID_ARGUMENT'` are byte for byte what a rejected API key returns from the same
+    // endpoint. It lands in `invalid_request`, whose remedy is not `reduce-context`, so the
+    // [[EXT-160]] compact-and-retry seam does not fire for it.
+    //
+    // **This cell pins the hole so nobody widens the matcher into it by accident.** An arm on
+    // 'invalid argument' would close this case and classify every malformed request in the product
+    // as a context overflow.
+    //
+    // **It is expected to FLIP when [[EXT-176]] lands**, which closes the case by a route prose
+    // cannot take — a `:countTokens` pre-flight, or a non-streaming re-issue to disambiguate. A
+    // future lane should update this assertion then, and must NOT delete it as a stale one.
+    const error = await thrownFor(
+      RECORDED_VERTEX_STREAM_INVALID_ARGUMENT,
+      400,
+      'Bad Request',
+      'stream',
+      () => vertexModel('gemini-2.5-flash-image')
+    );
+    expect(isContextOverflow(error)).toBe(false);
+    expect(classifyThrownTermination(error)).toEqual({
+      category: 'invalid_request',
+      detail: '400',
+    });
   });
 });
 

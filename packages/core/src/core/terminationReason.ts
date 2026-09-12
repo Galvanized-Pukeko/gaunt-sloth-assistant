@@ -401,14 +401,22 @@ const CONTEXT_OVERFLOW_PATTERNS: readonly string[] = [
   // rendered inline — `The input token count (1246756) exceeds the maximum …` — a gap the head
   // cannot span and this arm still covers.
   //
-  // **VERTEX: the envelope is shared by construction; only the WORDING is unverified.** From the
-  // package's code, `BaseChatGoogle` reaches both platforms through one `apiClient.fetch(...)` and
-  // one `throw await RequestError.fromResponse(response)`, and the only platform branch is
-  // `buildUrl` (host, api version, auth) — so the class, the status, the `data` body and the
-  // `message = errorBody.error.message` derivation are identical on Vertex. What nobody has
-  // captured is the sentence the Vertex endpoint puts in `error.message`, because this machine has
-  // no Vertex credential (no ADC, no service account, no project) to make the call with. If Vertex
-  // words its limit differently, it needs its own arm beside this one.
+  // **VERTEX IS MEASURED, and this one arm carries it too — no second arm is needed.** Live on
+  // 2026-09-12 through the same package: the envelope is identical by construction (one
+  // `apiClient.fetch(...)`, one `throw await RequestError.fromResponse(response)`, `buildUrl` the
+  // only platform branch), and **the wording differs in the parentheses and nothing else** —
+  // `The input token count exceeds the maximum number of tokens allowed 1048576.` against AI
+  // Studio's `... allowed (1048576).` So matching the tail rather than the head is what spans the
+  // two PLATFORMS as well as the inline-count case above; an arm reaching into the open paren
+  // would have missed Vertex entirely. Confirmed on both curated Vertex defaults
+  // (`gemini-3.8-flash`, `gemini-3.5-flash-lite`) and on both transports.
+  //
+  // The one Vertex case this cannot reach is `gemini-2.5-flash-image` while STREAMING, which
+  // answers an oversized input `Request contains an invalid argument.` with no token-count prose
+  // anywhere in the body. Neither prose nor structure can close it — `code: 400` /
+  // `status: 'INVALID_ARGUMENT'` are byte for byte a rejected key — and matching 'invalid
+  // argument' would make every malformed request an overflow. [[EXT-176]] carries it; a negative
+  // control in `googleContextOverflow.spec.ts` pins it until then.
   'exceeds the maximum number of tokens allowed',
 ];
 
