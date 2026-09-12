@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import type { GthConfig, ScopedPromptsEntry } from '#src/config.js';
 import type { PromptSegmentName } from '#src/config.js';
 
@@ -34,7 +34,14 @@ vi.mock('node:fs', () => ({
     // Anything outside the virtual project is the installed package's bundled default, which
     // `readFileFromInstallDir` reaches by absolute path. Answering deterministically keeps the
     // "nothing configured, no project file" branch readable instead of throwing.
-    return Object.hasOwn(files, key) ? files[key] : `BUNDLED ${key.split('/').pop()}`;
+    //
+    // `basename`, never `key.split('/').pop()`. This key is a REAL filesystem path built by
+    // `resolve()`, so on win32 it is backslash-separated and splitting on `/` returns the whole
+    // absolute path — which is how this cell reached CI green on Linux and macOS and red on both
+    // Windows cells. The POSIX-only rule belongs to diff paths, which are `/`-separated by
+    // construction; a path off this machine's filesystem is the opposite case and wants the
+    // platform-aware helper.
+    return Object.hasOwn(files, key) ? files[key] : `BUNDLED ${basename(key)}`;
   }),
 }));
 
