@@ -836,12 +836,75 @@ const promptSegmentSchema = z.union([
 ]);
 
 /**
+ * CFG-70 — the message a scoped entry's rejected key produces. It NAMES the entry, because the
+ * issue path alone gives an array index and the user needs the entry they wrote; and it says why
+ * the key is refused rather than only that it is, because a user who wanted `mode` there has a
+ * real intention that the message has to redirect.
+ *
+ * `mode` and `enabled` are rejected rather than ignored on purpose. A scoped entry always APPENDS
+ * to the root segment — accepting a key with the opposite default in a nested position would let
+ * one module's entry silently discard the whole repository's guidelines, and a runtime that takes
+ * a key it will never honour is GS2-81's exact defect.
+ */
+function scopedPromptsEntryKeyMessage(entry: unknown, keys: readonly string[]): string {
+  const name =
+    entry && typeof entry === 'object' && typeof (entry as { name?: unknown }).name === 'string'
+      ? (entry as { name: string }).name
+      : undefined;
+  const subject = name ? `Scoped prompt entry ${JSON.stringify(name)}` : 'A scoped prompt entry';
+  const rejected = keys.map((key) => JSON.stringify(key)).join(', ');
+  return (
+    `${subject} under prompts.paths does not accept ${rejected}. A scoped entry always APPENDS ` +
+    `to the root segment and can neither replace nor disable it, so mode and enabled are not ` +
+    `accepted here; every segment in a scoped entry is a plain file path. To replace or disable ` +
+    `a segment, configure it at the top level of prompts.`
+  );
+}
+
+/**
+ * CFG-70 — one entry of `prompts.paths`: extra prompt content attached to the paths a diff
+ * touches. `name` and `match` are required and non-empty; each of the seven segment names is an
+ * optional plain string path.
+ *
+ * **Strict**, unlike {@link promptsSchema} itself. `mode` and `enabled` are the keys a user will
+ * reach for here — the top-level segment shape has them — and a plain `z.object` would strip
+ * either one silently, leaving a config that reads as though it replaced the root guidelines while
+ * the runtime appended to them.
+ */
+const scopedPromptsEntrySchema = z.strictObject(
+  {
+    name: z.string().min(1),
+    match: z.array(z.string().min(1)).min(1),
+    backstory: z.string().optional(),
+    guidelines: z.string().optional(),
+    system: z.string().optional(),
+    chat: z.string().optional(),
+    code: z.string().optional(),
+    exec: z.string().optional(),
+    review: z.string().optional(),
+  },
+  {
+    // Only the unrecognized-key issue is re-worded: the schema-level `error` also sees the
+    // `invalid_type` raised when the entry is not an object at all, and Zod's own wording for that
+    // one is already right. Child issues (a missing `name`, an empty `match`) never reach here.
+    error: (issue) =>
+      issue.code === 'unrecognized_keys'
+        ? scopedPromptsEntryKeyMessage(issue.input, issue.keys)
+        : undefined,
+  }
+);
+
+/**
  * GS2-43 — the unified `prompts` config object (CFG-18's flat-key→rich-object precedent).
  * Replaces the removed flat `projectGuidelines` / `projectReviewInstructions` keys and makes
  * ALL seven prompt segments retargetable through config (previously backstory/system/chat/
  * code/exec were reachable only by placing a file in the config dir). Kept as a plain
  * `z.object` of optional sibling keys so a future segment (e.g. GS2-44's `agents`) is a
  * one-line addition with no collision risk.
+ *
+ * Plain, therefore, means **stripping**: only the root config object is loose. A sibling key has
+ * to be declared here to survive a load at all — there is no "it flows through" — which is why
+ * CFG-70's `paths` is listed below rather than merely typed.
  */
 const promptsSchema = z.object({
   backstory: promptSegmentSchema.optional(),
@@ -851,6 +914,7 @@ const promptsSchema = z.object({
   code: promptSegmentSchema.optional(),
   exec: promptSegmentSchema.optional(),
   review: promptSegmentSchema.optional(),
+  paths: z.array(scopedPromptsEntrySchema).optional(),
 });
 
 const prCommandSchema = z.object({

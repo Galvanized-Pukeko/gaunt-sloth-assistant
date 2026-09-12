@@ -303,6 +303,52 @@
               }
             }
           ]
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "match": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "backstory": {
+                "type": "string"
+              },
+              "guidelines": {
+                "type": "string"
+              },
+              "system": {
+                "type": "string"
+              },
+              "chat": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "exec": {
+                "type": "string"
+              },
+              "review": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "match"
+            ],
+            "additionalProperties": false
+          }
         }
       }
     },

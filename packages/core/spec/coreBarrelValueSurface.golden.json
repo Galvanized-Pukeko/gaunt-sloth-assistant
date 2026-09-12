@@ -590,6 +590,10 @@
       "kind": "function"
     },
     {
+      "name": "selectScopedPrompts",
+      "kind": "function"
+    },
+    {
       "name": "stripRungToolDescriptionSuffix",
       "kind": "function"
     },

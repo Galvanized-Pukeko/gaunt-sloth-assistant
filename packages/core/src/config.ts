@@ -11,6 +11,8 @@
  * This module is the **public barrel** for the configuration system. The implementation
  * is split into focused modules under `config/`:
  * - `config/types.ts` — the configuration type surface.
+ * - `config/scopedPrompts.ts` — CFG-70: the pure selector deciding which `prompts.paths` entries a
+ *   diff's paths activate.
  * - `config/shell-policy.ts` — {@link GthDevToolsConfig} + the shell/dev-tools resolvers.
  * - `config/defaults.ts` — {@link DEFAULT_CONFIG}.
  * - `config/loader.ts` — discovery + the layered load/merge pipeline.
@@ -35,6 +37,10 @@ export * from '#src/config/types.js';
 // `packages/agent` imports `@gaunt-sloth/core/config.js`, and a parser it could not reach is a
 // parser it would reimplement.
 export * from '#src/config/tokenBudget.js';
+// CFG-70 — the path-scoped prompt selector. Exported from the barrel deliberately: the review
+// package re-exports this barrel wholesale, so an embedder populating changed paths itself reaches
+// the same selector the commands use rather than reimplementing the match rules.
+export * from '#src/config/scopedPrompts.js';
 export * from '#src/config/shell-policy.js';
 export * from '#src/config/tool-descriptions.js';
 export * from '#src/config/filesystem-tools.js';

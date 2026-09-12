@@ -607,6 +607,11 @@
       "arity": 0
     },
     {
+      "name": "ScopedPromptsEntry",
+      "file": "config/types.d.ts",
+      "arity": 0
+    },
+    {
       "name": "ServerTool",
       "file": "config/types.d.ts",
       "arity": 0

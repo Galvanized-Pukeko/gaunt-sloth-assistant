@@ -47,13 +47,56 @@ export interface PromptSegmentConfig {
 export type PromptSegmentSetting = string | PromptSegmentConfig;
 
 /**
+ * CFG-70 — one entry of {@link PromptsConfig}'s `paths` list: extra prompt content that applies
+ * only when the diff under review touches particular paths.
+ *
+ * Each segment here is a **plain string path** — deliberately NOT a
+ * {@link PromptSegmentSetting}, which would admit `mode` and `enabled`.
+ *
+ * A scoped entry always **appends** to the root segment; it can neither replace nor disable it.
+ * The root segment's own default is `replace`, so accepting the same `mode` key in a nested
+ * position with the opposite default is the worse of the two options available: one module's entry
+ * could silently drop the whole repository's guidelines, and nothing in the run would say so.
+ * Rather than ignore the key, the schema **rejects** `mode` and `enabled` inside an entry — a
+ * runtime that accepts a key it will never honour is GS2-81's exact defect.
+ */
+export interface ScopedPromptsEntry {
+  /** Required, non-empty. Identifies the entry in the composed heading and in the run's report. */
+  name: string;
+  /**
+   * Required, non-empty list of globs matched against the paths in the diff. A leading `!` negates:
+   * a path a `!` pattern matches cannot pull the entry in on its own, though another path under the
+   * same entry still can.
+   */
+  match: string[];
+  backstory?: string;
+  guidelines?: string;
+  system?: string;
+  chat?: string;
+  code?: string;
+  exec?: string;
+  review?: string;
+}
+
+/**
  * GS2-43 — the unified `prompts` config object. Replaces the removed flat
  * `projectGuidelines` / `projectReviewInstructions` keys and makes all seven prompt
  * segments retargetable through config. Sibling keys are trivially addable (GS2-44 will
  * add `agents` for AGENTS.md auto-discovery), so keep segment names and future siblings
  * in this one flat namespace.
+ *
+ * CFG-70's `paths` is such a sibling: a list of {@link ScopedPromptsEntry}. It is written as an
+ * intersection rather than by widening the `Record` so the seven segment names keep their exact
+ * {@link PromptSegmentSetting} type and `paths` keeps its own.
  */
-export type PromptsConfig = Partial<Record<PromptSegmentName, PromptSegmentSetting>>;
+export type PromptsConfig = Partial<Record<PromptSegmentName, PromptSegmentSetting>> & {
+  /**
+   * CFG-70 — path-scoped overlays, in the order the user wrote them. Across config layers this
+   * list **replaces** rather than concatenates (the `deepMerge` default), so a project config's
+   * list wholly supersedes a global one.
+   */
+  paths?: ScopedPromptsEntry[];
+};
 
 /**
  * Shared per-command tooling configuration (the knobs every actionable command carries).
