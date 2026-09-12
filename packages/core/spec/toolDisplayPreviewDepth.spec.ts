@@ -183,6 +183,66 @@ describe('tool-output preview depth (TUI-C105)', () => {
      */
   });
 
+  /**
+   * [[TUI-C108]] — the floor is the second exception to the configured depth, and it lives beside
+   * the depth-0 one because the two have to be read together: a call that did not work is not a
+   * tool call occupying a block, it is the reason the run is about to go wrong.
+   *
+   * These cells are on `buildToolPreviewLines` rather than on either surface deliberately — BOTH
+   * surfaces call it, and the floor is meant to reach both.
+   */
+  describe('a FAILED call floors the depth, whatever was configured', () => {
+    const failed = {
+      name: 'read_file',
+      argsText: '{"path":"a.ts"}',
+      result: TWELVE_LINES,
+      isError: true,
+    };
+
+    it('keeps the floor of error lines at depth 0, where a success gets nothing', async () => {
+      const { buildToolPreviewLines, setToolDisplayConfig, TOOL_ERROR_PREVIEW_FLOOR_LINES } =
+        await load();
+      setToolDisplayConfig({ toolOutputPreviewLines: 0 });
+
+      const success = buildToolPreviewLines({ ...failed, isError: false }, []);
+      const failure = buildToolPreviewLines(failed, []);
+
+      // The contrast is the assertion: same depth, same result text, different outcome.
+      expect(success).toEqual([]);
+      expect(failure.length).toBeGreaterThanOrEqual(TOOL_ERROR_PREVIEW_FLOOR_LINES);
+      // Asserted on the CONTENT, not the count: a floor that kept three lines of nothing would
+      // satisfy a count and still withhold why the call failed.
+      expect(failure.map((l) => l.text)).toContain('body-1');
+    });
+
+    it('floors a depth of 1 and 2 as well — the floor is not a depth-0 special case', async () => {
+      for (const depth of [1, 2]) {
+        vi.resetModules();
+        const { buildToolPreviewLines, setToolDisplayConfig, TOOL_ERROR_PREVIEW_FLOOR_LINES } =
+          await load();
+        setToolDisplayConfig({ toolOutputPreviewLines: depth });
+        const failure = buildToolPreviewLines(failed, []);
+        // The overflow marker returns at any depth above 0, so the body is floor + marker.
+        expect(failure.length).toBeGreaterThanOrEqual(TOOL_ERROR_PREVIEW_FLOOR_LINES);
+        expect(failure.map((l) => l.text)).toContain('body-3');
+      }
+    });
+
+    it('NEVER shortens a depth above the floor — the default 10 stays 10', async () => {
+      const { buildToolPreviewLines } = await load();
+      // Nothing registered: the canonical cap. A floor implemented as an assignment rather than a
+      // Math.max would cut this to 3 and reds here.
+      expect(buildToolPreviewLines(failed, [])).toHaveLength(11); // 10 + the overflow marker
+    });
+
+    it('leaves a SUCCESSFUL call at the configured depth', async () => {
+      const { buildToolPreviewLines, setToolDisplayConfig } = await load();
+      setToolDisplayConfig({ toolOutputPreviewLines: 1 });
+      // The control for the cells above: the floor must key on the outcome, not fire for everyone.
+      expect(buildToolPreviewLines(readFile, [])).toHaveLength(2); // 1 + the overflow marker
+    });
+  });
+
   describe('secret redaction survives every depth (TUI-C102 order is untouched)', () => {
     // Acceptance 4. The cap is step 3 of redact → neutralise → cap, and changing how many lines
     // survive must not change that the surviving text was redacted first. Both cases assert on the

@@ -12,10 +12,11 @@
  *         # Readme            ← up to the canonical 10 preview lines, dim
  *         … (+42 more lines)
  *
- * Stream discipline (matches how the plain surface prints tool activity today): the block is
- * emitted at INFO level through `displayToolIndication` — same stdout channel, same
- * `consoleLevel` gate and session-log treatment as the existing tool notices — so scripted
- * consumers that already silence INFO chatter silence this too. Colour is used exactly when the
+ * Stream discipline (matches how the plain surface prints tool activity today): the block goes out
+ * through `displayToolIndication` — same stdout channel, same `consoleLevel` gate and session-log
+ * treatment as the existing tool notices — so scripted consumers that already silence INFO chatter
+ * silence a successful call too. **The level it is gated at is the call's OUTCOME, not this call
+ * site** (`TOOL_STATUS_LEVEL` below), so a quieted console keeps the failures. Colour is used exactly when the
  * resolved `useColour` (the CFG-30 ladder in `config/colour.ts`) says so — TUI-C35 removed the
  * local `&& stdout.isTTY` narrowing this module used to apply on top, which was redundant against
  * the ladder's own rung-4 TTY auto-detection everywhere except `FORCE_COLOR` on a pipe, the one
@@ -37,10 +38,35 @@ import {
   summariseToolCall,
   toolStatusDisplay,
 } from '#src/core/toolDisplay.js';
+import type { ToolStatusTone } from '#src/core/toolDisplay.js';
+import { StatusLevel } from '#src/core/types.js';
 import { displayToolIndication } from '#src/utils/consoleUtils.js';
 import { getUseColour } from '#src/utils/systemUtils.js';
 
 const INDENT = '    ';
+
+/**
+ * [[TUI-C108]] — **how loud a finished tool call is, decided by how it ENDED.**
+ *
+ * A non-interactive `gth review` spends three lines on every tool call, and the reporter of
+ * issue #445 wants only the failures. That was not expressible before this map, because the row's
+ * level was a property of the call site: each `consoleLevel` rung that hid a success hid a failure
+ * with it. Keying the level on the tone instead makes `consoleLevel: "display"` mean "tell me when
+ * a tool BROKE", which is the setting that was being asked for.
+ *
+ * It reads off {@link toolStatusDisplay}'s tone rather than re-deriving from `isError`, so the
+ * level cannot disagree with the glyph and words printed beside it — including the case where a
+ * rater clarification outranks an error status, which is a WARNING here precisely because §5.4
+ * says it is not a failure.
+ *
+ * `warn` sits at WARNING rather than ERROR so that a `consoleLevel: "error"` session — someone who
+ * asked for failures only — is not shown a negotiation round that is still in progress.
+ */
+const TOOL_STATUS_LEVEL: Record<ToolStatusTone, StatusLevel> = {
+  success: StatusLevel.INFO,
+  warn: StatusLevel.WARNING,
+  error: StatusLevel.ERROR,
+};
 
 /** One tracked (possibly still-streaming) tool call. */
 interface TrackedToolCall {
@@ -71,10 +97,12 @@ export interface PlainToolIndicationObserver {
  * NOT `concat()` whole `AIMessageChunk`s: only the tool-call slices are needed, which also
  * sidesteps the TUI-C29 `__raw_response` aggregation-growth trap entirely.
  *
- * `emit` is injectable for tests; production uses the INFO-level `displayToolIndication`.
+ * `emit` is injectable for tests; production uses `displayToolIndication`, which gates on the
+ * level this module passes it — `TOOL_STATUS_LEVEL`, which is module-private deliberately: the
+ * mapping is this surface's rendering decision, not an API another package should key on.
  */
 export function createPlainToolIndication(
-  emit: (text: string) => void = displayToolIndication,
+  emit: (text: string, level: StatusLevel) => void = displayToolIndication,
   /**
    * [[TUI-C69]] §5.4 — **was this call refused back to the agent as a negotiation round?** Asked
    * per tool-call id at the moment the result is rendered, never earlier: the gate decides while
@@ -194,7 +222,10 @@ export function createPlainToolIndication(
     const body = preview.map((line) => INDENT + renderToolLineAnsi(line, colour));
     // Leading newline mirrors the historical notice framing (the model text stream may have
     // left the cursor mid-line).
-    emit(['', head, ...body].join('\n'));
+    // [[TUI-C108]] — the status row and its preview body leave through ONE write, so one level
+    // governs both: a failure that survives a quieted console brings its explanation with it, and
+    // a success that does not costs nothing.
+    emit(['', head, ...body].join('\n'), TOOL_STATUS_LEVEL[status.tone]);
   };
 
   return {

@@ -1133,6 +1133,19 @@ export class GthLangChainAgent extends GthAbstractAgent {
         compactMessages({ messages, summarize: createModelSummarizer(sessionModel) }),
       systemPromptCharacters: () => systemPromptCharacters,
       ...(reserveWasConfigured ? { reserve: configuredNumPredict } : {}),
+      // [[TUI-C108]] — **this notice stays at INFO, so `consoleLevel: "display"` silences it.**
+      // That is a known, deliberate loss, and the reason it is accepted here is that raising it is
+      // not the one-word change it looks like. `defaultStatusCallback` routes INFO through
+      // `displayInfo` (dim, `su.info`) and DISPLAY through `display` (undimmed, `su.log`), so
+      // moving the level also restyles the notice and moves its channel — for every user on the
+      // default console level, none of whom asked for either. Level and loudness are welded
+      // together in that callback; separating them is what a fix has to do first, and it is a
+      // change to the whole status bus rather than to this line.
+      //
+      // See the twin at `contextOverflowSeam`'s recovered-fold notice. Note the asymmetry the two
+      // of them leave behind: the fold that FAILS is a WARNING and survives a quieted console,
+      // while the fold that succeeds — the silent one, on exactly the large diffs this config
+      // exists for — does not.
       onCompact: (message) => statusUpdate(StatusLevel.INFO, message),
     });
 

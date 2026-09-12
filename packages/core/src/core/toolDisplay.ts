@@ -46,6 +46,13 @@ import { env } from '#src/utils/systemUtils.js';
 export const TOOL_OUTPUT_PREVIEW_LINES = 10;
 
 /**
+ * [[TUI-C108]] — the fewest preview lines a FAILED call is rendered with, whatever depth the user
+ * configured. See {@link buildToolPreviewLines} for why a failure is the one case the configured
+ * depth does not get the last word on.
+ */
+export const TOOL_ERROR_PREVIEW_FLOOR_LINES = 3;
+
+/**
  * Per-line cap for preview lines, in terminal COLUMNS (a one-line minified bundle must not flood a
  * row). The `CHARS` in the name is historical; every cap here is a column budget, because a
  * character count is not a width — see `#src/utils/displayWidth.js`.
@@ -782,6 +789,28 @@ export function capToolDisplayLines(
  * asked for one line is not served by being given two, and the whole point of the setting is that
  * a tool call stops occupying a block. The marker returns at any depth above 0.
  *
+ * **[[TUI-C108]] — a FAILED call floors at {@link TOOL_ERROR_PREVIEW_FLOOR_LINES}, and that is the
+ * second exception.** The two are read together: depth 0 says "a tool call stops occupying a
+ * block", and this says that a call which did not work is not a tool call occupying a block, it is
+ * the reason the run is about to go wrong. An errored `ToolMessage` carries its explanation in its
+ * content — the softened shell and MCP failures put the child's output and the error message
+ * there — so honouring a depth of 0 would print `✗ name(args…)` and nothing else, which reports
+ * that something broke while withholding what. The floor is on the OUTCOME, never on the console
+ * level, so a scripted run that quiets successes still gets a failure that explains itself.
+ *
+ * A user on the default 10, or any depth above the floor, is unaffected: the floor only ever
+ * raises a depth below it, so this cannot shorten anything.
+ *
+ * **Both surfaces get it**, because both call this function. The Ink TUI's expansion affordance
+ * makes a floored failure less urgent there, not wrong: the alternative is the two surfaces
+ * disagreeing about what depth 0 means for a failure, which is exactly the divergence this
+ * function exists to prevent.
+ *
+ * One case is out of reach by construction: a shell-shaped result renders with
+ * `liveOutputAlreadyShown` on the plain surface, so its body is empty before any cap applies and
+ * there is nothing for the floor to keep. Nothing is lost — that child's output already streamed
+ * raw and ungated through the tool-output channel, at every console level.
+ *
  * The cap stays step 3 of the [[TUI-C102]] order (redact → neutralise → cap): the depth decides
  * only HOW MANY already-neutralised lines survive, and the short-circuit above drops all of them
  * rather than reordering anything. Nothing here can put an escape back on a row.
@@ -790,7 +819,8 @@ export function buildToolPreviewLines(
   input: ToolCallDisplayInput,
   secrets: readonly string[] = getDefaultSecrets()
 ): ToolDisplayLine[] {
-  const maxLines = resolveToolPreviewLines(input.name);
+  const resolved = resolveToolPreviewLines(input.name);
+  const maxLines = input.isError ? Math.max(TOOL_ERROR_PREVIEW_FLOOR_LINES, resolved) : resolved;
   if (maxLines <= 0) return [];
   return capToolDisplayLines(buildToolBodyLines(input, secrets), maxLines);
 }

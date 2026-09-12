@@ -186,14 +186,31 @@ export function display(message: string): void {
 
 /**
  * TUI-C30 — print one pre-styled tool-call indication block (the plain surface's compact
- * `✓ name(args…)` + greyed preview, built by `core/plainToolIndication.ts`). Same INFO-level
- * gate, stdout channel and session-log treatment as {@link displayInfo} — matching the stream
- * discipline of the existing tool notices — but WITHOUT the blanket dim wrap: the block styles
- * each line itself (diff colours, per-line dim), and an outer wrapper would be broken by the
- * inner resets. The session log gets the ANSI-stripped text via {@link writeToSessionLog}.
+ * `✓ name(args…)` + greyed preview, built by `core/plainToolIndication.ts`). Same stdout channel
+ * and session-log treatment as {@link displayInfo} — matching the stream discipline of the
+ * existing tool notices — but WITHOUT the blanket dim wrap: the block styles each line itself
+ * (diff colours, per-line dim), and an outer wrapper would be broken by the inner resets. The
+ * session log gets the ANSI-stripped text via {@link writeToSessionLog}.
+ *
+ * [[TUI-C108]] — **`level` is the CALL'S OUTCOME, not this call site's loudness**, and that is the
+ * whole point of the parameter. While the level was hardcoded here, every `consoleLevel` rung that
+ * hid a successful tool call hid a failed one with it, so "keep only the failures" was not
+ * expressible at any setting. The caller derives it from the tone it has already computed, which
+ * makes a quieted console drop the chatter and keep what went wrong.
+ *
+ * **The LEVEL moves; the CHANNEL deliberately does not.** An ERROR-gated line still goes to
+ * `su.info` rather than to stderr — as {@link displayError} already writes with `su.log` — because
+ * splitting one surface's tool rows across two streams would reorder them against each other and
+ * against the model text they are interleaved with. Level and stream are independent here.
+ *
+ * The `StatusLevel.INFO` default is what keeps every existing caller, and the default console
+ * level, rendering exactly as before.
  */
-export function displayToolIndication(message: string): void {
-  if (!shouldDisplayLevel(StatusLevel.INFO)) return;
+export function displayToolIndication(
+  message: string,
+  level: StatusLevel = StatusLevel.INFO
+): void {
+  if (!shouldDisplayLevel(level)) return;
   writeToSessionLog(message + '\n');
   su.info(message);
 }

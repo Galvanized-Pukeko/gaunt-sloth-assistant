@@ -245,6 +245,17 @@ export async function handleContextOverflow(
     return null;
   }
 
+  // [[TUI-C108]] — **INFO, so a quieted console does not see the fold.** Kept deliberately, on the
+  // same reasoning as the proactive twin in `GthLangChainAgent`'s `onCompact`: in
+  // `defaultStatusCallback` the level also picks the colour and the channel, so DISPLAY would
+  // restyle this notice for every default-level user as a side effect of making it survive at
+  // `consoleLevel: "display"`. The honest fix is to let a level be raised without changing how the
+  // line looks, which is a change to the status bus, not to this call.
+  //
+  // The gap is real and worth naming rather than leaving for someone to rediscover: the
+  // nothing-left-to-compact branch above is a WARNING and survives, so today the ladder reports a
+  // context fold only when the fold FAILED — the successful one, which quietly changes what the
+  // model can still see, is the one that goes silent.
   host.statusUpdate(
     StatusLevel.INFO,
     `The context overflowed, so ${compaction.removedCount} earlier messages were folded into a ` +
