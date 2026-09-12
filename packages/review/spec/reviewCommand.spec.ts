@@ -141,7 +141,7 @@ describe('reviewCommand', () => {
       expect.any(Object),
       // No positional argument, so no pull request to bind GitHub-only review tools to; they fall
       // back to discovering the current branch's PR. CFG-54.
-      { prId: undefined }
+      { prId: undefined, changedPaths: [] }
     );
   });
 
@@ -164,7 +164,7 @@ describe('reviewCommand', () => {
       expect.objectContaining({}),
       'review',
       expect.any(Object),
-      { prId: undefined }
+      { prId: undefined, changedPaths: [] }
     );
   });
 
@@ -243,7 +243,7 @@ describe('reviewCommand', () => {
       expect.any(Object),
       // `content-id` is literal content under the text source, not a pull request number, so it
       // must NOT be forwarded as one. CFG-54.
-      { prId: undefined }
+      { prId: undefined, changedPaths: [] }
     );
   });
 
@@ -290,7 +290,7 @@ describe('reviewCommand', () => {
       expect.any(Object),
       // The diff came from PR 123, so the GitHub-only review tools are bound to PR 123 as well.
       // CFG-54.
-      { prId: '123' }
+      { prId: '123', changedPaths: [] }
     );
   });
 
@@ -329,7 +329,7 @@ describe('reviewCommand', () => {
       'review',
       expect.any(Object),
       // A ref range is not a pull request id. CFG-54.
-      { prId: undefined }
+      { prId: undefined, changedPaths: [] }
     );
   });
 
@@ -387,7 +387,7 @@ describe('reviewCommand', () => {
       expect.objectContaining({}),
       'review',
       expect.any(Object),
-      { prId: undefined }
+      { prId: undefined, changedPaths: [] }
     );
   });
 
@@ -421,7 +421,7 @@ describe('reviewCommand', () => {
       }),
       'review',
       expect.any(Object),
-      { prId: '123' }
+      { prId: '123', changedPaths: [] }
     );
   });
 });

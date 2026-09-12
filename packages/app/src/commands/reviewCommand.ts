@@ -21,6 +21,7 @@ import { readMultipleFilesFromProjectDir } from '@gaunt-sloth/review/utils/fileU
 // From the REVIEW package, not this package's own same-named module: both ship a
 // `commands/commandUtils`, and this helper lives only in review's (GS2-45).
 import { resolvePrIdFromArg } from '@gaunt-sloth/review/commands/commandUtils.js';
+import { extractChangedPathsFromDiff } from '@gaunt-sloth/review/utils/diffPaths.js';
 
 interface ReviewCommandOptions {
   file?: string[];
@@ -117,7 +118,17 @@ export function reviewCommand(
         setExitCode(1);
         return;
       }
+      // CFG-70 — the changed paths come from `providedContent` alone, never from `content`, which
+      // by the time it is passed also holds the requirements, the `--file` contents, stdin and
+      // `--message`. A requirements document that quotes a diff would otherwise inject paths this
+      // change never touched, attaching another module's guidelines to it.
+      //
+      // Inside the same truthiness guard as the push: `getCommandSourceInput` is TYPED as
+      // returning a string but resolves to nothing when a source produces no content, which is
+      // what the guard below has always been for.
+      let changedPaths: string[] = [];
       if (providedContent) {
+        changedPaths = extractChangedPathsFromDiff(providedContent);
         content.push(providedContent);
       }
 
@@ -146,7 +157,7 @@ export function reviewCommand(
         // request's files, silently. `contentId` is a content id rather than a PR id — a ref
         // range or a file path under the other sources — so only a bare number is taken as one;
         // anything else, including no argument at all, keeps the branch-discovery fallback.
-        { prId: resolvePrIdFromArg(contentId) }
+        { prId: resolvePrIdFromArg(contentId), changedPaths }
       );
     });
 }

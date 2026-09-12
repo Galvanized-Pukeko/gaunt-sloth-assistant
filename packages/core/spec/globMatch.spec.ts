@@ -152,6 +152,46 @@ describe('CFG-70 globMatch: characters outside the vocabulary are literal', () =
     expect(compileGlob('src/a+.ts').test('src/aaa.ts')).toBe(false);
     expect(compileGlob('src/x$.ts').test('src/x$.ts')).toBe(true);
   });
+
+  /**
+   * The other half of that row in the module's vocabulary table: everything outside the vocabulary
+   * is a literal **including `\`**, because there is no escape character at all.
+   *
+   * The `.`/`(`/`[`/`+`/`$` cells above pin "everything else is literal"; none of them pins the
+   * no-escape half, and no pattern anywhere else in this file contains a backslash. A mutation
+   * teaching the parser to treat `\` as an escape therefore survived the entire suite while
+   * changing what `a\*b` means.
+   *
+   * Asserted in the shape a user actually produces it, not only as the abstract rule: a Windows
+   * habit writes `packages\vue-ui\**`, and under this vocabulary that is one long literal segment
+   * name that matches nothing. **A silent non-match, never an error** — which is the behaviour to
+   * know about, and the reason the docs say patterns are POSIX.
+   */
+  it('a `\\` is a literal, because there is no escape character', () => {
+    // The Windows-habit pattern against the path a diff actually carries. There is no `/` in the
+    // pattern, so it is ONE segment whose `\` are ordinary characters — it cannot match a path
+    // whose separators are real separators. Silent, and the reason the docs say patterns are POSIX.
+    expect(compileGlob('packages\\vue-ui\\**').test('packages/vue-ui/src/Button.vue')).toBe(false);
+    // It is a literal rather than a parse failure, which is what makes the miss silent: the
+    // trailing `**` is inside a larger segment and so degrades to `*`, leaving a pattern that does
+    // match a backslash-separated string — a shape `extractChangedPathsFromDiff` never produces.
+    expect(compileGlob('packages\\vue-ui\\**').test('packages\\vue-ui\\src\\Button.vue')).toBe(
+      true
+    );
+    expect(compileGlob('packages\\vue-ui\\**').test('packages\\other\\src\\Button.vue')).toBe(
+      false
+    );
+
+    // And a backslash does not escape the star beside it. In `src/a\*b.ts` the `\` is one more
+    // literal character the path must contain, and the `*` keeps its wildcard meaning — so the
+    // pattern matches a path with a real backslash in it...
+    expect(compileGlob('src/a\\*b.ts').test('src/a\\xyzb.ts')).toBe(true);
+    // ...and does NOT match the path an escape grammar would make it mean, a literal asterisk.
+    // This pair is the whole assertion: a parser that learned to treat `\` as an escape flips both
+    // of these, and nothing else in the suite would notice.
+    expect(compileGlob('src/a\\*b.ts').test('src/a*b.ts')).toBe(false);
+    expect(compileGlob('src/a\\*b.ts').test('src/axyzb.ts')).toBe(false);
+  });
 });
 
 describe('CFG-70 globMatch: pattern lists answer the two questions separately', () => {

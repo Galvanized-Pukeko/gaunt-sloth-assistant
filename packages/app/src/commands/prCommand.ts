@@ -16,6 +16,7 @@ import { wrapContent } from '@gaunt-sloth/core/utils/llmUtils.js';
 import { runPrDiscovery } from '#src/commands/prDiscovery.js';
 
 import { readMultipleFilesFromProjectDir } from '@gaunt-sloth/review/utils/fileUtils.js';
+import { extractChangedPathsFromDiff } from '@gaunt-sloth/review/utils/diffPaths.js';
 
 interface PrCommandOptions {
   file?: string[];
@@ -72,6 +73,16 @@ export function prCommand(
         content.push(readMultipleFilesFromProjectDir(options.file));
       }
 
+      // CFG-70 — the paths this run's DIFF touches, for `prompts.paths` selection. Declared out
+      // here because `gth pr` has TWO content producers, not one: discovery mode's
+      // `discoveryResult.diff` and the explicit-PR path's `prContent`. Wiring only the branch one
+      // happens to be reading leaves the other silently unscoped.
+      //
+      // Both take the producer's own output, never `content` — which by then also carries the
+      // requirements, `--file` contents and `--message`, any of which may quote a diff for a
+      // module this change never touched.
+      let changedPaths: string[] = [];
+
       const isDiscovery = !prId && !requirementsId;
       const looksLikeRequirementsOnlyMode =
         contentSource === 'github' && Boolean(prId) && !requirementsId && !/^\d+$/.test(prId);
@@ -121,6 +132,7 @@ export function prCommand(
             setExitCode(1);
             return;
           }
+          changedPaths = extractChangedPathsFromDiff(discoveryResult.diff);
           content.push(wrapContent(discoveryResult.diff, 'discovered-diff', 'GitHub diff'));
         } catch (error) {
           // [[TUI-C71]] — `runPrDiscovery` runs an agent inside a try/FINALLY with no catch of its
@@ -170,6 +182,7 @@ export function prCommand(
             setExitCode(1);
             return;
           }
+          changedPaths = extractChangedPathsFromDiff(prContent);
           content.push(prContent);
         } catch (error) {
           displayError(error instanceof Error ? error.message : String(error));
@@ -194,7 +207,7 @@ export function prCommand(
         // Bind GitHub-only review tools (gth_gh_read_file) to this PR's repo/ref, so they read
         // the PR under review rather than letting the model guess owner/repo. Undefined prId =
         // discovery mode (current branch's PR), which `gh pr view` resolves on its own.
-        { prId }
+        { prId, changedPaths }
       );
 
       if (

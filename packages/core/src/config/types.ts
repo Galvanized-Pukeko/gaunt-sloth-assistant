@@ -202,6 +202,22 @@ export interface GthConfig {
    */
   prompts?: PromptsConfig;
   /**
+   * CFG-70 — **runtime only**: the `prompts.paths` entries this run's diff actually selected.
+   *
+   * It is deliberately absent from the zod schema, from `gsloth-config.schema.json` and from every
+   * config layer. A user never writes it; `review()` sets it on the already-resolved config after
+   * matching the diff's paths against `prompts.paths`, and the prompt-reading layer
+   * (`readPromptSegment`) is its only reader. Writing it in a config file would therefore do
+   * nothing useful, which is why the schema does not offer it — the schema describes what a user
+   * can say, and this is what the run worked out.
+   *
+   * It carries the **selected entries, not composed text**. File resolution needs the config dir,
+   * the identity profile and `noDefaultPrompts`, all of which live in core's prompt-reading layer;
+   * keeping this a list of entries is what lets the review package select without knowing any of
+   * that.
+   */
+  scopedPrompts?: ScopedPromptsEntry[];
+  /**
    * Separate identity profile.
    * May include separate identity, guidelines and command protocol,
    * making gsloth behave as an agent different from default profile behaviour.

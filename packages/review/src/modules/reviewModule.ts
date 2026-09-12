@@ -1,5 +1,9 @@
 import type { GthConfig, RatingConfig } from '@gaunt-sloth/core/config.js';
-import { isGhReadFileToolEnabled } from '@gaunt-sloth/core/config.js';
+import { isGhReadFileToolEnabled, selectScopedPrompts } from '@gaunt-sloth/core/config.js';
+import {
+  measureScopedPrompts,
+  SCOPED_PROMPT_BUDGET_BYTES,
+} from '@gaunt-sloth/core/utils/llmUtils.js';
 import type { StructuredToolInterface } from '@langchain/core/tools';
 import {
   defaultStatusCallback,
@@ -35,6 +39,19 @@ import { get as getGhReadFileTool, GTH_GH_READ_FILE_TOOL_NAME } from '#src/tools
 export interface ReviewContext {
   /** PR number under review; undefined in `gth pr` discovery mode (current branch's PR). */
   prId?: string;
+  /**
+   * CFG-70 — the paths this run's diff touches, for selecting `prompts.paths` entries.
+   *
+   * **Extracted from the content-source output alone**, never from the whole message: `review()`
+   * is handed requirements + the diff + `--file` contents + stdin + `--message` joined together,
+   * and a requirements document that quotes a diff would otherwise inject paths no change went
+   * near — attaching one module's guidelines to another module's review, silently.
+   *
+   * An embedder populates it itself with `extractChangedPathsFromDiff`, exported from this
+   * package's barrel for exactly that. An empty array and an absent one are treated alike: both
+   * mean no path was found, and both are worth saying out loud when entries are configured.
+   */
+  changedPaths?: string[];
 }
 
 /**
@@ -103,8 +120,30 @@ export async function review(
     // deliberately reverses REL-12 for a user who asks for it: a caller piping a review into their
     // own template or diffing captured stdout needs a byte-clean stream, and nobody loses
     // attribution without setting this key.
+
+    // CFG-70 — select the path-scoped prompt entries this diff activates, BEFORE the agent below
+    // composes its system prompt from the same config object. Mutating the resolved config inside
+    // `review()` is the established shape here: `maybeAddGhReadFileTool` above does it too.
+    //
+    // Placed after `initSessionLogging` so its diagnostics reach the report file as well as the
+    // terminal, and before the heading guard so the report line can join the heading inside it.
+    const scopedPromptsReport = applyScopedPrompts(config, reviewContext?.changedPaths);
+
     if (config.output?.header !== 'none') {
       display(reviewHeadingBlock(command, config.modelDisplayName, config.modelProviderType));
+      // CFG-70 — inside the GS2-93 guard, with the heading, because it is review-document
+      // provenance of the same kind: which module guidelines this verdict was formed under. A
+      // caller who silenced the header to diff captured stdout byte-for-byte would otherwise find
+      // a line they did not ask for at the top of their stream.
+      //
+      // The WARNINGS `applyScopedPrompts` emits are deliberately NOT in here. They are diagnostics
+      // about the run's configuration, not content of the review, and the one situation that most
+      // needs them — a misspelled glob matching nothing — is indistinguishable from a working run
+      // without them. `output.header: 'none'` asks for a clean document, not for silence about
+      // config that did not do what it says.
+      if (scopedPromptsReport) {
+        display(scopedPromptsReport);
+      }
     }
 
     const rateConfig = config.commands?.[command]?.rating;
@@ -204,6 +243,74 @@ export async function review(
     // `stop()` is idempotent, so the normal path's second call is a no-op.
     progressIndicator?.stop();
   }
+}
+
+/**
+ * CFG-70 — match this run's changed paths against `prompts.paths`, set the runtime field the
+ * prompt-reading layer reads, and say what happened.
+ *
+ * @returns the one-line report for the review document when at least one entry matched, else
+ *   `undefined`. Warnings are emitted here directly; the report line is returned so the caller can
+ *   place it inside the `output.header` guard, which the warnings are not subject to.
+ *
+ * A misspelled glob (`packages/vue-ui/*` where `/**` was meant), or `--content-source text`,
+ * produces zero matches and a review that runs on the root guidelines alone — **indistinguishable
+ * from a working run** unless the run says so. Hence three outcomes rather than one:
+ *
+ * - at least one entry matched → the report line;
+ * - paths found, no entry matched → a warning naming how many paths were seen, because the number
+ *   is what separates "my globs are wrong" from "the diff really is outside every module";
+ * - no paths at all → a warning that the content source is not a unified diff, which is the actual
+ *   cause when `--content-source text` or a file review reaches here.
+ *
+ * Nothing is said at all when no entries are configured: that is every run of every project not
+ * using the feature.
+ */
+function applyScopedPrompts(
+  config: GthConfig,
+  changedPaths: string[] | undefined
+): string | undefined {
+  const entries = config.prompts?.paths;
+  if (!entries?.length) {
+    return undefined;
+  }
+
+  const paths = changedPaths ?? [];
+  if (paths.length === 0) {
+    displayWarning(
+      `No "diff --git" header was found in the content under review, so none of the ` +
+        `${entries.length} configured prompts.paths entries could be selected. Path-scoped ` +
+        `prompts need a unified diff — check the content source for this run.`
+    );
+    return undefined;
+  }
+
+  const selected = selectScopedPrompts(paths, entries);
+  if (selected.length === 0) {
+    displayWarning(
+      `None of the ${entries.length} configured prompts.paths entries matched any of the ` +
+        `${paths.length} changed paths in this diff, so no module prompts were attached. ` +
+        `Check the match globs against the paths the diff actually touches.`
+    );
+    return undefined;
+  }
+
+  config.scopedPrompts = selected;
+
+  // The budget check, once per run and from here: this is the only site that knows the final
+  // selection, and a "have I warned yet" module flag would misbehave across the several agent
+  // inits a single process performs. Warn, never truncate — a guideline cut mid-sentence is worse
+  // than a long prompt, because the model then follows a rule whose exception was removed.
+  const budget = measureScopedPrompts(selected, config);
+  if (budget.overBudget) {
+    displayWarning(
+      `Path-scoped prompts add ${budget.totalBytes} bytes to this run's prompt ` +
+        `(${budget.entryNames.join(', ')}), over the ${SCOPED_PROMPT_BUDGET_BYTES}-byte guide. ` +
+        `Nothing was truncated; consider narrowing the match globs or shortening those files.`
+    );
+  }
+
+  return `Scoped prompts: ${selected.map((entry) => entry.name).join(', ')} (${selected.length} of ${entries.length} entries, ${paths.length} changed files)`;
 }
 
 /**

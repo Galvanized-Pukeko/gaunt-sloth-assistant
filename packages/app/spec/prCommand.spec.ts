@@ -153,7 +153,7 @@ describe('prCommand', () => {
       expect.objectContaining({}),
       'pr',
       expect.any(Object),
-      { prId: undefined }
+      { prId: undefined, changedPaths: [] }
     );
   });
 
@@ -345,7 +345,7 @@ describe('prCommand', () => {
       }),
       'pr',
       expect.any(Object),
-      { prId: '123' }
+      { prId: '123', changedPaths: [] }
     );
   });
 
@@ -431,7 +431,7 @@ describe('prCommand', () => {
       expect.objectContaining({}),
       'pr',
       expect.any(Object),
-      { prId: '123' }
+      { prId: '123', changedPaths: [] }
     );
   });
 
@@ -563,7 +563,7 @@ describe('prCommand', () => {
       }),
       'pr',
       expect.any(Object),
-      { prId: '123' }
+      { prId: '123', changedPaths: [] }
     );
   });
 
@@ -608,7 +608,7 @@ describe('prCommand', () => {
       expect.objectContaining({}),
       'pr',
       expect.any(Object),
-      { prId: '123' }
+      { prId: '123', changedPaths: [] }
     );
   });
 });

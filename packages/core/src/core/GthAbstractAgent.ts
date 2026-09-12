@@ -1681,6 +1681,7 @@ export abstract class GthAbstractAgent implements GthAgentInterface {
       this.statusUpdate(StatusLevel.WARNING, 'Model does not seem to support tools.');
       debugLog('Warning: Model does not support tools');
     }
+    this.warnScopedPromptsUnusable(config, command);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cmdConfig = (command && config.commands?.[command]) as any;
     return {
@@ -1693,6 +1694,41 @@ export abstract class GthAbstractAgent implements GthAgentInterface {
       binaryFormats:
         cmdConfig?.binaryFormats !== undefined ? cmdConfig.binaryFormats : config.binaryFormats,
     };
+  }
+
+  /**
+   * CFG-70 — say so when the verb being run can never honour `prompts.paths`.
+   *
+   * A user who configures path-scoped prompts and then runs `gth ask` gets a perfectly ordinary
+   * run with none of their scoped content in it, and nothing anywhere says why. The feature
+   * selects entries by matching a **diff's** paths, and only `review` and `pr` have a diff;
+   * `ask`/`chat` have no paths at all, and `code`/`exec` have no defined path source yet (that is
+   * its own decision, deliberately not taken here).
+   *
+   * **Why here and not at config load.** The natural-sounding home is `initConfig`, and it cannot
+   * work: `initConfig` takes `CommandLineConfigOverrides`, which carries no verb, so a warning
+   * there could only say "some commands ignore this" — which is not actionable and would fire on
+   * every run of the verbs that DO honour it. `getEffectiveConfig` is the single funnel every verb
+   * passes through holding its own verb, which is exactly the fact the message needs.
+   *
+   * **`command: undefined` is not a verb that ignores the feature.** `gth pr` discovery runs its
+   * agent commandless on purpose (GS2-81), so warning on an absent command would fire during the
+   * one verb that supports this best. Absent means "no verb claimed", never "a verb that cannot".
+   *
+   * This fires **once per agent init**, not once per process, and that is left as it is: a process
+   * that inits two agents ran two agents, and the second is as unable to honour the config as the
+   * first. De-duplicating would need module-level "have I warned yet" state, which is wrong across
+   * the several inits a single `gth pr` or an interactive session performs.
+   */
+  private warnScopedPromptsUnusable(config: GthConfig, command: GthCommand | undefined): void {
+    if (!command || command === 'review' || command === 'pr') return;
+    if (!config.prompts?.paths?.length) return;
+    this.statusUpdate(
+      StatusLevel.WARNING,
+      `Config sets prompts.paths, but the ${command} command cannot use it: path-scoped prompts ` +
+        `are selected from the paths in a diff, and only review and pr have one. The root prompt ` +
+        `segments still apply.`
+    );
   }
 
   /**
