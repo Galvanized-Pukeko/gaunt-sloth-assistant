@@ -93,4 +93,34 @@ describe('getReviewPreamble over the real prompt readers', () => {
         'SYSTEM'
     );
   });
+
+  it('puts the date after the module blocks, not between them and the root guidelines', async () => {
+    // `readGuidelines` appends `Organization:` / `Current Date:` to whatever `readPromptSegment`
+    // returned, so the scoped blocks land INSIDE the guidelines segment and the date follows all
+    // of them. That is the right order and it is deliberate: the date is a fact about the run, not
+    // a rule, and a line about today's date sitting between the root guidelines and the module
+    // guidelines would read as a boundary between two rule sets. Unasserted, the ordering could
+    // invert on any future edit to either function with nothing to catch it.
+    files[at('vue-ui.md')] = 'VUE UI RULES';
+    const { getReviewPreamble } = await import('#src/commands/commandUtils.js');
+
+    const preamble = getReviewPreamble({
+      noDefaultPrompts: true,
+      includeCurrentDateAfterGuidelines: true,
+      organization: { name: 'Pukeko Robotics' },
+      scopedPrompts: [{ name: 'vue-ui', match: ['packages/vue-ui/**'], guidelines: 'vue-ui.md' }],
+    } as unknown as GthConfig);
+
+    const lines = preamble.split('\n');
+    const indexOf = (needle: string) => lines.findIndex((line) => line.startsWith(needle));
+
+    expect(indexOf('GUIDELINES')).toBeGreaterThanOrEqual(0);
+    expect(indexOf('## Module guidelines')).toBeGreaterThan(indexOf('GUIDELINES'));
+    expect(indexOf('VUE UI RULES')).toBeGreaterThan(indexOf('## Module guidelines'));
+    expect(indexOf('Organization: Pukeko Robotics')).toBeGreaterThan(indexOf('VUE UI RULES'));
+    expect(indexOf('Current Date: ')).toBeGreaterThan(indexOf('Organization: Pukeko Robotics'));
+    // And still ahead of the next segment: the date belongs to the guidelines, not to the review
+    // instructions that follow it.
+    expect(indexOf('REVIEW INSTRUCTIONS')).toBeGreaterThan(indexOf('Current Date: '));
+  });
 });

@@ -127,6 +127,17 @@ describe('review() — selecting path-scoped prompt entries', () => {
     );
   });
 
+  it('agrees its counts with their nouns when every count is one', async () => {
+    // Every number in these lines is routinely 1 — a one-file diff, a project with one entry —
+    // and "1 changed files" in a line whose job is to be believed reads as a bug in the tool.
+    // Asserted on a config with a SINGLE entry so both nouns are exercised at once.
+    await runReview(configWith({ prompts: { paths: [ENTRIES[0]] } } as Partial<GthConfig>), [
+      'packages/vue-ui/src/Button.vue',
+    ]);
+
+    expect(scopedReportLine()).toBe('Scoped prompts: vue-ui (1 of 1 entry, 1 changed file)');
+  });
+
   it('says nothing at all when no entries are configured', async () => {
     await runReview(configWith({ prompts: {} }), []);
 
@@ -203,7 +214,67 @@ describe('review() — output.header: none', () => {
   it('emits the report line when the header is not silenced', async () => {
     await runReview(configWith(), ['packages/vue-ui/src/Button.vue']);
 
-    expect(scopedReportLine()).toBe('Scoped prompts: vue-ui (1 of 4 entries, 1 changed files)');
+    expect(scopedReportLine()).toBe('Scoped prompts: vue-ui (1 of 4 entries, 1 changed file)');
+  });
+});
+
+describe('review() — a real diff, end to end through the selector', () => {
+  /**
+   * CFG-70 — the two acceptance bullets that are only true if the **extractor and the selector
+   * agree**, joined here in one run.
+   *
+   * Task 1 pins each half against its own arguments: `diffPaths.spec.ts` that a rename header
+   * yields both of its paths, `scopedPrompts.spec.ts` that a `!` pattern is evaluated per path.
+   * Neither can see the seam. This cell feeds a real unified diff to the real
+   * `extractChangedPathsFromDiff` and hands the result to the real `selectScopedPrompts` inside
+   * `review()` — which is the path a `gth review` run actually takes.
+   */
+  const RENAME_AND_GENERATED_DIFF = [
+    'diff --git a/packages/vue-ui/src/Button.vue b/packages/adk/src/Button.vue',
+    'similarity index 100%',
+    'rename from packages/vue-ui/src/Button.vue',
+    'rename to packages/adk/src/Button.vue',
+    'diff --git a/packages/core/generated/api.ts b/packages/core/generated/api.ts',
+    '--- a/packages/core/generated/api.ts',
+    '+++ b/packages/core/generated/api.ts',
+    '@@ -1 +1 @@',
+    '-old',
+    '+new',
+  ].join('\n');
+
+  const RENAME_ENTRIES: ScopedPromptsEntry[] = [
+    { name: 'vue-ui', match: ['packages/vue-ui/**'], guidelines: 'vue-ui.md' },
+    { name: 'adk', match: ['packages/adk/**'], guidelines: 'kotlin.md' },
+    // The only path this diff touches under `packages/core/` is an excluded one, so this entry
+    // must not be pulled in — the exclusion is the user saying generated files are not the module.
+    {
+      name: 'core',
+      match: ['packages/core/**', '!packages/core/generated/**'],
+      guidelines: 'core.md',
+    },
+  ];
+
+  it('selects both sides of a rename, and not an entry held out by its own exclusion', async () => {
+    const { extractChangedPathsFromDiff } = await import('#src/utils/diffPaths.js');
+    const changedPaths = extractChangedPathsFromDiff(RENAME_AND_GENERATED_DIFF);
+
+    // Stated before the selection so a regression in the extractor is diagnosed as one, rather
+    // than surfacing as a puzzling selection two layers down.
+    expect(changedPaths).toEqual([
+      'packages/vue-ui/src/Button.vue',
+      'packages/adk/src/Button.vue',
+      'packages/core/generated/api.ts',
+    ]);
+
+    const config = await runReview(
+      configWith({ prompts: { paths: RENAME_ENTRIES } } as Partial<GthConfig>),
+      changedPaths
+    );
+
+    // The module a file LEFT and the module it arrived in: both sets of guidelines bear on
+    // reviewing the move, and only the destination would be attached if the extractor kept one
+    // side of the header.
+    expect(config.scopedPrompts?.map((entry) => entry.name)).toEqual(['vue-ui', 'adk']);
   });
 });
 

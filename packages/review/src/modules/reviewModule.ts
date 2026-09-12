@@ -246,6 +246,18 @@ export async function review(
 }
 
 /**
+ * CFG-70 — a count and the noun it governs, agreeing. Every number below is routinely 1: a
+ * one-file diff, a project with a single `prompts.paths` entry. "1 changed files" in a line the
+ * review document carries reads as a bug in the tool, which is the wrong thing for a line whose
+ * whole job is to be believed about what the review ran on.
+ */
+function countOf(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+const ENTRY_NOUN = ['configured prompts.paths entry', 'configured prompts.paths entries'] as const;
+
+/**
  * CFG-70 — match this run's changed paths against `prompts.paths`, set the runtime field the
  * prompt-reading layer reads, and say what happened.
  *
@@ -278,8 +290,8 @@ function applyScopedPrompts(
   const paths = changedPaths ?? [];
   if (paths.length === 0) {
     displayWarning(
-      `No "diff --git" header was found in the content under review, so none of the ` +
-        `${entries.length} configured prompts.paths entries could be selected. Path-scoped ` +
+      `No "diff --git" header was found in the content under review, so the ` +
+        `${countOf(entries.length, ...ENTRY_NOUN)} could not be selected from. Path-scoped ` +
         `prompts need a unified diff — check the content source for this run.`
     );
     return undefined;
@@ -288,9 +300,9 @@ function applyScopedPrompts(
   const selected = selectScopedPrompts(paths, entries);
   if (selected.length === 0) {
     displayWarning(
-      `None of the ${entries.length} configured prompts.paths entries matched any of the ` +
-        `${paths.length} changed paths in this diff, so no module prompts were attached. ` +
-        `Check the match globs against the paths the diff actually touches.`
+      `${countOf(entries.length, ...ENTRY_NOUN)} matched none of the ` +
+        `${countOf(paths.length, 'changed path')} in this diff, so no module prompts were ` +
+        `attached. Check the match globs against the paths the diff actually touches.`
     );
     return undefined;
   }
@@ -310,7 +322,11 @@ function applyScopedPrompts(
     );
   }
 
-  return `Scoped prompts: ${selected.map((entry) => entry.name).join(', ')} (${selected.length} of ${entries.length} entries, ${paths.length} changed files)`;
+  return (
+    `Scoped prompts: ${selected.map((entry) => entry.name).join(', ')} ` +
+    `(${selected.length} of ${countOf(entries.length, 'entry', 'entries')}, ` +
+    `${countOf(paths.length, 'changed file')})`
+  );
 }
 
 /**
