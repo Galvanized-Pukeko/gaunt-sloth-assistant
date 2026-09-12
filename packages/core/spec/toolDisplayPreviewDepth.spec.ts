@@ -167,26 +167,42 @@ describe('tool-output preview depth (TUI-C105)', () => {
     });
 
     /**
-     * The RESIDUAL, pinned so it is not mistaken for the case above. This is the shape of the run
-     * the node came from: the display layer never learned the call's arguments (no tool-call id
-     * reached the plain observer), so the summary has nothing to name the file with, and at depth 0
-     * the preamble that WOULD have named it is gone with the body.
+     * [[TUI-C106]] — what was TUI-C105's labelled residual, now asserting the behaviour that
+     * closed it. Kept in place, and kept at depth 0, because the framing is the point: this is the
+     * shape of the run the node came from, where the display layer never learned the call's
+     * arguments, and depth 0 is where it hurts — the preamble that names the file goes with the
+     * body, leaving the summary as the only line that could carry it.
      *
-     * This is NOT desired behaviour. It is recorded because a registry entry cannot fix it — the
-     * arguments are missing upstream of the display layer — and because without it the suite would
-     * assert the feature works on exactly the inputs where it does.
+     * The arguments are still missing (they go missing upstream of this module and some shapes
+     * genuinely cannot carry them). What changed is that the summary no longer gives up: read
+     * through {@link summariseToolCallWithResult}, the tool's own result heading is a second source
+     * for the one thing this line exists to say.
      */
-    it('RESIDUAL: with untracked args, depth 0 leaves one line that names nothing', async () => {
-      const { buildToolPreviewLines, summariseToolCall, setToolDisplayConfig } = await load();
+    it('with untracked args, the one line depth 0 leaves NAMES THE FILE', async () => {
+      const { buildToolPreviewLines, summariseToolCallWithResult, setToolDisplayConfig } =
+        await load();
       setToolDisplayConfig({ toolOutputPreviewLines: 0 });
 
       const result = `Full contents of acme/widgets/src/tenant/Community.ts@main:\n\n${TWELVE_LINES}`;
-      const summary = summariseToolCall('gth_gh_read_file', undefined, []);
+      const summary = summariseToolCallWithResult('gth_gh_read_file', undefined, result, []);
       const body = buildToolPreviewLines({ name: 'gth_gh_read_file', result }, []);
 
-      expect(summary).toBe('gth_gh_read_file()');
       expect(body).toEqual([]);
-      expect(summary).not.toContain('Community.ts');
+      expect(summary).toContain('src/tenant/Community.ts');
+      expect(summary).not.toBe('gth_gh_read_file()');
+    });
+
+    /**
+     * The other half of the same claim: the fallback is a fallback. With no result to read, the
+     * line still cannot name anything, and it must not invent one.
+     */
+    it('still renders empty parentheses when there is no result to read either', async () => {
+      const { summariseToolCallWithResult, setToolDisplayConfig } = await load();
+      setToolDisplayConfig({ toolOutputPreviewLines: 0 });
+
+      expect(summariseToolCallWithResult('gth_gh_read_file', undefined, undefined, [])).toBe(
+        'gth_gh_read_file()'
+      );
     });
   });
 

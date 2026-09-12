@@ -375,6 +375,11 @@ export function foldEvents(state: TurnViewModel, event: AgentStreamEvent): TurnV
         ...state,
         segments: upsertTool(state.segments, event.id, (tc) => ({
           ...tc,
+          // [[TUI-C106]] — a result can be the FIRST event mentioning this id, in which case
+          // `upsertTool` has just created a placeholder with no name and the row would read
+          // `(tool)()`. The name the result carries is the only one that will ever arrive for such
+          // a call. A name already set by `tool_start` wins — this never overwrites it.
+          name: tc.name || event.name || '',
           status: 'done',
           result: event.content,
           isError: event.isError,

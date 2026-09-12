@@ -34,7 +34,7 @@ import {
   getToolGlyph,
   isShellShapedResult,
   renderToolLineAnsi,
-  summariseToolCall,
+  summariseToolCallWithResult,
   toolStatusDisplay,
 } from '#src/core/toolDisplay.js';
 import { displayToolIndication } from '#src/utils/consoleUtils.js';
@@ -55,9 +55,18 @@ export interface PlainToolIndicationObserver {
 }
 
 /**
- * Create the per-stream observer. State is scoped to one stream (one `agent.stream()` call);
+ * Create the observer.
+ *
+ * **Its state lives for a TURN, not for a stream, and the caller is what decides that.**
+ * `GthAbstractAgent` builds one on the first `streamFromInput` of a turn and reuses it for every
+ * later stream of the same turn, discarding it when the next turn opens or `/clear` lands. This
+ * is [[TUI-C106]]: an approval-gated call is announced in the stream that suspends at the gate and
+ * answered in the stream that resumes, so a per-stream observer met the `ToolMessage` having never
+ * seen its producer, threw away arguments it had correctly accumulated, and rendered `name()` —
+ * issue #445. Nothing in this module changed to fix that; only how long it is kept.
+ *
  * tool_call deltas are accumulated from `tool_call_chunks` (keyed by the provider's chunk
- * `index`, which restarts per LLM round — the map is flushed into the by-id map whenever a
+ * `index`, which restarts per LLM round — the map is closed into the round's tracking whenever a
  * `ToolMessage` arrives, mirroring `processEventStream`'s reset-per-round). Deliberately does
  * NOT `concat()` whole `AIMessageChunk`s: only the tool-call slices are needed, which also
  * sidesteps the TUI-C29 `__raw_response` aggregation-growth trap entirely.
@@ -81,19 +90,70 @@ export function createPlainToolIndication(
   const streaming = new Map<number, TrackedToolCall>();
   /** Completed calls awaiting their ToolMessage, keyed by tool call id. */
   const byId = new Map<string, TrackedToolCall>();
+  /**
+   * [[TUI-C106]] — every call tracked in the CURRENT round, in arrival order, that no `ToolMessage`
+   * has claimed yet. The by-id map above is the authoritative match and stays so; this is the
+   * fallback for the case that produced the node — **a result whose `tool_call_id` the observer
+   * never saw associated with any arguments.**
+   *
+   * That happens in more ways than a missing id. A provider may stream no tool-call id at all (the
+   * deltas carry `name`/`args` only); a provider whose wire format has no ids may have one MINTED
+   * for it by its LangChain integration, in which case nothing guarantees the id on the streamed
+   * chunk is the id the graph later dispatches and puts on the `ToolMessage`; and two calls sharing
+   * a chunk `index` in one round collapse into a single entry keyed under whichever id arrived
+   * last. In all three the arguments were observed — they are simply filed under the wrong key, or
+   * under none — and an exact-id lookup alone throws them away and renders `name()`.
+   *
+   * **Scoped to the round, and that is load-bearing.** Matching is by tool NAME, which cannot
+   * mis-fire the way an id match cannot: a call left here unclaimed (one held at the approval gate,
+   * one that never returned) would be eaten by the next same-name call several rounds later and
+   * render a confidently wrong filename. So it is emptied when the next round starts streaming,
+   * and a stale entry is simply lost — which costs a fallback label, not a correct one.
+   */
+  let unconsumed: TrackedToolCall[] = [];
+  /** A round's results have started arriving; the next tracking event opens a new round. */
+  let roundSettled = false;
 
-  const flushStreamingIntoById = (): void => {
-    for (const call of streaming.values()) {
-      if (call.id) byId.set(call.id, call);
-    }
+  /** Start a new round if the last one has settled, discarding its unclaimed calls. */
+  const beginRoundIfSettled = (): void => {
+    if (!roundSettled) return;
+    roundSettled = false;
+    unconsumed = [];
+  };
+
+  const track = (call: TrackedToolCall): void => {
+    if (call.id) byId.set(call.id, call);
+    unconsumed.push(call);
+  };
+
+  const closeStreamingRound = (): void => {
+    for (const call of streaming.values()) track(call);
     streaming.clear();
+  };
+
+  /** Drop a call from the round's unclaimed list once a result has spoken for it. */
+  const consume = (call: TrackedToolCall): void => {
+    const at = unconsumed.indexOf(call);
+    if (at !== -1) unconsumed.splice(at, 1);
   };
 
   const renderToolMessage = (message: ToolMessage): void => {
     const id = typeof message.tool_call_id === 'string' ? message.tool_call_id : '';
-    const tracked = id ? byId.get(id) : undefined;
+    const messageName = typeof message.name === 'string' ? message.name : '';
+    let tracked = id ? byId.get(id) : undefined;
     if (id) byId.delete(id);
-    const name = tracked?.name || (typeof message.name === 'string' ? message.name : '') || '';
+    // [[TUI-C106]] — the id matched nothing, so fall back to this round's unclaimed calls. Matched
+    // on the tool name when the result carries one; when it does not, only a round holding exactly
+    // one unclaimed call is unambiguous enough to attribute.
+    if (!tracked) {
+      tracked = messageName
+        ? unconsumed.find((call) => call.name === messageName)
+        : unconsumed.length === 1
+          ? unconsumed[0]
+          : undefined;
+    }
+    if (tracked) consume(tracked);
+    const name = tracked?.name || messageName || '';
     const result =
       typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
     const isError = message.status === 'error';
@@ -114,7 +174,10 @@ export function createPlainToolIndication(
     const status = toolStatusDisplay({ isError, raterClarification });
     const ansi = status.tone === 'error' ? '31' : status.tone === 'warn' ? '33' : '32';
     const statusGlyph = colour ? `\x1b[${ansi}m${status.glyph}\x1b[0m` : status.glyph;
-    const summary = summariseToolCall(name, tracked?.argsText);
+    // [[TUI-C106]] — the result is a second source for the summary when the arguments never
+    // reached this layer. A parsed args buffer always wins; this only fills a line that would
+    // otherwise be `name()` and say nothing about what was read.
+    const summary = summariseToolCallWithResult(name, tracked?.argsText, result);
     const summaryText = colour ? `\x1b[2m${summary}\x1b[0m` : summary;
     const note = raterClarification ? `  [${status.label}]` : '';
     const noteText = colour && note ? `\x1b[33m${note}\x1b[0m` : note;
@@ -149,6 +212,7 @@ export function createPlainToolIndication(
           const c = chunk as AIMessageChunk;
           const deltas = c.tool_call_chunks ?? [];
           if (deltas.length > 0) {
+            beginRoundIfSettled();
             for (const delta of deltas) {
               const index = typeof delta.index === 'number' ? delta.index : 0;
               const entry = streaming.get(index) ?? { name: '', argsText: '' };
@@ -157,16 +221,15 @@ export function createPlainToolIndication(
               if (delta.args) entry.argsText += delta.args;
               streaming.set(index, entry);
             }
-          } else {
+          } else if ((c.tool_calls ?? []).length > 0) {
             // Some providers surface COMPLETE tool_calls on a chunk instead of deltas.
+            // [[TUI-C106]] — tracked whether or not the call carries an id: without one it is
+            // unreachable by an exact lookup, which is exactly what the round's unclaimed list is
+            // for. It still goes into the by-id map when there IS an id, so nothing changes for a
+            // call whose id the result later matches.
+            beginRoundIfSettled();
             for (const tc of c.tool_calls ?? []) {
-              if (tc.id) {
-                byId.set(tc.id, {
-                  id: tc.id,
-                  name: tc.name,
-                  argsText: JSON.stringify(tc.args ?? {}),
-                });
-              }
+              track({ id: tc.id, name: tc.name, argsText: JSON.stringify(tc.args ?? {}) });
             }
           }
         } catch {
@@ -179,14 +242,10 @@ export function createPlainToolIndication(
         // TUI-C32 residual e — same fail-soft wrap as above/the ToolMessage branch.
         try {
           const m = chunk as AIMessage;
-          for (const tc of m.tool_calls ?? []) {
-            if (tc.id) {
-              byId.set(tc.id, {
-                id: tc.id,
-                name: tc.name,
-                argsText: JSON.stringify(tc.args ?? {}),
-              });
-            }
+          const calls = m.tool_calls ?? [];
+          if (calls.length > 0) beginRoundIfSettled();
+          for (const tc of calls) {
+            track({ id: tc.id, name: tc.name, argsText: JSON.stringify(tc.args ?? {}) });
           }
         } catch {
           /* indication is best-effort; the model-facing stream is untouched */
@@ -198,8 +257,12 @@ export function createPlainToolIndication(
         // next round), then render the arrived result. Fail-soft — rendering must never break
         // the run.
         try {
-          flushStreamingIntoById();
+          closeStreamingRound();
           renderToolMessage(chunk);
+          // [[TUI-C106]] — the round has produced a result, so the next tracking event belongs to a
+          // new one. Deferred rather than done here: the round's SIBLING results are still to come,
+          // and they need this round's unclaimed calls to attribute against.
+          roundSettled = true;
         } catch {
           /* indication is best-effort; the model-facing stream is untouched */
         }

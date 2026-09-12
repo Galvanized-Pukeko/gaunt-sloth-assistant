@@ -139,6 +139,32 @@ describe('tui/viewModel foldEvents', () => {
     ]);
   });
 
+  /**
+   * [[TUI-C106]] — the placeholder above is how a call the stream never ANNOUNCED reaches this
+   * surface: `flushAggregated` does not emit `tool_start` for a call with no id, but the round's
+   * result still arrives under the `ToolMessage`'s own id and creates the row. Unnamed, that row
+   * renders `(tool)()` — worse than the plain surface's `name()`. The result carries the name so
+   * the row can say what ran.
+   */
+  it('names an unannounced call from the name its RESULT carries', async () => {
+    const { foldEventSequence, turnToolCalls } = await import('#src/tui/viewModel.js');
+    const vm = foldEventSequence([
+      { type: 'tool_result', id: 'ghost', name: 'gth_gh_read_file', content: 'orphan' },
+    ]);
+    expect(turnToolCalls(vm)[0]).toMatchObject({ id: 'ghost', name: 'gth_gh_read_file' });
+  });
+
+  it('never lets a result rename a call that tool_start already named', async () => {
+    const { foldEventSequence, turnToolCalls } = await import('#src/tui/viewModel.js');
+    // The announcement is the authoritative name; the result's is only a fallback for a row that
+    // has none. A provider echoing a different name must not rewrite the announced one.
+    const vm = foldEventSequence([
+      { type: 'tool_start', id: 't1', name: 'read_file' },
+      { type: 'tool_result', id: 't1', name: 'something_else', content: 'body' },
+    ]);
+    expect(turnToolCalls(vm)[0]).toMatchObject({ name: 'read_file' });
+  });
+
   it('does not mutate the input state (immutability for React ref-equality)', async () => {
     const { initialTurnViewModel, foldEvents } = await import('#src/tui/viewModel.js');
     const start = initialTurnViewModel();

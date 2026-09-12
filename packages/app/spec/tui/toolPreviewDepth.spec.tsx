@@ -83,4 +83,22 @@ describe('tui tool-call panel — configurable preview depth (TUI-C105)', () => 
     expect(stripAnsi(lastFrame() ?? '')).toContain('📁');
     unmount();
   });
+
+  /**
+   * [[TUI-C106]] — the same call with its ARGUMENTS never tracked. This is the row a call reaches
+   * the TUI as when the stream never announced it: created by its result, so it has an id, a
+   * status and a body, and nothing at all inside the parentheses. At depth 0 the preamble that
+   * would have named the file is gone with the body, so the summary is the only line left that
+   * can carry it.
+   */
+  it('names the file at depth 0 even when the call arrived with no arguments', () => {
+    setToolDisplayConfig({ toolOutputPreviewLines: 0 });
+    const untracked: ToolCallViewModel = { ...ghCall, argsText: '' };
+    const { lastFrame, unmount } = render(<LiveTurn turn={turnWith(untracked)} columns={120} />);
+    const f = stripAnsi(lastFrame() ?? '');
+
+    expect(f).toContain('src/tenant/Community.ts');
+    expect(f).not.toContain('gth_gh_read_file()');
+    unmount();
+  });
 });

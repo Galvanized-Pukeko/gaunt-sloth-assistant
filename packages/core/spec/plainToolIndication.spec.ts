@@ -443,6 +443,203 @@ describe('plainToolIndication (TUI-C30 — the --no-tui / piped surface)', () =>
   });
 
   /**
+   * [[TUI-C106]] — **a call whose arguments never reached this observer under its result's id.**
+   *
+   * Every case here is the same failure wearing a different hat: a `ToolMessage` arrives and the
+   * by-id lookup finds nothing, so the summary had nothing to name the file with and rendered
+   * `gth_gh_read_file()` — empty parentheses at every preview depth, which is what defeats
+   * [[TUI-C105]]'s depth-0 setting.
+   *
+   * Each asserts on the FILENAME, never on a line count: a count passes on the useless version of
+   * this feature, where the one surviving line says nothing about what was read.
+   */
+  describe('arguments that never reached the display layer (TUI-C106)', () => {
+    const GH_RESULT =
+      'Full contents of acme/widgets/src/tenant/Community.ts@main:\n\nexport class Community {}';
+
+    /**
+     * A streaming delta for one call. The id is omitted unless supplied, and so is `index` when
+     * it is passed as `undefined` — a provider that sends no index is one of the shapes here.
+     */
+    const delta = (name: string, args: string, id?: string, index: number | undefined = 0) =>
+      new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [
+          {
+            name,
+            args,
+            ...(id ? { id } : {}),
+            ...(index === undefined ? {} : { index }),
+            type: 'tool_call_chunk',
+          },
+        ],
+      });
+
+    const head = (sink: ReturnType<typeof vi.fn>, call = 0): string =>
+      (sink.mock.calls[call][0] as string).split('\n')[1];
+
+    it('shape B: the deltas carried no tool-call id, and the result still names the file', async () => {
+      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
+      const sink = vi.fn();
+      const observer = createPlainToolIndication(sink);
+      // The args stream in across two deltas and neither carries an id; the result arrives under
+      // an id minted elsewhere, so the by-id map cannot match it.
+      observer.observe(delta('gth_gh_read_file', '{"path":"src/tenant/Comm'));
+      observer.observe(delta('gth_gh_read_file', 'unity.ts"}'));
+      observer.observe(
+        new ToolMessage({
+          content: GH_RESULT,
+          tool_call_id: 'minted-elsewhere',
+          name: 'gth_gh_read_file',
+        })
+      );
+
+      expect(sink).toHaveBeenCalledTimes(1);
+      // The ARGUMENTS were recovered, so this is the model's own path, not the result-derived one.
+      expect(head(sink)).toContain('gth_gh_read_file(path=src/tenant/Community.ts)');
+    });
+
+    it('recovers args when the streamed id and the result id disagree', async () => {
+      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
+      const sink = vi.fn();
+      const observer = createPlainToolIndication(sink);
+      // A provider whose wire format has no tool-call ids may have one MINTED per message by its
+      // LangChain integration, and nothing then guarantees the streamed chunk's id is the one the
+      // graph dispatches. The arguments were observed; only the key is wrong.
+      observer.observe(
+        delta('gth_gh_read_file', '{"path":"src/tenant/Community.ts"}', 'lc-tool-call-AAAA')
+      );
+      observer.observe(
+        new ToolMessage({
+          content: GH_RESULT,
+          tool_call_id: 'lc-tool-call-BBBB',
+          name: 'gth_gh_read_file',
+        })
+      );
+
+      expect(head(sink)).toContain('gth_gh_read_file(path=src/tenant/Community.ts)');
+    });
+
+    it('shape D: no producer was observed at all, so the file comes from the result heading', async () => {
+      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
+      const sink = vi.fn();
+      const observer = createPlainToolIndication(sink);
+      // Nothing to recover: the only place the filename appears is the preamble the tool itself
+      // bakes into its result.
+      observer.observe(
+        new ToolMessage({ content: GH_RESULT, tool_call_id: 'orphan', name: 'gth_gh_read_file' })
+      );
+
+      expect(head(sink)).toContain('acme/widgets/src/tenant/Community.ts@main');
+    });
+
+    it('reads the file out of a TRUNCATED result heading too', async () => {
+      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
+      const sink = vi.fn();
+      const observer = createPlainToolIndication(sink);
+      observer.observe(
+        new ToolMessage({
+          content: 'Partial contents of acme/widgets/big.ts@main (truncated):\n\nhalf a file',
+          tool_call_id: 'orphan',
+          name: 'gth_gh_read_file',
+        })
+      );
+
+      expect(head(sink)).toContain('acme/widgets/big.ts@main');
+      expect(head(sink)).not.toContain('truncated');
+    });
+
+    it('two parallel calls whose deltas carry NO chunk index each name their own file', async () => {
+      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
+      const sink = vi.fn();
+      const observer = createPlainToolIndication(sink);
+      // MEASURED as the reproduction of issue #445: a provider that omits `index` collapses every
+      // call in the round onto index 0, so the two calls merge into one entry — the first result
+      // then finds nothing under its id (`name()`) and the second finds a concatenated args buffer
+      // that cannot parse (`name(…)`). A `pr` review reads several files, so this is a round shape
+      // it reaches routinely.
+      observer.observe(delta('gth_gh_read_file', '{"path":"a.ts"}', 'c1', undefined));
+      observer.observe(delta('gth_gh_read_file', '{"path":"b.ts"}', 'c2', undefined));
+      observer.observe(
+        new ToolMessage({
+          content: 'Full contents of acme/widgets/a.ts@main:\n\nbody-a',
+          tool_call_id: 'c1',
+          name: 'gth_gh_read_file',
+        })
+      );
+      observer.observe(
+        new ToolMessage({
+          content: 'Full contents of acme/widgets/b.ts@main:\n\nbody-b',
+          tool_call_id: 'c2',
+          name: 'gth_gh_read_file',
+        })
+      );
+
+      expect(sink).toHaveBeenCalledTimes(2);
+      expect(head(sink, 0)).toContain('acme/widgets/a.ts@main');
+      expect(head(sink, 1)).toContain('acme/widgets/b.ts@main');
+      // Neither row may claim the other's file — the whole hazard of a merged entry.
+      expect(head(sink, 0)).not.toContain('b.ts');
+      expect(head(sink, 1)).not.toContain('a.ts@main');
+    });
+
+    it('never attributes a LATER round result to an earlier round unclaimed call', async () => {
+      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
+      const sink = vi.fn();
+      const observer = createPlainToolIndication(sink);
+      // Round 1 asks for two files; only the first returns (the second is held at the approval
+      // gate and its result never reaches this stream).
+      observer.observe(
+        new AIMessageChunk({
+          content: '',
+          tool_call_chunks: [
+            {
+              name: 'read_file',
+              args: '{"path":"RETURNED.txt"}',
+              id: 'r1',
+              index: 0,
+              type: 'tool_call_chunk',
+            },
+            {
+              name: 'read_file',
+              args: '{"path":"GATED.txt"}',
+              id: 'r2',
+              index: 1,
+              type: 'tool_call_chunk',
+            },
+          ],
+        })
+      );
+      observer.observe(
+        new ToolMessage({ content: 'body-1', tool_call_id: 'r1', name: 'read_file' })
+      );
+      // Round 2 is a DIFFERENT read_file whose deltas carry no id. Matching by name alone would
+      // let it eat round 1's abandoned call and print a confidently wrong filename.
+      observer.observe(delta('read_file', '{"path":"ROUND2.txt"}'));
+      observer.observe(
+        new ToolMessage({ content: 'body-2', tool_call_id: 'wire-2', name: 'read_file' })
+      );
+
+      expect(sink).toHaveBeenCalledTimes(2);
+      expect(head(sink, 0)).toContain('read_file(path=RETURNED.txt)');
+      expect(head(sink, 1)).toContain('read_file(path=ROUND2.txt)');
+      expect(head(sink, 1)).not.toContain('GATED.txt');
+    });
+
+    it('leaves the tracked happy path byte-for-byte alone', async () => {
+      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
+      const sink = vi.fn();
+      const observer = createPlainToolIndication(sink);
+      // The case measured working on a real provider before this node: the id matches, so the
+      // fallbacks must not engage and must not change what the row says.
+      observer.observe(delta('read_file', '{"path":"notes.txt"}', 'c1'));
+      observer.observe(new ToolMessage({ content: 'notes body', tool_call_id: 'c1' }));
+
+      expect(head(sink)).toContain('read_file(path=notes.txt)');
+    });
+  });
+
+  /**
    * [[TUI-C105]] — the configurable preview depth on THIS surface, which is the one `review` runs
    * on and therefore the one the originating issue is about. The depth is resolved in the shared
    * `toolDisplay` module, so these assert the setting actually reaches the rendered block rather

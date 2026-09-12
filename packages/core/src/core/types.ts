@@ -177,6 +177,20 @@ export type AgentStreamEvent =
       id: string;
       content: string;
       /**
+       * [[TUI-C106]] — the tool that produced this result (`ToolMessage.name`), so a consumer can
+       * NAME a call it never saw start.
+       *
+       * A result routinely reaches a renderer for a call that was never announced: the stream only
+       * announces a call whose id survived into the merged message's `tool_calls`, and an id-less
+       * one does not (LangChain files it under `invalid_tool_calls` instead). The renderer still
+       * draws a row — the id on THIS event is what creates it — and without a name that row reads
+       * `(tool)()`, which is worse than the plain surface's `name()`.
+       *
+       * Additive and display-only. A consumer that already has the name from `tool_start` must
+       * keep it; this is the fallback for the one that does not.
+       */
+      name?: string;
+      /**
        * True when the underlying `ToolMessage.status` is `'error'` (LangChain's real
        * tool-result error signal). Absent/undefined means success — consumers must not
        * sniff the result text to infer failure. Optional for backward compatibility with

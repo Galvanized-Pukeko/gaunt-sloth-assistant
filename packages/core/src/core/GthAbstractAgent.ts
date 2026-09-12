@@ -31,7 +31,10 @@ import type { DebugCapture, DebugRequestExtras, LastModelRequest } from '#src/co
 import { modelProviderLabel } from '#src/core/modelLabel.js';
 import { replaceGraphMessages } from '#src/core/compaction.js';
 import type { AutocompactController } from '#src/core/compactionThreshold.js';
-import { createPlainToolIndication } from '#src/core/plainToolIndication.js';
+import {
+  createPlainToolIndication,
+  type PlainToolIndicationObserver,
+} from '#src/core/plainToolIndication.js';
 import { runHeaderLine } from '#src/core/runHeader.js';
 import { debugLog, debugLogError, debugLogObject } from '#src/utils/debugUtils.js';
 import { ProgressIndicator } from '#src/utils/ProgressIndicator.js';
@@ -832,6 +835,15 @@ export abstract class GthAbstractAgent implements GthAgentInterface {
   ): Promise<IterableReadableStream<string>> {
     debugLog('=== Starting streaming invoke ===');
     debugLogObject('LLM Input Messages', messages);
+    // [[TUI-C106]] — a NEW turn, so the plain surface's tool tracking starts empty. This is the
+    // only place that resets it: {@link streamResume} is the SAME turn continuing and must keep it.
+    //
+    // One caller re-enters here WITHIN a turn, and it was checked rather than assumed: [[EXT-160]]'s
+    // retry-after-compaction (`GthAgentRunner.runTurn(…, attempt + 1)`). Resetting there is the
+    // wanted behaviour — compaction has rewritten the history the announcement belonged to, so
+    // carrying it over could only name a later row from an earlier turn's arguments. It costs at
+    // most a nameless row in that one path, which is where every row stood before this node.
+    this.plainToolIndication = undefined;
     return this.streamFromInput({ messages }, runConfig);
   }
 
@@ -885,18 +897,33 @@ export abstract class GthAbstractAgent implements GthAgentInterface {
     const noteFinishReason = (path: GthFinishReasonObservation['path'], message: unknown) =>
       this.noteFinishReason(path, message);
     // TUI-C30 — compact per-tool-call indication for the plain surface (`name(args…)` + the
-    // canonical 10-line greyed preview when each ToolMessage lands). Per-stream state; emits at
-    // INFO level so the existing consoleLevel gate governs it like the historical tool notices.
-    // The TUI never runs this string path (it renders the typed event stream itself).
+    // canonical 10-line greyed preview when each ToolMessage lands). Emits at INFO level so the
+    // existing consoleLevel gate governs it like the historical tool notices. The TUI never runs
+    // this string path (it renders the typed event stream itself).
+    //
+    // [[TUI-C106]] — **the observer's state belongs to the TURN, not to this stream.** It used to
+    // be built here, per call, and that is what produced the nameless rows in issue #445. An
+    // approval-gated tool suspends the graph: this method returns with the call announced and its
+    // result not yet produced, `GthAgentRunner.resolveToolInterrupts` collects the human's
+    // decision, and the turn continues through `streamResume` — a SECOND call to this method. The
+    // `ToolMessage` therefore lands in a stream whose observer never saw the producer message, so
+    // the arguments were not missing at all: they were discarded at the stream boundary, and the
+    // row rendered `name()`. Every approval-gated tool was affected, not only the file reader the
+    // issue happened to catch.
+    //
+    // Reset in {@link stream} (a new turn) and in {@link clearRaterClarifications} (`/clear`),
+    // which is the same lifetime the rater-clarification set has, for the same reason.
     //
     // [[TUI-C69]] §5.4 — the plain surface's twin of the typed event's `raterClarification`, read
     // through a closure rather than handed a snapshot: the set is filled WHILE this stream is
     // drained, because the runner notes the id at the moment it refuses the call, which is after
-    // this observer was built and before the refusal's own result arrives.
+    // this observer was built and before the refusal's own result arrives. The set is owned by the
+    // agent, so the closure stays valid across every stream of the turn.
     const raterClarifications = this.raterClarifications;
-    const toolIndication = createPlainToolIndication(undefined, (id) =>
+    this.plainToolIndication ??= createPlainToolIndication(undefined, (id) =>
       raterClarifications.has(id)
     );
+    const toolIndication = this.plainToolIndication;
     const interruptState = { escape: false, messageShown: false };
     const abortController = new AbortController();
     const showInterruptMessage = () => {
@@ -1290,10 +1317,23 @@ export abstract class GthAbstractAgent implements GthAgentInterface {
    */
   clearRaterClarifications(): void {
     this.raterClarifications.clear();
+    // [[TUI-C106]] — the plain surface's tool tracking has the same lifetime and goes with it: a
+    // call announced before the user asked for the conversation to be forgotten must not supply
+    // the arguments for a row drawn after it.
+    this.plainToolIndication = undefined;
   }
 
   /** [[TUI-C69]] — the ids {@link noteRaterClarification} has been told about this turn. */
   protected raterClarifications = new Set<string>();
+
+  /**
+   * [[TUI-C106]] — the plain surface's tool-call tracking for the CURRENT TURN.
+   *
+   * Held on the agent rather than inside `streamFromInput` because a turn that suspends at the
+   * approval gate spans TWO streams, and the gated call's result always lands in the second one.
+   * `undefined` means the next stream opens a turn and builds a fresh observer.
+   */
+  private plainToolIndication: PlainToolIndicationObserver | undefined;
 
   protected async *processEventStream(
     stream: IterableReadableStream<[BaseMessage, Record<string, unknown>]>
@@ -1380,6 +1420,25 @@ export abstract class GthAbstractAgent implements GthAgentInterface {
      * that is what puts a call on screen, with the arguments the human is about to rule on.
      * `tool_end` is not: it waits for the call's own result, and is emitted beside it when that
      * result reaches THIS stream — which for a gated call it never does. See `pendingEnds` above.
+     *
+     * ---
+     *
+     * [[TUI-C106]] — **an id-less call is deliberately NOT announced here, and the decision was
+     * taken rather than inherited.** Both loops below skip an entry with no id, and they keep
+     * doing so.
+     *
+     * The alternative was to announce it anyway, which means minting an id, because `flushed` and
+     * `pendingEnds` are both keyed on one. That was rejected on a rule this repo already holds:
+     * [[EXT-47]] requires a promoted call's id to be *stable and wire-derived, without
+     * fabricating*. A minted id is also worse than useless downstream — the AG-UI bridge frames
+     * `TOOL_CALL_START`/`TOOL_CALL_RESULT` on it, and the result arrives under the id the graph
+     * dispatched, so a fabricated announcement would open a frame nothing ever closes.
+     *
+     * **Dropping the announcement does not drop the call.** The round's `ToolMessage` still yields
+     * a `tool_result` under its own `tool_call_id`, which IS wire-derived, and that is what puts
+     * the row on screen (the Ink reducer creates a row for any id it has not seen). What the row
+     * lacked was a NAME, so the result event carries one — see the `tool_result` yield below. The
+     * transparency property is kept, at no cost to the id rule.
      */
     function* flushAggregated(): Generator<AgentStreamEvent> {
       if (!aggregatedAIChunk) return;
@@ -1524,6 +1583,10 @@ export abstract class GthAbstractAgent implements GthAgentInterface {
           type: 'tool_result',
           id: toolCallId,
           content,
+          // [[TUI-C106]] — the tool's name, for a consumer that never saw this call start. See the
+          // decision recorded on `flushAggregated` above: an id-less call is not announced, but its
+          // RESULT still draws a row, and this is what that row is named from.
+          ...(typeof chunk.name === 'string' && chunk.name.length > 0 ? { name: chunk.name } : {}),
           ...(chunk.status === 'error' ? { isError: true } : {}),
           ...(this.raterClarifications.has(toolCallId) ? { raterClarification: true } : {}),
         };
