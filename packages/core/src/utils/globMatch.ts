@@ -106,10 +106,16 @@ function parseTokens(
     const character = segment[index];
     if (stopAt.includes(character)) break;
     if (character === '*') {
-      // Consecutive `*` collapse to ONE star. This is also where `**` inside a larger segment
-      // (`**.ts`, `a**b`) degrades to `*` and stays within the segment: only a segment that is
-      // EXACTLY `**` crosses `/`, which keeps the crossing decision a property of the whole
-      // segment rather than of a character run.
+      // Consecutive `*` collapse to ONE star. Under the position-set sweep this is a
+      // NORMALISATION and not a correctness mechanism — adjacent stars are idempotent there, so
+      // removing this loop changes no result, and a mutation that removes it survives the suite
+      // deliberately. It is kept because it bounds the token count: without it a pattern of a
+      // thousand stars in one segment costs a thousand set fills to mean exactly `*`.
+      //
+      // `**` inside a larger segment (`**.ts`, `a**b`) therefore degrades to `*` and stays within
+      // the segment. The decision that a segment CROSSES a separator is not made here at all — it
+      // is `compileSegment`'s exact match on `**`, so it is a property of the whole segment rather
+      // than of a character run.
       while (index < segment.length && segment[index] === '*') index++;
       flush();
       tokens.push({ kind: 'star' });

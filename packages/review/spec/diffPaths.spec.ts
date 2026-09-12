@@ -102,6 +102,33 @@ describe('CFG-70 extractChangedPathsFromDiff', () => {
     expect(extractChangedPathsFromDiff(diff)).toEqual(['src/real.ts']);
   });
 
+  it('skips a header whose prefixes are not a/ and b/, quoted or not', () => {
+    // --src-prefix / --dst-prefix reach the prefix check itself, which the two headers above do
+    // not: those carry no ` b/` at all and are rejected one step earlier. Without these the
+    // prefix check would be an unexercised guard, and dropping it — so a wrong prefix is merely
+    // sliced off — would fabricate `rc/y.ts` out of `xrc/y.ts`.
+    const diff = [
+      'diff --git x/src/y.ts b/src/y.ts',
+      'diff --git a/src/z.ts y/src/z.ts',
+      'diff --git "x/pkg/\\303\\244.ts" "y/pkg/\\303\\244.ts"',
+      'diff --git a/src/real.ts b/src/real.ts',
+    ].join('\n');
+    expect(extractChangedPathsFromDiff(diff)).toEqual(['src/real.ts']);
+  });
+
+  it('skips a half-quoted header rather than reading the second path out of stray quotes', () => {
+    // git quotes BOTH sides when either needs it, so this shape never comes from git — but the
+    // extractor is handed whatever the content source produced. Without the "second token must
+    // open with a quote" check, the quoted reader starts one character past the space, runs to
+    // the next stray quote, and reads `b/y` — which strips to a changed path of `y` that nobody
+    // wrote. Fabricating a path is the one failure this module refuses, so the check is here and
+    // this is the header that distinguishes it.
+    const diff = ['diff --git "a/x.ts" ab/y".ts', 'diff --git a/src/real.ts b/src/real.ts'].join(
+      '\n'
+    );
+    expect(extractChangedPathsFromDiff(diff)).toEqual(['src/real.ts']);
+  });
+
   it('de-duplicates, so a file count is not doubled by the a/b pair', () => {
     const diff = [
       'diff --git a/src/x.ts b/src/x.ts',
