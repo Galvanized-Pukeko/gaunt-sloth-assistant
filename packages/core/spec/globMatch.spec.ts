@@ -158,20 +158,27 @@ describe('CFG-70 globMatch: pattern lists answer the two questions separately', 
 
 describe('CFG-70 globMatch: bounded time', () => {
   /**
-   * Generous enough that a loaded CI runner cannot flake it, and far below the failure being
-   * guarded against: the regex implementation this replaced took 163 SECONDS on the sibling-star
-   * case below, so a real regression here is three to six orders of magnitude over the budget, not
-   * a near miss.
+   * Generous enough that a cold or loaded CI runner cannot flake it, and still far below the
+   * failure being guarded against: the regex implementation this replaced took 163 SECONDS on the
+   * sibling-star case below, so a real regression here is over two orders of magnitude past the
+   * budget, not a near miss. A thin budget on a Windows cell reads green until it does not, and the
+   * measured cost here is well under a millisecond — headroom costs nothing and buys the whole
+   * difference between a live cell and a flaky one.
    */
-  const BUDGET_MS = 100;
+  const BUDGET_MS = 1000;
 
   const longPath = `${Array.from({ length: 400 }, (_, index) => `segment${index}`).join('/')}/file.tsx`;
 
   it('resolves deep `**` runs with nested alternation against a long non-matching path', () => {
     const pattern = compileGlob('**/**/**/**/**/**/**/**/**/**/{a,{b,{c,d}}}*x*y*z/**/*.ts');
+    // The clock stops before the matcher runs: an `expect` call inside the timed region measures
+    // vitest as well as the code under test, which is the half of the reading that a loaded runner
+    // actually moves.
     const started = performance.now();
-    expect(pattern.test(longPath)).toBe(false);
-    expect(performance.now() - started).toBeLessThan(BUDGET_MS);
+    const matched = pattern.test(longPath);
+    const elapsed = performance.now() - started;
+    expect(matched).toBe(false);
+    expect(elapsed).toBeLessThan(BUDGET_MS);
   });
 
   it('resolves a run of sibling `*` in one segment against a long non-matching segment', () => {
@@ -180,8 +187,10 @@ describe('CFG-70 globMatch: bounded time', () => {
     const pattern = compileGlob(`pkg/${'a*'.repeat(16)}b/x.ts`);
     const subject = `pkg/${'a'.repeat(255)}/x.ts`;
     const started = performance.now();
-    expect(pattern.test(subject)).toBe(false);
-    expect(performance.now() - started).toBeLessThan(BUDGET_MS);
+    const matched = pattern.test(subject);
+    const elapsed = performance.now() - started;
+    expect(matched).toBe(false);
+    expect(elapsed).toBeLessThan(BUDGET_MS);
   });
 
   it('still matches the sibling-`*` shape when it should', () => {

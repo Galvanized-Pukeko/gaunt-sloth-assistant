@@ -111,7 +111,15 @@ function readQuotedToken(line: string, start: number): { value: string; end: num
   return undefined;
 }
 
-/** Split the unquoted `a/… b/…` remainder into its two prefixed halves — see the module docblock. */
+/**
+ * Split the unquoted `a/… b/…` remainder into its two prefixed halves — see the module docblock.
+ *
+ * The equal-halves rule is deterministic rather than merely first-match: equal strings have equal
+ * length, so a candidate whose halves are equal can only be the exact midpoint, and a string has
+ * one midpoint. At most one candidate can therefore satisfy it, and which one is found first never
+ * matters. The last candidate is the fallback only for a genuine rename, where no split makes the
+ * halves equal.
+ */
 function splitUnquotedPair(remainder: string): [string, string] | undefined {
   const candidates: number[] = [];
   for (
