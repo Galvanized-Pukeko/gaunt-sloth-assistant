@@ -1,10 +1,18 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import type { Server } from 'node:http';
 import { EventEncoder } from '@ag-ui/encoder';
 import { EventType } from '@ag-ui/core';
 import { GthConfig } from '@gaunt-sloth/core/config.js';
 import { GthAbstractAgent } from '@gaunt-sloth/core/core/GthAbstractAgent.js';
 import { GthLangChainAgent } from '@gaunt-sloth/core/core/GthLangChainAgent.js';
+import {
+  retryEventTurnOnContextOverflow,
+  type ContextOverflowSeamHost,
+} from '@gaunt-sloth/core/core/contextOverflowSeam.js';
+import type { AgentStreamEvent } from '@gaunt-sloth/core/core/types.js';
+import type { ConversationCompaction } from '@gaunt-sloth/core/core/compaction.js';
+import { overflowCompactionNotice, type SlashCommandNotice } from '#src/modules/slashCommands.js';
 import {
   defaultStatusCallback,
   displayError,
@@ -332,6 +340,34 @@ function terminationOf(agent: GthAbstractAgent | null | undefined): GthTerminati
 }
 
 /**
+ * [[EXT-174]] — the `name` of the AG-UI `CUSTOM` event that tells the client the session folded the
+ * older conversation into a summary mid-turn, because the provider rejected the turn for size, and
+ * is asking the model again. Its `value` is an {@link AgUiContextCompactedValue}.
+ *
+ * At most one per run. Everything the client has rendered for the run stands: the retry continues
+ * the same thread from its state, so the tool calls announced before this event ran and their
+ * results are what the model continues from. What follows is the same turn with less history behind
+ * it, as a new text message. A client that does not handle the name renders a correct turn with the
+ * fold unannounced — the degradation the event exists to prevent, and the reason it is `CUSTOM`
+ * rather than a text message a client would show as the assistant's words and replay to the model.
+ */
+export const AGUI_CONTEXT_COMPACTED_EVENT = 'context_compacted';
+
+/** [[EXT-174]] — the `value` of an {@link AGUI_CONTEXT_COMPACTED_EVENT} event. */
+export interface AgUiContextCompactedValue {
+  /** Why the fold happened. Only the rejected request today; named so a preventive fold could not be mistaken for one. */
+  cause: 'context_overflow';
+  /** What the fold did, in the numbers `/compact` reports. */
+  compaction: ConversationCompaction;
+  /**
+   * The notice as the other surfaces render it, so a client can show the sentence without inventing
+   * wording of its own — the same pairing of fact and prose `RUN_FINISHED`'s `result.termination`
+   * carries.
+   */
+  notice: SlashCommandNotice;
+}
+
+/**
  * The interface the AG-UI server binds when nothing says otherwise: IPv4 loopback.
  *
  * A default is a decision someone inherits rather than makes, so this one is the safe half of the
@@ -436,13 +472,16 @@ function formatUrlHost(address: string): string {
  * `Access-Control-Allow-Origin` matches nothing and would block every browser client — the opposite
  * of what supplying the flag can have meant. That is the same reasoning as the empty host above and
  * the opposite outcome, since there the empty value had a live meaning to `listen` worth overriding.
+ *
+ * Resolves with the bound `http.Server` once it is listening: the one handle that says which port a
+ * `port: 0` request actually got, and the one way to stop the server. The CLI door ignores it.
  */
 export async function startAgUiServer(
   config: GthConfig,
   port: number,
   host?: string,
   corsOrigin?: string
-): Promise<void> {
+): Promise<Server> {
   const app = express();
   app.use(express.json({ limit: '5mb' }));
 
@@ -707,34 +746,50 @@ export async function startAgUiServer(
         if (!openToolCalls.delete(toolCallId)) return;
         res.write(encoder.encode({ type: EventType.TOOL_CALL_END, toolCallId }));
       };
+      const endReasoning = () => {
+        if (reasoningMessageId) {
+          res.write(
+            encoder.encode({
+              type: EventType.REASONING_MESSAGE_END,
+              messageId: reasoningMessageId,
+            })
+          );
+          reasoningMessageId = null;
+        }
+      };
 
-      let eventStream;
-      if (isCopilotToolResume) {
-        const resumeContent =
-          typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content);
-        eventStream = activeAgent.streamWithEventsResume(resumeContent, runConfig, [], ac.signal);
-      } else if (forwardedProps?.command?.resume !== undefined) {
-        // Follow-up messages piggy-backed on the resume: deliver them to the
-        // agent on its next decision turn via Command.update (see
-        // GthLangChainAgent.streamWithEventsResume). Accepts plain strings or
-        // AG-UI message objects.
-        const queued = forwardedProps.command.queuedMessages;
-        const queuedMessages: BaseMessage[] = Array.isArray(queued)
-          ? queued
-              .map((s: unknown) =>
-                typeof s === 'string'
-                  ? new HumanMessage(s)
-                  : convertMessage(s as Parameters<typeof convertMessage>[0], allowedToolNames)
-              )
-              .filter((m): m is BaseMessage => Boolean(m))
-          : [];
-        eventStream = activeAgent.streamWithEventsResume(
-          forwardedProps.command.resume,
-          runConfig,
-          queuedMessages,
-          ac.signal
-        );
-      } else {
+      /**
+       * The turn the client asked for — one of three ways of starting the same thread. Which one it
+       * was makes no difference to anything after the first attempt.
+       */
+      const startTurn = (): AsyncGenerator<AgentStreamEvent> => {
+        if (isCopilotToolResume) {
+          const resumeContent =
+            typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content);
+          return activeAgent.streamWithEventsResume(resumeContent, runConfig, [], ac.signal);
+        }
+        if (forwardedProps?.command?.resume !== undefined) {
+          // Follow-up messages piggy-backed on the resume: deliver them to the
+          // agent on its next decision turn via Command.update (see
+          // GthLangChainAgent.streamWithEventsResume). Accepts plain strings or
+          // AG-UI message objects.
+          const queued = forwardedProps.command.queuedMessages;
+          const queuedMessages: BaseMessage[] = Array.isArray(queued)
+            ? queued
+                .map((s: unknown) =>
+                  typeof s === 'string'
+                    ? new HumanMessage(s)
+                    : convertMessage(s as Parameters<typeof convertMessage>[0], allowedToolNames)
+                )
+                .filter((m): m is BaseMessage => Boolean(m))
+            : [];
+          return activeAgent.streamWithEventsResume(
+            forwardedProps.command.resume,
+            runConfig,
+            queuedMessages,
+            ac.signal
+          );
+        }
         // The system prompt (backstory + guidelines + mode prompt + identity) is composed by the
         // agent itself (GthLangChainAgent) and handed to the graph, so it is not prepended here. A
         // separate, non-first SystemMessage would be rejected by Anthropic.
@@ -744,8 +799,58 @@ export async function startAgUiServer(
           (messages || []) as Parameters<typeof convertMessages>[0],
           allowedToolNames
         );
-        eventStream = activeAgent.streamWithEvents(langChainMessages, runConfig, ac.signal);
-      }
+        return activeAgent.streamWithEvents(langChainMessages, runConfig, ac.signal);
+      };
+
+      // [[EXT-174]] — **compact and retry once on a context overflow, through the same seam every
+      // other surface uses.** This server drives the agent's stream directly, and the seam was a
+      // private method of `GthAgentRunner`, so a turn the provider rejected for size ended here as
+      // a `RUN_ERROR` where the readline session, the TUI and the editor integrations folded the
+      // conversation and carried on. Two ways to close that were weighed from what the code costs:
+      //
+      // ROUTING THIS SERVER THROUGH `processMessagesWithEvents` was rejected. That driver does
+      // three things per turn that are right for a terminal and wrong on this wire. (1) It closes
+      // every tool call it saw start and never saw end with an error `tool_result` ("This call did
+      // not run."), which is exactly the state of a call the graph suspended for the BROWSER to
+      // fulfil — the encoder below would forward it as a `TOOL_CALL_RESULT`, and the client would
+      // hold a failed result for the tool it is about to run. That alone breaks client tools.
+      // (2) It drains pending approval interrupts through the runner's own gate, which DECIDES them
+      // (bypass → allow-list → rater → a human callback that defaults to reject); this server
+      // leaves such a graph parked, and changing that is a decision about approvals, not about
+      // overflow. (3) It drives one runner-owned thread, where this handler rotates a checkpoint
+      // thread per fresh run and pins the suspended one for a resume — and it has no entry point
+      // for a client resume at all (`streamWithEventsResume` with the client's value and queued
+      // messages). Routing would mean a runner per toolset, a per-request thread API and a new
+      // resume driver: three new runner surfaces to reach one seam, plus a semantic fork in the
+      // driver for (1).
+      //
+      // A SEAM OF THIS SERVER'S OWN — catch, classify, compact, retry written a third time — was
+      // rejected for the reason EXT-167 gave when it made both runner drivers call one function:
+      // three copies of a decision drift.
+      //
+      // So the seam itself moved. The decision and the retry loop live in `contextOverflowSeam.ts`,
+      // the runner's private methods delegate to them, and this handler calls the same functions
+      // with its own agent, thread and model. There is exactly one implementation; what keeps it
+      // one is that neither caller holds a copy to edit, and a spec on each side pins that the
+      // shared loop is what it reaches.
+      //
+      // The retry continues the SAME thread with an empty message list whichever shape the first
+      // attempt took. On a resume, the client's value has already been delivered to the suspended
+      // tool and its result committed to state before the model step threw, so re-sending the
+      // resume would answer an interrupt that no longer exists, and re-sending the history would
+      // append a second copy of it. The browser is told with the `context_compacted` event, put on
+      // the wire below as a `CUSTOM` event.
+      const overflowHost: ContextOverflowSeamHost = {
+        agent: activeAgent,
+        runConfig,
+        model: config.llm,
+        statusUpdate: defaultStatusCallback,
+      };
+      const eventStream = retryEventTurnOnContextOverflow(
+        (attempt) =>
+          attempt === 0 ? startTurn() : activeAgent.streamWithEvents([], runConfig, ac.signal),
+        overflowHost
+      );
 
       for await (const event of eventStream) {
         switch (event.type) {
@@ -842,15 +947,40 @@ export async function startAgUiServer(
             break;
           }
           case 'reasoning_end': {
-            if (reasoningMessageId) {
-              res.write(
-                encoder.encode({
-                  type: EventType.REASONING_MESSAGE_END,
-                  messageId: reasoningMessageId,
-                })
-              );
-              reasoningMessageId = null;
-            }
+            endReasoning();
+            break;
+          }
+          case 'context_compacted': {
+            // [[EXT-174]] — the session folded the conversation mid-turn and is asking the model
+            // again. AG-UI has no event for a notice about the session, and each event it does
+            // have fails for the reason EXT-167 rejected the stream's own variants: a text message
+            // reaches the client's history and is replayed to the model as the assistant's words
+            // on the next turn; a tool result needs a call; `RUN_FINISHED`'s `result` is the end of
+            // the run, and this happened in the middle of it. `CUSTOM` is the protocol's extension
+            // point — the client's verifier passes it at any point in a run, and a client with no
+            // handler for the name ignores it, which is the right degradation. The value carries
+            // the numbers AND the rendered notice, as `RUN_FINISHED.result.termination` does: a
+            // client can act on the fact without parsing prose, and show the sentence without
+            // inventing wording of its own.
+            //
+            // Any open text run or reasoning message is closed first, as before a tool call: what
+            // follows was produced with the summary in place of the older messages, so it is a new
+            // message rather than an append to one the client already holds — and a
+            // `TEXT_MESSAGE_START` while another text message is open is a protocol error.
+            endTextRun();
+            endReasoning();
+            const value: AgUiContextCompactedValue = {
+              cause: event.cause,
+              compaction: event.compaction,
+              notice: overflowCompactionNotice(event.compaction),
+            };
+            res.write(
+              encoder.encode({
+                type: EventType.CUSTOM,
+                name: AGUI_CONTEXT_COMPACTED_EVENT,
+                value,
+              })
+            );
             break;
           }
         }
@@ -934,7 +1064,7 @@ export async function startAgUiServer(
     });
   });
 
-  return new Promise((resolve, reject) => {
+  return new Promise<Server>((resolve, reject) => {
     let settled = false;
 
     // The listen callback firing is NOT evidence of a bind. Express wraps the callback in `once()`
@@ -964,7 +1094,7 @@ export async function startAgUiServer(
         // requested host and claim a reachability nothing measured. Name the port asked for and
         // make no claim about the interface at all.
         displayInfo(`AG-UI server listening on port ${port}`);
-        resolve();
+        resolve(server);
         return;
       }
       const urlHost = formatUrlHost(bound.address);
@@ -1000,7 +1130,7 @@ export async function startAgUiServer(
             `tools this configuration gives it.`
         );
       }
-      resolve();
+      resolve(server);
     });
 
     server.on('error', (err: Error) => {

@@ -178,8 +178,10 @@ The context overflowed, so 9 earlier messages were folded into a summary (13→5
 That is the plain readline surface (`--no-tui`). The TUI says the same thing as a notice inside the
 turn, at the point where the fold happened: the tool calls above it ran and still count, and the
 answer below it was made with the summary standing in for the older messages. The editor
-integrations put the same lines in the conversation. Every surface retries, and the preventive check
-above runs on every surface too.
+integrations put the same lines in the conversation, and the AG-UI server (`gth api ag-ui`) sends
+the web client a `context_compacted` custom event carrying the same numbers and the same notice, at
+the same point in the run — a client that does not handle it shows the turn with the fold
+unannounced. Every surface retries, and the preventive check above runs on every surface too.
 
 A turn is retried once. If the conversation still does not fit after being compacted, the turn ends
 and says why — folding it again would only eat the recent messages it just kept, so the next move is
