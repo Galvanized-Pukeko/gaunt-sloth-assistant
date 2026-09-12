@@ -185,23 +185,6 @@ interface ToolDisplayEntry {
     input: ToolCallDisplayInput,
     args: Record<string, unknown> | null
   ) => ToolDisplayLine[] | null;
-  /**
-   * [[TUI-C106]] — **last-resort args, recovered from the tool's own RESULT.**
-   *
-   * Consulted only by {@link summariseToolCallWithResult}, and only when there are no parsed
-   * arguments to summarise — i.e. exactly when the summary would otherwise be `name()` or
-   * `name(…)` and name nothing. Some tools bake what they acted on into their result text; where
-   * they do, that text is a second, independent source for the one thing the summary line exists
-   * to carry.
-   *
-   * Return a record in the same shape a parsed args buffer would have had (so the entry's
-   * {@link summariseArgs} filter still applies and the value still goes through redaction,
-   * neutralisation and the width cap), or `null` when the result says nothing usable.
-   *
-   * **This is a fallback, never a substitute.** A real args buffer always wins; the recovered
-   * record only ever fills a line that would otherwise be blank.
-   */
-  argsFromResult?: (result: string) => Record<string, unknown> | null;
 }
 
 const FALLBACK_GLYPH = '⚙';
@@ -516,51 +499,6 @@ function formatEditFileBody(
 }
 
 /* ------------------------------------------------------------------------- *
- * Result-derived arguments (the TUI-C106 fallback)                           *
- * ------------------------------------------------------------------------- */
-
-/** How far into a result we look for its heading. A heading is the first line or it is absent. */
-const RESULT_HEAD_SCAN_LIMIT = 512;
-
-/**
- * The two headings `ghReadFileTool` puts in front of what it read, and the suffix the truncated
- * one carries before its colon. Kept as literals rather than a regex on purpose: the input is
- * unbounded, attacker-influenced file text, and a linear `startsWith`/`slice` walk cannot
- * backtrack at all (the [[EXT-69]] defect class). They are also the ONLY coupling to that tool's
- * wording, and nothing in the build would catch it drifting — core cannot import the review
- * package. `packages/review/spec/ghReadFileTool.spec.ts` closes that from the side that OWNS the
- * wording: it drives the real tool and asserts this extractor still finds the file, so a reworded
- * heading fails there rather than silently emptying this line.
- */
-const GH_READ_FILE_RESULT_HEADS = ['Full contents of ', 'Partial contents of '] as const;
-const GH_READ_FILE_TRUNCATED_SUFFIX = ' (truncated)';
-
-/**
- * Recover the file `gth_gh_read_file` actually read, from the heading it bakes into its own
- * result (`Full contents of <owner>/<repo>/<path>@<ref>:`).
- *
- * The recovered value is the tool's REPORT of what it read, which is a superset of the `path` the
- * model asked for — it carries the owner/repo/ref binding the model is deliberately not allowed to
- * supply. It is keyed as `path` anyway, because that is the key the registry entry's
- * `summariseArgs` filter admits and because it is the same thing named a different way; the line
- * it produces names the file, which is the whole point of the fallback.
- */
-function ghReadFileArgsFromResult(result: string): Record<string, unknown> | null {
-  const head = result.slice(0, RESULT_HEAD_SCAN_LIMIT).split('\n', 1)[0] ?? '';
-  for (const prefix of GH_READ_FILE_RESULT_HEADS) {
-    if (!head.startsWith(prefix)) continue;
-    let label = head.slice(prefix.length);
-    if (!label.endsWith(':')) return null;
-    label = label.slice(0, -1);
-    if (label.endsWith(GH_READ_FILE_TRUNCATED_SUFFIX)) {
-      label = label.slice(0, -GH_READ_FILE_TRUNCATED_SUFFIX.length);
-    }
-    return label.length > 0 ? { path: label } : null;
-  }
-  return null;
-}
-
-/* ------------------------------------------------------------------------- *
  * The registry                                                               *
  * ------------------------------------------------------------------------- */
 
@@ -584,16 +522,7 @@ const TOOL_DISPLAY_REGISTRY: Record<string, ToolDisplayEntry> = {
   // any depth. Stripping it would make exactly the run this node came from strictly worse. No
   // `formatBody` is registered, so the generic body rendering is unchanged.
   //
-  // [[TUI-C106]] — and `argsFromResult` is the other half of that same decision. Keeping the
-  // preamble in the BODY only helps at a preview depth that still draws a body; at depth 0 the
-  // summary line is all there is. Reading the filename back out of the preamble puts it on the one
-  // line that always survives. It is a residue reader, not the repair for issue #445 — that is the
-  // observer lifetime in `GthAbstractAgent`; see {@link summariseToolCallWithResult}.
-  [GH_READ_FILE_TOOL_NAME]: {
-    glyph: FILE_GLYPH,
-    summariseArgs: ['path'],
-    argsFromResult: ghReadFileArgsFromResult,
-  },
+  [GH_READ_FILE_TOOL_NAME]: { glyph: FILE_GLYPH, summariseArgs: ['path'] },
   read_multiple_files: { glyph: FILE_GLYPH, summariseArgs: ['paths'] },
   gth_read_binary: { glyph: FILE_GLYPH, summariseArgs: ['path'] },
   write_file: { glyph: FILE_GLYPH, summariseArgs: ['path'], formatBody: formatWriteFileBody },
@@ -699,44 +628,6 @@ export function summariseToolCall(
   // Idempotent over the values, whose escape alphabet (`\`, `x`, `u`, `{`, `}`, hex) holds nothing
   // for it to rewrite.
   return neutralizeUntrustedText(redactText(`${label}(${inner})`, secrets));
-}
-
-/**
- * [[TUI-C106]] — {@link summariseToolCall}, with the tool's own RESULT as a second source for the
- * summary when the call's arguments never reached this layer.
- *
- * **Use this at every site that has a result in hand.** A tool call whose arguments were never
- * associated with its `tool_call_id` renders `name()` — empty parentheses at every preview depth,
- * which defeats the whole point of [[TUI-C105]]'s depth-0 setting, whose one surviving line exists
- * to name the file.
- *
- * **This is NOT the fix for that, and must not be read as one.** The arguments behind issue #445
- * were never missing: they were accumulated correctly and then discarded when the turn crossed a
- * `streamFromInput` boundary at an approval gate, and the repair is the observer's lifetime in
- * `GthAbstractAgent` — see `plainToolIndicationAcrossResume.spec.ts`, which pins it on a tool that
- * declares no reader here and so cannot be rescued by this path. What remains for a reader is the
- * residue: a result whose producer this process never observed at all, because the fold began
- * mid-turn. A registry entry may then declare an `argsFromResult` reader and the result is read
- * for what the call acted on.
- *
- * **The fallback engages only when there is nothing to summarise** — no parsed args, from an
- * absent buffer or an unparsable one. A parsed buffer always wins, so the path that works today
- * (`read_file(path=notes.txt)`) is byte-for-byte unchanged and cannot regress through here. The
- * recovered record is handed to {@link summariseToolCall} rather than rendered directly, so it
- * goes through the same per-value formatting, redaction, neutralisation and width cap as a real
- * one — the [[TUI-C102]] ordering is not re-implemented here, it is reused.
- */
-export function summariseToolCallWithResult(
-  name: string,
-  argsText: string | undefined,
-  result: string | undefined,
-  secrets: readonly string[] = getDefaultSecrets()
-): string {
-  if (parseToolArgsSafe(argsText) === null && typeof result === 'string' && result.length > 0) {
-    const recovered = TOOL_DISPLAY_REGISTRY[name]?.argsFromResult?.(result);
-    if (recovered) return summariseToolCall(name, JSON.stringify(recovered), secrets);
-  }
-  return summariseToolCall(name, argsText, secrets);
 }
 
 /* ------------------------------------------------------------------------- *

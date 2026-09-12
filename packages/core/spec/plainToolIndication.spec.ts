@@ -478,7 +478,7 @@ describe('plainToolIndication (TUI-C30 — the --no-tui / piped surface)', () =>
     const head = (sink: ReturnType<typeof vi.fn>, call = 0): string =>
       (sink.mock.calls[call][0] as string).split('\n')[1];
 
-    it('shape B: the deltas carried no tool-call id, and the result still names the file', async () => {
+    it('shape B: the deltas carried no tool-call id, and the row still names the file', async () => {
       const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
       const sink = vi.fn();
       const observer = createPlainToolIndication(sink);
@@ -495,7 +495,8 @@ describe('plainToolIndication (TUI-C30 — the --no-tui / piped surface)', () =>
       );
 
       expect(sink).toHaveBeenCalledTimes(1);
-      // The ARGUMENTS were recovered, so this is the model's own path, not the result-derived one.
+      // Recovered from the round's own tracking — the model's arguments, never read back out of
+      // the result text.
       expect(head(sink)).toContain('gth_gh_read_file(path=src/tenant/Community.ts)');
     });
 
@@ -518,35 +519,6 @@ describe('plainToolIndication (TUI-C30 — the --no-tui / piped surface)', () =>
       );
 
       expect(head(sink)).toContain('gth_gh_read_file(path=src/tenant/Community.ts)');
-    });
-
-    it('shape D: no producer was observed at all, so the file comes from the result heading', async () => {
-      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
-      const sink = vi.fn();
-      const observer = createPlainToolIndication(sink);
-      // Nothing to recover: the only place the filename appears is the preamble the tool itself
-      // bakes into its result.
-      observer.observe(
-        new ToolMessage({ content: GH_RESULT, tool_call_id: 'orphan', name: 'gth_gh_read_file' })
-      );
-
-      expect(head(sink)).toContain('acme/widgets/src/tenant/Community.ts@main');
-    });
-
-    it('reads the file out of a TRUNCATED result heading too', async () => {
-      const { createPlainToolIndication } = await import('#src/core/plainToolIndication.js');
-      const sink = vi.fn();
-      const observer = createPlainToolIndication(sink);
-      observer.observe(
-        new ToolMessage({
-          content: 'Partial contents of acme/widgets/big.ts@main (truncated):\n\nhalf a file',
-          tool_call_id: 'orphan',
-          name: 'gth_gh_read_file',
-        })
-      );
-
-      expect(head(sink)).toContain('acme/widgets/big.ts@main');
-      expect(head(sink)).not.toContain('truncated');
     });
 
     it('two parallel calls whose deltas carry NO chunk index each name their own file', async () => {
@@ -576,11 +548,13 @@ describe('plainToolIndication (TUI-C30 — the --no-tui / piped surface)', () =>
       );
 
       expect(sink).toHaveBeenCalledTimes(2);
-      expect(head(sink, 0)).toContain('acme/widgets/a.ts@main');
-      expect(head(sink, 1)).toContain('acme/widgets/b.ts@main');
+      // Each row carries the MODEL's own argument for that call, recovered from tracking: the id
+      // outranks the shared index, so the two calls never merged in the first place.
+      expect(head(sink, 0)).toContain('gth_gh_read_file(path=a.ts)');
+      expect(head(sink, 1)).toContain('gth_gh_read_file(path=b.ts)');
       // Neither row may claim the other's file — the whole hazard of a merged entry.
       expect(head(sink, 0)).not.toContain('b.ts');
-      expect(head(sink, 1)).not.toContain('a.ts@main');
+      expect(head(sink, 1)).not.toContain('path=a.ts');
     });
 
     it('never attributes a LATER round result to an earlier round unclaimed call', async () => {

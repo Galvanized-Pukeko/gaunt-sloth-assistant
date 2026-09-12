@@ -28,7 +28,7 @@ import {
   buildToolBodyLines,
   buildToolExpansionText,
   buildToolPreviewLines,
-  summariseToolCallWithResult,
+  summariseToolCall,
 } from '@gaunt-sloth/core/core/toolDisplay.js';
 import { approvalStopRows } from '@gaunt-sloth/core/core/shell/approvalStop.js';
 import { terminationNotice } from '@gaunt-sloth/core/core/terminationNotice.js';
@@ -101,11 +101,7 @@ function toolCallRows(tc: ToolCallViewModel, expanded: boolean, columns: number)
   };
   // The summary is measured without the caret/status/tool glyphs that precede it and without the
   // trailing status word, so the count stays under what the line really occupies.
-  // [[TUI-C106]] — measured through the SAME builder the panel paints with. A result-derived
-  // fallback label is wider than the `name()` it replaces, so an oracle still counting the old
-  // form would put this window and the renderer out of lockstep on exactly the calls the fallback
-  // exists for.
-  let rows = textRows(summariseToolCallWithResult(tc.name, tc.argsText, tc.result), columns);
+  let rows = textRows(summariseToolCall(tc.name, tc.argsText), columns);
   // [[TUI-C102]] — the args text and the notice are measured from `buildToolExpansionText`, which
   // is the function the panel PAINTS from. Neutralised text is wider than the raw text it replaces
   // (`\x1b[2J` is eight columns where the sequence was none), so counting the raw strings beside a

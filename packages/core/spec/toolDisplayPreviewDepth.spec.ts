@@ -166,44 +166,21 @@ describe('tool-output preview depth (TUI-C105)', () => {
       expect([summary, ...body.map((l) => l.text)]).toHaveLength(1);
     });
 
-    /**
-     * [[TUI-C106]] — what was TUI-C105's labelled residual, now asserting the behaviour that
-     * closed it. Kept in place, and kept at depth 0, because the framing is the point: this is the
-     * shape of the run the node came from, where the display layer never learned the call's
-     * arguments, and depth 0 is where it hurts — the preamble that names the file goes with the
-     * body, leaving the summary as the only line that could carry it.
+    /*
+     * [[TUI-C105]]'s labelled residual — a call whose arguments never reached this layer, whose one
+     * surviving line at depth 0 then named nothing — USED TO BE ASSERTED HERE, and deliberately is
+     * not any more.
      *
-     * The arguments are still missing (they go missing upstream of this module and some shapes
-     * genuinely cannot carry them). What changed is that the summary no longer gives up: read
-     * through {@link summariseToolCallWithResult}, the tool's own result heading is a second source
-     * for the one thing this line exists to say.
+     * [[TUI-C106]] found why those arguments went missing, and it is not a rendering question at
+     * all: they were accumulated correctly and then discarded when the turn crossed a
+     * `streamFromInput` boundary at an approval gate. Nothing this module could assert would have
+     * caught that, and a residual pinned here would go on passing while the defect was live.
+     *
+     * **It is pinned in `packages/core/spec/plainToolIndicationAcrossResume.spec.ts` instead**,
+     * which drives the real agent across the real `stream()` → `streamResume()` pair and fails
+     * with exactly the row issue #445 reported. That is the residual's real home: the cell that
+     * reproduces the defect rather than the one that renders its symptom.
      */
-    it('with untracked args, the one line depth 0 leaves NAMES THE FILE', async () => {
-      const { buildToolPreviewLines, summariseToolCallWithResult, setToolDisplayConfig } =
-        await load();
-      setToolDisplayConfig({ toolOutputPreviewLines: 0 });
-
-      const result = `Full contents of acme/widgets/src/tenant/Community.ts@main:\n\n${TWELVE_LINES}`;
-      const summary = summariseToolCallWithResult('gth_gh_read_file', undefined, result, []);
-      const body = buildToolPreviewLines({ name: 'gth_gh_read_file', result }, []);
-
-      expect(body).toEqual([]);
-      expect(summary).toContain('src/tenant/Community.ts');
-      expect(summary).not.toBe('gth_gh_read_file()');
-    });
-
-    /**
-     * The other half of the same claim: the fallback is a fallback. With no result to read, the
-     * line still cannot name anything, and it must not invent one.
-     */
-    it('still renders empty parentheses when there is no result to read either', async () => {
-      const { summariseToolCallWithResult, setToolDisplayConfig } = await load();
-      setToolDisplayConfig({ toolOutputPreviewLines: 0 });
-
-      expect(summariseToolCallWithResult('gth_gh_read_file', undefined, undefined, [])).toBe(
-        'gth_gh_read_file()'
-      );
-    });
   });
 
   describe('secret redaction survives every depth (TUI-C102 order is untouched)', () => {

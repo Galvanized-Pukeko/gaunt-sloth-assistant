@@ -34,7 +34,7 @@ import {
   getToolGlyph,
   isShellShapedResult,
   renderToolLineAnsi,
-  summariseToolCallWithResult,
+  summariseToolCall,
   toolStatusDisplay,
 } from '#src/core/toolDisplay.js';
 import { displayToolIndication } from '#src/utils/consoleUtils.js';
@@ -174,10 +174,7 @@ export function createPlainToolIndication(
     const status = toolStatusDisplay({ isError, raterClarification });
     const ansi = status.tone === 'error' ? '31' : status.tone === 'warn' ? '33' : '32';
     const statusGlyph = colour ? `\x1b[${ansi}m${status.glyph}\x1b[0m` : status.glyph;
-    // [[TUI-C106]] — the result is a second source for the summary when the arguments never
-    // reached this layer. A parsed args buffer always wins; this only fills a line that would
-    // otherwise be `name()` and say nothing about what was read.
-    const summary = summariseToolCallWithResult(name, tracked?.argsText, result);
+    const summary = summariseToolCall(name, tracked?.argsText);
     const summaryText = colour ? `\x1b[2m${summary}\x1b[0m` : summary;
     const note = raterClarification ? `  [${status.label}]` : '';
     const noteText = colour && note ? `\x1b[33m${note}\x1b[0m` : note;
@@ -215,7 +212,22 @@ export function createPlainToolIndication(
             beginRoundIfSettled();
             for (const delta of deltas) {
               const index = typeof delta.index === 'number' ? delta.index : 0;
-              const entry = streaming.get(index) ?? { name: '', argsText: '' };
+              let entry = streaming.get(index);
+              // [[TUI-C106]] — **the id outranks the index when the two disagree.** A provider that
+              // sends no `index` collapses every call in the round onto 0, so two concurrent calls
+              // would merge into one entry: the first result then finds nothing under its own id and
+              // renders `name()`, and the second finds a concatenated args buffer that cannot parse
+              // and renders `name(…)`. MEASURED on the base build with two `gth_gh_read_file` calls.
+              //
+              // A different id at the same index therefore means a NEW call, so the entry standing
+              // there is parked and a fresh one started. Continuation deltas are unaffected: they
+              // carry the id only on the first delta of a call (or none at all), and `delta.id`
+              // absent never splits.
+              if (entry && delta.id && entry.id && entry.id !== delta.id) {
+                track(entry);
+                entry = undefined;
+              }
+              entry ??= { name: '', argsText: '' };
               if (delta.id) entry.id = delta.id;
               if (delta.name) entry.name = entry.name || delta.name;
               if (delta.args) entry.argsText += delta.args;

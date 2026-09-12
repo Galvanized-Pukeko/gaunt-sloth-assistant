@@ -375,42 +375,4 @@ describe('ghReadFileTool', () => {
       expect((await reviewTool.invoke({ path: 'a.txt' })) as string).not.toContain(MARKER);
     });
   });
-
-  /**
-   * [[TUI-C106]] — **this tool's result heading is a DISPLAY contract, not only prose for the
-   * model.** When a call's arguments never reach the display layer, core reads the file back out
-   * of this heading so the status row still names what was read; the alternative is a row that
-   * says `gth_gh_read_file()` and nothing else.
-   *
-   * Core cannot import this package, so nothing in the build couples the two — the wording could
-   * be changed here and the only symptom would be a status line quietly going empty again. These
-   * assert from the side that OWNS the wording: the real tool produces the result, core's real
-   * extractor reads it, and both headings are covered because they are separate strings.
-   */
-  describe('the result heading is what core recovers the filename from', () => {
-    it('core reads the file out of a FULL-contents heading', async () => {
-      execAsyncMock.mockResolvedValue(contentsResponse('hello world'));
-      const { ghReadFileImpl } = await import('#src/tools/ghReadFileTool.js');
-      const { summariseToolCallWithResult } = await import('@gaunt-sloth/core/core/toolDisplay.js');
-
-      const result = await ghReadFileImpl({ path: 'src/index.ts' }, CTX);
-
-      expect(summariseToolCallWithResult('gth_gh_read_file', undefined, result, [])).toBe(
-        'gth_gh_read_file(path=octocat/hello-world/src/index.ts)'
-      );
-    });
-
-    it('core reads the file out of a PARTIAL-contents heading too', async () => {
-      execAsyncMock.mockResolvedValue(contentsResponse('x'.repeat(500)));
-      const { ghReadFileImpl } = await import('#src/tools/ghReadFileTool.js');
-      const { summariseToolCallWithResult } = await import('@gaunt-sloth/core/core/toolDisplay.js');
-
-      const result = await ghReadFileImpl({ path: 'src/index.ts' }, CTX, 100);
-
-      // The `(truncated)` suffix belongs to the heading, not to the filename.
-      expect(summariseToolCallWithResult('gth_gh_read_file', undefined, result, [])).toBe(
-        'gth_gh_read_file(path=octocat/hello-world/src/index.ts)'
-      );
-    });
-  });
 });

@@ -20,6 +20,16 @@ import type { RunnableConfig } from '@langchain/core/runnables';
  *
  * These cells drive the real agent across the real `stream()` → `streamResume()` pair rather than
  * asserting on the observer alone, because the observer was never wrong: its LIFETIME was.
+ *
+ * ---
+ *
+ * **This file also carries [[TUI-C105]]'s labelled residual**, moved here from
+ * `toolDisplayPreviewDepth.spec.ts`. That residual was written as a rendering question — a call
+ * whose arguments never reached the display layer leaves `toolOutputPreviewLines: 0` with one line
+ * that names nothing — and it could not have been closed where it was written, because the cause
+ * was upstream of every rendering module. The first cell below is what actually closes it: at any
+ * preview depth, the surviving line now carries the arguments, because they are no longer thrown
+ * away at the stream boundary.
  */
 
 const consoleUtilsMock = {

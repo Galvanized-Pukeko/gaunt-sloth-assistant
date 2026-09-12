@@ -5,7 +5,7 @@ import {
   buildToolExpansionText,
   buildToolPreviewLines,
   getToolGlyph,
-  summariseToolCallWithResult,
+  summariseToolCall,
   toolStatusDisplay,
   type ToolDisplayLine,
 } from '@gaunt-sloth/core/core/toolDisplay.js';
@@ -102,9 +102,7 @@ function ToolCallPanel({
 }): React.ReactElement {
   const { glyph, label, color } = toolStatus(tc);
   // Inline shortened params (summariseToolCall handles the empty/unparsable-args fallbacks).
-  // [[TUI-C106]] — with the RESULT as the last-resort source when this call's arguments never
-  // reached the view-model, so the row names the file instead of rendering empty parentheses.
-  const summary = summariseToolCallWithResult(tc.name, tc.argsText, tc.result);
+  const summary = summariseToolCall(tc.name, tc.argsText);
   const caret = expanded ? '▾' : '▸';
   const hasDetail = !!tc.argsText || !!tc.result || !!tc.output || !!tc.notice;
   // Collapsed: the canonical 10-line capped preview. Expanded: the full uncapped body.
